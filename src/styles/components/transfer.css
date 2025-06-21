@@ -1,0 +1,185 @@
+/* Transfer Section Components */
+
+/* Transfer Mode Styles */
+.transfer-section {
+    background: #f8f9fa;
+    border-radius: 12px;
+    padding: 25px;
+    border: 2px solid #e9ecef;
+    display: none;
+}
+
+.transfer-section.active {
+    display: block;
+}
+
+.transfer-flow {
+    display: flex;
+    align-items: center;
+    justify-content: space-around;
+    margin: 30px 0;
+}
+
+.transfer-container {
+    text-align: center;
+    padding: 20px;
+    border: 3px solid #e9ecef;
+    border-radius: 12px;
+    background: white;
+    min-width: 200px;
+}
+
+.transfer-container.filled {
+    border-color: #28a745;
+    background: #f8fff9;
+}
+
+.transfer-arrow {
+    font-size: 2rem;
+    color: #667eea;
+    animation: moveArrow 2s infinite;
+}
+
+.transfer-options {
+    background: #e3f2fd;
+    border: 2px solid #1976d2;
+    border-radius: 8px;
+    padding: 20px;
+    margin: 20px 0;
+    display: none;
+}
+
+.transfer-options.show {
+    display: block;
+}
+
+.transfer-mode-toggle {
+    display: flex;
+    gap: 15px;
+    margin-bottom: 20px;
+    justify-content: center;
+}
+
+.mode-option {
+    flex: 1;
+    padding: 15px;
+    border: 2px solid #e9ecef;
+    border-radius: 8px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    background: white;
+}
+
+.mode-option.selected {
+    border-color: #007bff;
+    background: #f0f4ff;
+}
+
+.mode-option:hover {
+    border-color: #007bff;
+}
+
+.tissue-counter {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 15px;
+    margin: 15px 0;
+}
+
+.counter-btn {
+    width: 40px;
+    height: 40px;
+    border: 2px solid #007bff;
+    background: white;
+    color: #007bff;
+    border-radius: 50%;
+    font-size: 1.2rem;
+    font-weight: bold;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.counter-btn:hover {
+    background: #007bff;
+    color: white;
+}
+
+.counter-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.tissue-count-display {
+    font-size: 2rem;
+    font-weight: bold;
+    color: #007bff;
+    min-width: 60px;
+}
+
+.split-preview {
+    background: #fff3cd;
+    border: 1px solid #ffc107;
+    border-radius: 6px;
+    padding: 15px;
+    margin-top: 15px;
+}
+
+.new-containers-list {
+    background: #e8f5e8;
+    border: 1px solid #28a745;
+    border-radius: 6px;
+    padding: 10px;
+    margin-top: 10px;
+    max-height: 150px;
+    overflow-y: auto;
+}
+
+.new-container-item {
+    font-family: monospace;
+    font-weight: bold;
+    color: #28a745;
+    margin: 2px 0;
+}
+
+.transfer-history {
+    background: #e3f2fd;
+    border: 2px solid #1976d2;
+    border-radius: 8px;
+    padding: 15px;
+    margin-top: 20px;
+    max-height: 300px;
+    overflow-y: auto;
+}
+
+.history-item {
+    padding: 10px;
+    margin: 5px 0;
+    background: white;
+    border-radius: 6px;
+    border-left: 4px solid #1976d2;
+    font-size: 0.9rem;
+}
+
+.transfer-count {
+    display: inline-block;
+    background: #28a745;
+    color: white;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    margin-left: 10px;
+}
+
+.lineage-badge {
+    display: inline-block;
+    padding: 2px 8px;
+    background: #e3f2fd;
+    color: #1976d2;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    margin-left: 5px;
+}
