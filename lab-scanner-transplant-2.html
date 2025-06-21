@@ -1,0 +1,2172 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Lab Barcode Builder & Transfer System</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segura UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 16px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #2c3e50 0%, #34495e 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+
+        .mode-selector {
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+            margin: 20px;
+        }
+
+        .mode-btn {
+            padding: 15px 30px;
+            border: 2px solid #667eea;
+            background: white;
+            color: #667eea;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .mode-btn.active {
+            background: #667eea;
+            color: white;
+        }
+
+        .mode-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+        }
+
+        .file-upload-section {
+            background: #f8f9fa;
+            padding: 20px;
+            border-bottom: 1px solid #e9ecef;
+        }
+
+        .upload-area {
+            border: 2px dashed #dee2e6;
+            border-radius: 12px;
+            padding: 20px;
+            text-align: center;
+            transition: all 0.3s ease;
+            cursor: pointer;
+        }
+
+        .upload-area:hover {
+            border-color: #667eea;
+            background: #f0f4ff;
+        }
+
+        .main-content {
+            display: grid;
+            grid-template-columns: 500px 1fr;
+            gap: 30px;
+            padding: 30px;
+        }
+
+        /* Builder Mode Styles */
+        .builder-section {
+            background: #f8f9fa;
+            border-radius: 12px;
+            padding: 25px;
+            border: 2px solid #e9ecef;
+            display: none;
+        }
+
+        .builder-section.active {
+            display: block;
+        }
+
+        .builder-progress {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 30px;
+            position: relative;
+        }
+
+        .builder-progress::before {
+            content: '';
+            position: absolute;
+            top: 20px;
+            left: 0;
+            right: 0;
+            height: 2px;
+            background: #e9ecef;
+            z-index: 0;
+        }
+
+        .progress-step {
+            position: relative;
+            z-index: 1;
+            text-align: center;
+            flex: 1;
+        }
+
+        .progress-circle {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background: white;
+            border: 3px solid #e9ecef;
+            margin: 0 auto 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            transition: all 0.3s ease;
+        }
+
+        .progress-step.completed .progress-circle {
+            background: #28a745;
+            border-color: #28a745;
+            color: white;
+        }
+
+        .progress-step.active .progress-circle {
+            background: #007bff;
+            border-color: #007bff;
+            color: white;
+            animation: pulse 2s infinite;
+        }
+
+        .progress-label {
+            font-size: 0.75rem;
+            color: #6c757d;
+        }
+
+        .builder-input-section {
+            margin-top: 30px;
+        }
+
+        .builder-prompt {
+            font-size: 1.25rem;
+            font-weight: 600;
+            color: #2c3e50;
+            margin-bottom: 15px;
+            text-align: center;
+        }
+
+        .builder-hint {
+            font-size: 0.9rem;
+            color: #6c757d;
+            text-align: center;
+            margin-bottom: 20px;
+        }
+
+        .builder-options {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 10px;
+            margin-bottom: 20px;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+
+        .option-btn {
+            padding: 12px;
+            border: 2px solid #e9ecef;
+            background: white;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            font-size: 0.9rem;
+        }
+
+        .option-btn:hover {
+            border-color: #007bff;
+            background: #f0f4ff;
+        }
+
+        .generated-barcode {
+            background: #e3f2fd;
+            border: 2px solid #1976d2;
+            border-radius: 8px;
+            padding: 20px;
+            margin-top: 20px;
+            text-align: center;
+            display: none;
+        }
+
+        .generated-barcode.show {
+            display: block;
+        }
+
+        .barcode-display {
+            font-family: 'Courier New', monospace;
+            font-size: 1.5rem;
+            font-weight: bold;
+            color: #1976d2;
+            margin: 10px 0;
+            letter-spacing: 2px;
+        }
+
+        .barcode-breakdown {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            margin-top: 15px;
+            flex-wrap: wrap;
+        }
+
+        .breakdown-part {
+            padding: 5px 10px;
+            background: white;
+            border-radius: 4px;
+            font-size: 0.8rem;
+            border: 1px solid #1976d2;
+        }
+
+        /* Transfer Mode Styles */
+        .transfer-section {
+            background: #f8f9fa;
+            border-radius: 12px;
+            padding: 25px;
+            border: 2px solid #e9ecef;
+            display: none;
+        }
+
+        .transfer-section.active {
+            display: block;
+        }
+
+        .transfer-flow {
+            display: flex;
+            align-items: center;
+            justify-content: space-around;
+            margin: 30px 0;
+        }
+
+        .transfer-container {
+            text-align: center;
+            padding: 20px;
+            border: 3px solid #e9ecef;
+            border-radius: 12px;
+            background: white;
+            min-width: 200px;
+        }
+
+        .transfer-container.filled {
+            border-color: #28a745;
+            background: #f8fff9;
+        }
+
+        .transfer-arrow {
+            font-size: 2rem;
+            color: #667eea;
+            animation: moveArrow 2s infinite;
+        }
+
+        @keyframes moveArrow {
+            0%, 100% { transform: translateX(0); }
+            50% { transform: translateX(10px); }
+        }
+
+        .transfer-options {
+            background: #e3f2fd;
+            border: 2px solid #1976d2;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 20px 0;
+            display: none;
+        }
+
+        .transfer-options.show {
+            display: block;
+        }
+
+        .transfer-mode-toggle {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 20px;
+            justify-content: center;
+        }
+
+        .mode-option {
+            flex: 1;
+            padding: 15px;
+            border: 2px solid #e9ecef;
+            border-radius: 8px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            background: white;
+        }
+
+        .mode-option.selected {
+            border-color: #007bff;
+            background: #f0f4ff;
+        }
+
+        .mode-option:hover {
+            border-color: #007bff;
+        }
+
+        .tissue-counter {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 15px;
+            margin: 15px 0;
+        }
+
+        .counter-btn {
+            width: 40px;
+            height: 40px;
+            border: 2px solid #007bff;
+            background: white;
+            color: #007bff;
+            border-radius: 50%;
+            font-size: 1.2rem;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .counter-btn:hover {
+            background: #007bff;
+            color: white;
+        }
+
+        .counter-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .tissue-count-display {
+            font-size: 2rem;
+            font-weight: bold;
+            color: #007bff;
+            min-width: 60px;
+        }
+
+        .split-preview {
+            background: #fff3cd;
+            border: 1px solid #ffc107;
+            border-radius: 6px;
+            padding: 15px;
+            margin-top: 15px;
+        }
+
+        .new-containers-list {
+            background: #e8f5e8;
+            border: 1px solid #28a745;
+            border-radius: 6px;
+            padding: 10px;
+            margin-top: 10px;
+            max-height: 150px;
+            overflow-y: auto;
+        }
+
+        .new-container-item {
+            font-family: monospace;
+            font-weight: bold;
+            color: #28a745;
+            margin: 2px 0;
+        }
+
+        .transfer-history {
+            background: #e3f2fd;
+            border: 2px solid #1976d2;
+            border-radius: 8px;
+            padding: 15px;
+            margin-top: 20px;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+
+        .history-item {
+            padding: 10px;
+            margin: 5px 0;
+            background: white;
+            border-radius: 6px;
+            border-left: 4px solid #1976d2;
+            font-size: 0.9rem;
+        }
+
+        .transfer-count {
+            display: inline-block;
+            background: #28a745;
+            color: white;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            margin-left: 10px;
+        }
+
+        .lineage-badge {
+            display: inline-block;
+            padding: 2px 8px;
+            background: #e3f2fd;
+            color: #1976d2;
+            border-radius: 4px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            margin-left: 5px;
+        }
+
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.02); }
+            100% { transform: scale(1); }
+        }
+
+        .input-group {
+            margin-bottom: 20px;
+        }
+
+        .input-group label {
+            display: block;
+            font-weight: 600;
+            margin-bottom: 8px;
+            color: #2c3e50;
+            font-size: 1rem;
+            letter-spacing: 0.5px;
+        }
+
+        .barcode-input {
+            width: 100%;
+            padding: 18px;
+            border: 3px solid #e9ecef;
+            border-radius: 12px;
+            font-size: 1.3rem;
+            font-family: 'Courier New', monospace;
+            background: white;
+            transition: all 0.3s ease;
+            text-align: center;
+        }
+
+        .barcode-input:focus {
+            outline: none;
+            border-color: #007bff;
+            box-shadow: 0 0 0 4px rgba(0, 123, 255, 0.1);
+            background: #f8f9ff;
+        }
+
+        .scan-feedback {
+            text-align: center;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 15px 0;
+            font-weight: 600;
+            display: none;
+        }
+
+        .feedback-success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+
+        .feedback-error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+
+        .feedback-info {
+            background: #cce5ff;
+            color: #004085;
+            border: 1px solid #b3d7ff;
+        }
+
+        .btn {
+            padding: 15px 30px;
+            border: none;
+            border-radius: 8px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            width: 100%;
+            margin: 5px 0;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #007bff 0%, #0056b3 100%);
+            color: white;
+        }
+
+        .btn-success {
+            background: #28a745;
+            color: white;
+        }
+
+        .btn-warning {
+            background: #ffc107;
+            color: #212529;
+        }
+
+        .btn-secondary {
+            background: #6c757d;
+            color: white;
+        }
+
+        .btn:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(0,0,0,0.2);
+        }
+
+        .btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .stat-card {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 15px;
+            border-radius: 8px;
+            text-align: center;
+        }
+
+        .inventory-section {
+            background: white;
+            border-radius: 12px;
+            padding: 25px;
+            border: 1px solid #e9ecef;
+        }
+
+        .inventory-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.85rem;
+        }
+
+        .inventory-table th,
+        .inventory-table td {
+            padding: 8px 6px;
+            text-align: left;
+            border-bottom: 1px solid #e9ecef;
+        }
+
+        .inventory-table th {
+            background: #f8f9fa;
+            font-weight: 600;
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+
+        .inventory-table tr:hover {
+            background: #f8f9fa;
+        }
+
+        .current-entry {
+            background: #fff3cd !important;
+            border-left: 4px solid #ffc107;
+        }
+
+        .notification {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            padding: 15px 25px;
+            border-radius: 8px;
+            color: white;
+            font-weight: 600;
+            z-index: 1000;
+            opacity: 0;
+            transform: translateX(100%);
+            transition: all 0.3s ease;
+        }
+
+        .notification.show {
+            opacity: 1;
+            transform: translateX(0);
+        }
+
+        .notification.success { background: #28a745; }
+        .notification.error { background: #dc3545; }
+        .notification.info { background: #17a2b8; }
+
+        .data-status {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px 15px;
+            background: #e9ecef;
+            border-radius: 6px;
+            margin-bottom: 20px;
+            font-size: 0.9rem;
+        }
+
+        .data-status.loaded {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        @media (max-width: 1200px) {
+            .main-content {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🧪 Lab Barcode Builder & Transfer System</h1>
+            <p>Create barcodes and manage container transfers with tissue splitting</p>
+        </div>
+
+        <div class="mode-selector">
+            <button class="mode-btn active" onclick="switchMode('builder')">
+                🏗️ Barcode Builder
+            </button>
+            <button class="mode-btn" onclick="switchMode('transfer')">
+                🔄 Container Transfer
+            </button>
+        </div>
+
+        <div class="file-upload-section">
+            <div class="upload-area" onclick="document.getElementById('fileInput').click()">
+                <input type="file" id="fileInput" accept=".xlsx,.xls" style="display: none;">
+                <h3>📄 Load Your Excel Data File</h3>
+                <p>Click here or drag your "barcode test.xlsx" file to load all reference tables</p>
+            </div>
+            
+            <div class="data-status" id="dataStatus">
+                <span>❌ Excel data not loaded</span>
+                <button class="btn btn-secondary" onclick="document.getElementById('fileInput').click()">Load Excel File</button>
+            </div>
+        </div>
+
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div style="font-size: 1.5rem; font-weight: 700;" id="totalProcessed">0</div>
+                <div style="font-size: 0.8rem;">Processed</div>
+            </div>
+            <div class="stat-card">
+                <div style="font-size: 1.5rem; font-weight: 700;" id="uniqueStrains">0</div>
+                <div style="font-size: 0.8rem;">Strains</div>
+            </div>
+            <div class="stat-card">
+                <div style="font-size: 1.5rem; font-weight: 700;" id="sessionCount">0</div>
+                <div style="font-size: 0.8rem;">This Session</div>
+            </div>
+            <div class="stat-card">
+                <div style="font-size: 1.5rem; font-weight: 700;" id="currentMode">Builder</div>
+                <div style="font-size: 0.8rem;">Current Mode</div>
+            </div>
+        </div>
+
+        <div class="main-content">
+            <!-- Barcode Builder Section -->
+            <div class="builder-section active" id="builderSection">
+                <h2 style="margin-bottom: 20px; color: #2c3e50;">🏗️ Barcode Builder</h2>
+                
+                <div class="builder-progress">
+                    <div class="progress-step active" id="step-container">
+                        <div class="progress-circle">1</div>
+                        <div class="progress-label">Container</div>
+                    </div>
+                    <div class="progress-step" id="step-owner">
+                        <div class="progress-circle">2</div>
+                        <div class="progress-label">Owner</div>
+                    </div>
+                    <div class="progress-step" id="step-strain">
+                        <div class="progress-circle">3</div>
+                        <div class="progress-label">Strain</div>
+                    </div>
+                    <div class="progress-step" id="step-media">
+                        <div class="progress-circle">4</div>
+                        <div class="progress-label">Media</div>
+                    </div>
+                    <div class="progress-step" id="step-stage">
+                        <div class="progress-circle">5</div>
+                        <div class="progress-label">Stage</div>
+                    </div>
+                    <div class="progress-step" id="step-tissue">
+                        <div class="progress-circle">6</div>
+                        <div class="progress-label">Tissue</div>
+                    </div>
+                    <div class="progress-step" id="step-date">
+                        <div class="progress-circle">7</div>
+                        <div class="progress-label">Date</div>
+                    </div>
+                </div>
+
+                <div class="builder-input-section">
+                    <div class="builder-prompt" id="builderPrompt">
+                        Enter or scan the Container ID:
+                    </div>
+                    <div class="builder-hint" id="builderHint">
+                        Scan or type the container number
+                    </div>
+
+                    <div class="input-group">
+                        <input type="text" id="builderInput" class="barcode-input" 
+                               placeholder="Scan or type here..." autocomplete="off">
+                    </div>
+
+                    <div class="builder-options" id="builderOptions">
+                        <!-- Options will be populated dynamically -->
+                    </div>
+
+                    <div class="scan-feedback" id="builderFeedback">
+                        Feedback will appear here
+                    </div>
+
+                    <button class="btn btn-primary" id="builderNextBtn" onclick="nextBuilderStep()">
+                        Next Step →
+                    </button>
+                    <button class="btn btn-secondary" onclick="resetBuilder()">
+                        Start Over
+                    </button>
+                </div>
+
+                <div class="generated-barcode" id="generatedBarcode">
+                    <h3 style="margin-bottom: 10px;">✅ Barcode Generated!</h3>
+                    <div style="font-weight: 600; color: #28a745; margin-bottom: 10px;">
+                        Container: <span id="finalContainerId" style="font-family: monospace;"></span>
+                    </div>
+                    <div class="barcode-display" id="barcodeDisplay">
+                        <!-- Generated barcode will appear here -->
+                    </div>
+                    <div class="barcode-breakdown" id="barcodeBreakdown">
+                        <!-- Breakdown will appear here -->
+                    </div>
+                    <button class="btn btn-success" onclick="useGeneratedBarcode()" style="margin-top: 15px;">
+                        Save to Inventory
+                    </button>
+                </div>
+            </div>
+
+            <!-- Container Transfer Section -->
+            <div class="transfer-section" id="transferSection">
+                <h2 style="margin-bottom: 20px; color: #2c3e50;">🔄 Container Transfer</h2>
+                
+                <div class="transfer-flow">
+                    <div class="transfer-container" id="sourceContainer">
+                        <h3>📦 Source Container</h3>
+                        <p style="margin: 10px 0; font-size: 1.5rem; font-weight: bold;" id="sourceContainerValue">-</p>
+                        <div style="font-size: 0.9rem; color: #6c757d;" id="sourceSummary">Scan to see contents</div>
+                        <input type="text" id="sourceContainerInput" class="barcode-input" 
+                               placeholder="Scan source..." autocomplete="off" style="margin-top: 10px;">
+                    </div>
+                    
+                    <div class="transfer-arrow">→</div>
+                    
+                    <div class="transfer-container" id="destContainer">
+                        <h3>📦 Destination</h3>
+                        <p style="margin: 10px 0; font-size: 1.5rem; font-weight: bold;" id="destContainerValue">-</p>
+                        <div style="font-size: 0.9rem; color: #6c757d;" id="destSummary">Single or multiple containers</div>
+                        <input type="text" id="destContainerInput" class="barcode-input" 
+                               placeholder="Scan destination..." autocomplete="off" style="margin-top: 10px;">
+                    </div>
+                </div>
+
+                <div class="scan-feedback" id="transferFeedback">
+                    Transfer feedback will appear here
+                </div>
+
+                <div class="transfer-options" id="transferOptions">
+                    <h3 style="margin-bottom: 15px;">🌱 Transfer Options</h3>
+                    
+                    <div class="transfer-mode-toggle">
+                        <div class="mode-option selected" id="singleTransferOption" onclick="selectTransferMode('single')">
+                            <h4>📦 Single Container</h4>
+                            <p style="font-size: 0.9rem; color: #6c757d; margin-top: 5px;">
+                                Move all samples to one destination
+                            </p>
+                        </div>
+                        <div class="mode-option" id="splitTransferOption" onclick="selectTransferMode('split')">
+                            <h4>🌱 Split Tissues</h4>
+                            <p style="font-size: 0.9rem; color: #6c757d; margin-top: 5px;">
+                                Divide samples across new containers
+                            </p>
+                        </div>
+                    </div>
+
+                    <div id="singleTransferDetails" style="display: block;">
+                        <p style="text-align: center; color: #6c757d;">
+                            Ready to transfer <span id="singleTransferCount" style="font-weight: bold;">0</span> samples
+                        </p>
+                    </div>
+
+                    <div id="splitTransferDetails" style="display: none;">
+                        <div style="text-align: center;">
+                            <label>Number of New Containers:</label>
+                            <div class="tissue-counter">
+                                <button class="counter-btn" id="decreaseBtn" onclick="adjustSplitCount(-1)">-</button>
+                                <div class="tissue-count-display" id="splitCount">2</div>
+                                <button class="counter-btn" id="increaseBtn" onclick="adjustSplitCount(1)">+</button>
+                            </div>
+                            <div style="font-size: 0.8rem; color: #6c757d; margin-top: 5px;" id="splitHint">
+                                Each container will get equal tissues
+                            </div>
+                        </div>
+
+                        <div class="split-preview" id="splitPreview" style="display: none;">
+                            <div id="splitSummary">
+                                <!-- Split summary will appear here -->
+                            </div>
+                            <div class="new-containers-list" id="newContainersList">
+                                <!-- New container IDs will appear here -->
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div style="margin-top: 25px;">
+                    <button class="btn btn-primary" id="transferBtn" onclick="processTransfer()" disabled>
+                        Process Transfer
+                    </button>
+                    <button class="btn btn-secondary" onclick="clearTransfer()">
+                        Clear Transfer
+                    </button>
+                </div>
+
+                <div class="transfer-history" id="transferHistory" style="display: none;">
+                    <h3 style="margin-bottom: 10px;">📋 Recent Transfers</h3>
+                    <div id="transferHistoryList">
+                        <!-- Transfer history will be populated here -->
+                    </div>
+                </div>
+            </div>
+
+            <div class="inventory-section">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                    <h2 style="color: #2c3e50;">📦 Inventory Log</h2>
+                    <div>
+                        <button class="btn btn-success" onclick="exportInventory()">Export Excel</button>
+                        <button class="btn btn-secondary" onclick="clearInventory()">Clear Log</button>
+                    </div>
+                </div>
+
+                <div style="max-height: 600px; overflow-y: auto; border: 1px solid #e9ecef; border-radius: 6px;">
+                    <table class="inventory-table">
+                        <thead>
+                            <tr>
+                                <th>Container</th>
+                                <th>Lineage</th>
+                                <th>Sample Barcode</th>
+                                <th>Strain</th>
+                                <th>Owner</th>
+                                <th>Stage</th>
+                                <th>Media</th>
+                                <th>Count</th>
+                                <th>Date</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody id="inventoryTableBody">
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="notification" class="notification"></div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script>
+        // Application state
+        let inventoryLog = [];
+        let currentContainer = null;
+        let currentSample = null;
+        let currentMetadata = null;
+        let sessionCounter = 0;
+        let isDataLoaded = false;
+        let currentMode = 'builder';
+
+        // Container Transfer state
+        let transferState = {
+            source: null,
+            sourceData: null,
+            destination: null,
+            mode: 'single', // 'single' or 'split'
+            splitCount: 2,
+            maxSplitCount: 10,
+            totalTissueCount: 0
+        };
+
+        // Container lineage tracking
+        let containerLineage = {}; // Maps container IDs to their history
+        let transferHistory = []; // List of all transfers
+
+        // Container ID counter for generating new IDs
+        let highestContainerId = 0; // Track the highest container ID used
+
+        // Barcode Builder state
+        let builderState = {
+            currentStep: 0,
+            steps: ['container', 'owner', 'strain', 'media', 'stage', 'tissue', 'date'],
+            values: {
+                container: null,
+                owner: null,
+                strain: null,
+                media: null,
+                stage: null,
+                tissue: null,
+                date: null
+            },
+            metadata: {
+                ownerName: null,
+                strainName: null,
+                mediaName: null,
+                stageName: null
+            }
+        };
+
+        // Data tables
+        let strainsTable = {};
+        let ownersTable = {};
+        let stagesTable = {};
+        let locationsTable = [];
+        let mediaTypesTable = {};
+
+        // Mode switching function
+        function switchMode(mode) {
+            currentMode = mode;
+            
+            // Update mode buttons
+            document.querySelectorAll('.mode-btn').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            event.target.classList.add('active');
+            
+            // Hide all sections
+            document.getElementById('builderSection').classList.remove('active');
+            document.getElementById('transferSection').classList.remove('active');
+            
+            // Show/hide sections based on mode
+            if (mode === 'builder') {
+                document.getElementById('builderSection').classList.add('active');
+                document.getElementById('currentMode').textContent = 'Builder';
+                focusBuilderInput();
+            } else if (mode === 'transfer') {
+                document.getElementById('transferSection').classList.add('active');
+                document.getElementById('currentMode').textContent = 'Transfer';
+                document.getElementById('sourceContainerInput').focus();
+                updateTransferHistory();
+            }
+        }
+
+        // Function to get the next container ID
+        function getNextContainerId() {
+            // Update highest container ID from all existing containers
+            inventoryLog.forEach(entry => {
+                const containerId = parseInt(entry.containerId);
+                if (!isNaN(containerId) && containerId > highestContainerId) {
+                    highestContainerId = containerId;
+                }
+            });
+            
+            // Also check current container being processed
+            if (currentContainer) {
+                const currentId = parseInt(currentContainer);
+                if (!isNaN(currentId) && currentId > highestContainerId) {
+                    highestContainerId = currentId;
+                }
+            }
+            
+            // Return the next sequential ID
+            return highestContainerId + 1;
+        }
+
+        // Transfer Functions
+        function handleSourceContainerScan() {
+            const input = document.getElementById('sourceContainerInput').value.trim();
+            if (!input) return;
+
+            // Find all samples in this container
+            const containerSamples = inventoryLog.filter(entry => entry.containerId === input);
+            if (containerSamples.length === 0) {
+                showTransferFeedback(`❌ No samples found in container ${input}`, 'error');
+                document.getElementById('sourceContainerInput').value = '';
+                return;
+            }
+
+            // Calculate total tissue count
+            const totalTissueCount = containerSamples.reduce((sum, entry) => {
+                const count = parseInt(entry.tissueCount) || 0;
+                return sum + count;
+            }, 0);
+
+            transferState.source = input;
+            transferState.sourceData = containerSamples;
+            transferState.totalTissueCount = totalTissueCount;
+            transferState.maxSplitCount = Math.min(totalTissueCount - 1, 10); // Keep at least 1 in original
+
+            document.getElementById('sourceContainerValue').textContent = input;
+            document.getElementById('sourceSummary').textContent = `${totalTissueCount} tissue samples, ${containerSamples.length} entries`;
+            document.getElementById('sourceContainer').classList.add('filled');
+            
+            showTransferFeedback(`✅ Source container ${input} scanned (${totalTissueCount} samples)`, 'success');
+            
+            // Show transfer options if there are multiple tissue samples
+            if (totalTissueCount > 1) {
+                document.getElementById('transferOptions').classList.add('show');
+                document.getElementById('singleTransferCount').textContent = totalTissueCount;
+                updateSplitPreview();
+            }
+            
+            // Clear input and move to destination
+            document.getElementById('sourceContainerInput').value = '';
+            document.getElementById('destContainerInput').focus();
+            
+            checkReadyToTransfer();
+        }
+
+        function handleDestContainerScan() {
+            const input = document.getElementById('destContainerInput').value.trim();
+            if (!input) return;
+
+            if (input === transferState.source) {
+                showTransferFeedback('❌ Destination cannot be the same as source', 'error');
+                document.getElementById('destContainerInput').value = '';
+                return;
+            }
+
+            // In single mode, this is the destination container
+            // In split mode, this input is ignored and we'll generate new IDs
+            if (transferState.mode === 'single') {
+                transferState.destination = input;
+                document.getElementById('destContainerValue').textContent = input;
+                document.getElementById('destContainer').classList.add('filled');
+                
+                showTransferFeedback(`✅ Destination container ${input} scanned`, 'success');
+            } else {
+                // In split mode, we don't need a destination scan
+                showTransferFeedback('ℹ️ In split mode, new containers will be generated automatically', 'info');
+            }
+            
+            // Clear input
+            document.getElementById('destContainerInput').value = '';
+            
+            checkReadyToTransfer();
+        }
+
+        function selectTransferMode(mode) {
+            transferState.mode = mode;
+            
+            // Update UI
+            document.getElementById('singleTransferOption').classList.toggle('selected', mode === 'single');
+            document.getElementById('splitTransferOption').classList.toggle('selected', mode === 'split');
+            
+            document.getElementById('singleTransferDetails').style.display = mode === 'single' ? 'block' : 'none';
+            document.getElementById('splitTransferDetails').style.display = mode === 'split' ? 'block' : 'none';
+            
+            if (mode === 'split') {
+                document.getElementById('destContainerValue').textContent = 'Auto-generate';
+                document.getElementById('destSummary').textContent = `${transferState.splitCount} new containers`;
+                document.getElementById('destContainer').classList.add('filled');
+                updateSplitPreview();
+            } else {
+                document.getElementById('destContainerValue').textContent = transferState.destination || '-';
+                document.getElementById('destSummary').textContent = 'Single or multiple containers';
+                if (!transferState.destination) {
+                    document.getElementById('destContainer').classList.remove('filled');
+                }
+            }
+            
+            checkReadyToTransfer();
+        }
+
+        function adjustSplitCount(delta) {
+            const newCount = transferState.splitCount + delta;
+            if (newCount < 2 || newCount > transferState.maxSplitCount) return;
+
+            transferState.splitCount = newCount;
+            document.getElementById('splitCount').textContent = newCount;
+            document.getElementById('destSummary').textContent = `${newCount} new containers`;
+
+            // Update button states
+            document.getElementById('decreaseBtn').disabled = newCount <= 2;
+            document.getElementById('increaseBtn').disabled = newCount >= transferState.maxSplitCount;
+
+            updateSplitPreview();
+        }
+
+        function updateSplitPreview() {
+            if (transferState.mode !== 'split' || !transferState.sourceData) return;
+
+            const tissuesPerNewContainer = Math.floor(transferState.totalTissueCount / (transferState.splitCount + 1));
+            const remainingInOriginal = transferState.totalTissueCount - (tissuesPerNewContainer * transferState.splitCount);
+
+            document.getElementById('splitSummary').innerHTML = `
+                <strong>Original Container ${transferState.source}:</strong> ${remainingInOriginal} tissue samples<br>
+                <strong>New Containers:</strong> ${transferState.splitCount} containers with ${tissuesPerNewContainer} sample(s) each
+            `;
+
+            // Generate preview of new container IDs
+            const newContainerIds = [];
+            const startId = getNextContainerId();
+            for (let i = 0; i < transferState.splitCount; i++) {
+                newContainerIds.push((startId + i).toString());
+            }
+
+            const containersList = document.getElementById('newContainersList');
+            containersList.innerHTML = newContainerIds.map(id => 
+                `<div class="new-container-item">📦 Container ${id} → ${tissuesPerNewContainer} tissue sample(s)</div>`
+            ).join('');
+
+            document.getElementById('splitPreview').style.display = 'block';
+            document.getElementById('splitHint').textContent = `Max ${transferState.maxSplitCount} containers (keeping 1 in original)`;
+        }
+
+        function checkReadyToTransfer() {
+            const transferBtn = document.getElementById('transferBtn');
+            
+            if (transferState.mode === 'single') {
+                // For single transfer, need both source and destination
+                if (transferState.source && transferState.destination) {
+                    transferBtn.disabled = false;
+                    transferBtn.textContent = 'Process Transfer';
+                } else {
+                    transferBtn.disabled = true;
+                    if (!transferState.source && !transferState.destination) {
+                        transferBtn.textContent = 'Scan Both Containers';
+                    } else if (!transferState.source) {
+                        transferBtn.textContent = 'Scan Source Container';
+                    } else {
+                        transferBtn.textContent = 'Scan Destination Container';
+                    }
+                }
+            } else {
+                // For split transfer, only need source
+                if (transferState.source) {
+                    transferBtn.disabled = false;
+                    transferBtn.textContent = `Split into ${transferState.splitCount} Containers`;
+                } else {
+                    transferBtn.disabled = true;
+                    transferBtn.textContent = 'Scan Source Container';
+                }
+            }
+        }
+
+        function processTransfer() {
+            if (!transferState.source) {
+                showNotification('Please scan source container', 'error');
+                return;
+            }
+
+            if (transferState.mode === 'single') {
+                processSingleTransfer();
+            } else {
+                processSplitTransfer();
+            }
+        }
+
+        function processSingleTransfer() {
+            if (!transferState.destination) {
+                showNotification('Please scan destination container', 'error');
+                return;
+            }
+
+            // Find all samples in the source container
+            const samplesToTransfer = inventoryLog.filter(entry => entry.containerId === transferState.source);
+            
+            if (samplesToTransfer.length === 0) {
+                showNotification('No samples found in source container', 'error');
+                return;
+            }
+
+            // Update container lineage
+            if (!containerLineage[transferState.destination]) {
+                containerLineage[transferState.destination] = [];
+            }
+            
+            // Add source's lineage to destination
+            if (containerLineage[transferState.source]) {
+                containerLineage[transferState.destination] = [...containerLineage[transferState.source]];
+            }
+            containerLineage[transferState.destination].push(transferState.source);
+
+            // Update all samples to the new container
+            samplesToTransfer.forEach(entry => {
+                entry.containerId = transferState.destination;
+                entry.containerLineage = containerLineage[transferState.destination].join(' ← ');
+            });
+
+            // Create transfer record
+            const transfer = {
+                timestamp: new Date(),
+                source: transferState.source,
+                destination: transferState.destination,
+                destinationContainers: [transferState.destination],
+                samplesTransferred: samplesToTransfer.length,
+                tissuesTransferred: transferState.totalTissueCount,
+                transferType: 'Single Container Transfer'
+            };
+
+            // Add to transfer history
+            transferHistory.unshift(transfer);
+
+            showNotification(`Transfer complete: ${transferState.totalTissueCount} samples moved from ${transferState.source} → ${transferState.destination}`, 'success');
+            console.log('Transfer processed:', transfer);
+
+            // Update displays
+            updateTransferHistory();
+            updateInventoryTable();
+            
+            // Clear transfer state
+            setTimeout(() => {
+                clearTransfer();
+            }, 2000);
+        }
+
+        function processSplitTransfer() {
+            const tissuesPerNewContainer = Math.floor(transferState.totalTissueCount / (transferState.splitCount + 1));
+            const remainingInOriginal = transferState.totalTissueCount - (tissuesPerNewContainer * transferState.splitCount);
+
+            // Generate new container IDs
+            const newContainerIds = [];
+            const startId = getNextContainerId();
+            for (let i = 0; i < transferState.splitCount; i++) {
+                newContainerIds.push((startId + i).toString());
+            }
+
+            // Get original data as template
+            const originalData = transferState.sourceData[0];
+
+            // Update original container to have remaining tissue count
+            transferState.sourceData.forEach(entry => {
+                entry.tissueCount = remainingInOriginal;
+            });
+
+            // Create new containers with split samples
+            const newEntries = [];
+            newContainerIds.forEach(containerId => {
+                // Get lineage for new container
+                const sourceLineage = getContainerLineage(transferState.source);
+                if (!containerLineage[containerId]) {
+                    containerLineage[containerId] = [...sourceLineage, transferState.source];
+                }
+
+                // Create new inventory entry
+                const newEntry = {
+                    ...originalData, // Copy all original data
+                    timestamp: new Date(),
+                    containerId: containerId,
+                    containerLineage: containerLineage[containerId].join(' ← '),
+                    tissueCount: tissuesPerNewContainer,
+                    status: 'Split Transfer'
+                };
+
+                newEntries.push(newEntry);
+                inventoryLog.unshift(newEntry);
+                sessionCounter++;
+            });
+
+            // Create transfer record
+            const transfer = {
+                timestamp: new Date(),
+                source: transferState.source,
+                destination: 'Multiple (Split)',
+                destinationContainers: newContainerIds,
+                newContainers: newContainerIds,
+                tissuesPerContainer: tissuesPerNewContainer,
+                remainingInSource: remainingInOriginal,
+                totalNewContainers: transferState.splitCount,
+                samplesTransferred: transferState.splitCount,
+                tissuesTransferred: transferState.totalTissueCount,
+                transferType: 'Split Transfer'
+            };
+
+            transferHistory.unshift(transfer);
+
+            // Update highest container ID
+            highestContainerId = startId + transferState.splitCount - 1;
+
+            showNotification(`Split complete: ${transferState.splitCount} new containers created from ${transferState.source}`, 'success');
+            console.log('Split transfer executed:', transfer);
+
+            // Update displays
+            updateInventoryTable();
+            updateStats();
+            updateTransferHistory();
+
+            // Clear transfer
+            setTimeout(() => {
+                clearTransfer();
+            }, 2000);
+        }
+
+        function clearTransfer() {
+            transferState = {
+                source: null,
+                sourceData: null,
+                destination: null,
+                mode: 'single',
+                splitCount: 2,
+                maxSplitCount: 10,
+                totalTissueCount: 0
+            };
+            
+            document.getElementById('sourceContainerValue').textContent = '-';
+            document.getElementById('destContainerValue').textContent = '-';
+            document.getElementById('sourceSummary').textContent = 'Scan to see contents';
+            document.getElementById('destSummary').textContent = 'Single or multiple containers';
+            document.getElementById('sourceContainer').classList.remove('filled');
+            document.getElementById('destContainer').classList.remove('filled');
+            document.getElementById('sourceContainerInput').value = '';
+            document.getElementById('destContainerInput').value = '';
+            
+            document.getElementById('transferFeedback').style.display = 'none';
+            document.getElementById('transferOptions').classList.remove('show');
+            document.getElementById('splitPreview').style.display = 'none';
+            
+            // Reset to single mode
+            selectTransferMode('single');
+            
+            document.getElementById('sourceContainerInput').focus();
+            
+            checkReadyToTransfer();
+        }
+
+        function showTransferFeedback(message, type) {
+            const feedback = document.getElementById('transferFeedback');
+            feedback.textContent = message;
+            feedback.className = `scan-feedback feedback-${type}`;
+            feedback.style.display = 'block';
+            
+            setTimeout(() => {
+                feedback.style.display = 'none';
+            }, 3000);
+        }
+
+        function updateTransferHistory() {
+            if (transferHistory.length === 0) {
+                document.getElementById('transferHistory').style.display = 'none';
+                return;
+            }
+
+            document.getElementById('transferHistory').style.display = 'block';
+            const historyList = document.getElementById('transferHistoryList');
+            historyList.innerHTML = '';
+
+            transferHistory.slice(0, 10).forEach(transfer => {
+                const item = document.createElement('div');
+                item.className = 'history-item';
+                
+                if (transfer.transferType === 'Split Transfer') {
+                    item.innerHTML = `
+                        <strong>Container ${transfer.source} → ${transfer.totalNewContainers} new containers</strong>
+                        <span class="transfer-count">${transfer.tissuesPerContainer} tissues each</span>
+                        <br>
+                        <small>New containers: ${transfer.newContainers.join(', ')}</small><br>
+                        <small>${transfer.timestamp.toLocaleString()}</small>
+                    `;
+                } else {
+                    item.innerHTML = `
+                        <strong>${transfer.source} → ${transfer.destination}</strong>
+                        <span class="transfer-count">${transfer.tissuesTransferred} tissues</span>
+                        <br>
+                        <small>${transfer.timestamp.toLocaleString()}</small>
+                    `;
+                }
+                
+                historyList.appendChild(item);
+            });
+        }
+
+        function getContainerLineage(containerId) {
+            return containerLineage[containerId] || [];
+        }
+
+        // Builder Functions
+        function resetBuilder() {
+            builderState.currentStep = 0;
+            builderState.values = {
+                container: null,
+                owner: null,
+                strain: null,
+                media: null,
+                stage: null,
+                tissue: null,
+                date: null
+            };
+            builderState.metadata = {
+                ownerName: null,
+                strainName: null,
+                mediaName: null,
+                stageName: null
+            };
+            
+            // Reset UI
+            document.querySelectorAll('.progress-step').forEach((step, index) => {
+                step.classList.remove('active', 'completed');
+                if (index === 0) step.classList.add('active');
+            });
+            
+            document.getElementById('generatedBarcode').classList.remove('show');
+            updateBuilderStep();
+        }
+
+        function updateBuilderStep() {
+            const step = builderState.steps[builderState.currentStep];
+            const stepConfig = getStepConfig(step);
+            
+            document.getElementById('builderPrompt').textContent = stepConfig.prompt;
+            document.getElementById('builderHint').textContent = stepConfig.hint;
+            document.getElementById('builderInput').value = '';
+            document.getElementById('builderInput').placeholder = stepConfig.placeholder;
+            
+            // Populate options
+            populateBuilderOptions(step);
+            
+            // Update button text
+            const isLastStep = builderState.currentStep === builderState.steps.length - 1;
+            document.getElementById('builderNextBtn').textContent = isLastStep ? 'Generate Barcode' : 'Next Step →';
+            
+            focusBuilderInput();
+        }
+
+        function getStepConfig(step) {
+            const configs = {
+                container: {
+                    prompt: 'Enter or scan the Container ID:',
+                    hint: 'Scan or type the container number',
+                    placeholder: 'e.g., 1234'
+                },
+                owner: {
+                    prompt: 'Select or scan the Owner ID:',
+                    hint: 'Choose from the list below or scan/type the ID',
+                    placeholder: 'e.g., LW, J, etc.'
+                },
+                strain: {
+                    prompt: 'Select or scan the Strain:',
+                    hint: 'Choose from the list or enter the strain ID (5 digits)',
+                    placeholder: 'e.g., 00001'
+                },
+                media: {
+                    prompt: 'Select or scan the Media Type:',
+                    hint: 'Choose from the list below or scan/type the media code',
+                    placeholder: 'e.g., IA, MA, etc.'
+                },
+                stage: {
+                    prompt: 'Select the Propagation Stage:',
+                    hint: 'Choose the current stage (1-9)',
+                    placeholder: 'e.g., 1'
+                },
+                tissue: {
+                    prompt: 'Enter the Tissue Count:',
+                    hint: 'How many tissue samples? (1-99)',
+                    placeholder: 'e.g., 15'
+                },
+                date: {
+                    prompt: 'Enter or select the Date:',
+                    hint: 'Format: YYYYMMDD or use today\'s date',
+                    placeholder: 'e.g., 20250617'
+                }
+            };
+            
+            return configs[step];
+        }
+
+        function populateBuilderOptions(step) {
+            const optionsDiv = document.getElementById('builderOptions');
+            optionsDiv.innerHTML = '';
+            
+            let options = [];
+            
+            switch(step) {
+                case 'container':
+                    // No predefined options for container
+                    break;
+                    
+                case 'owner':
+                    options = Object.entries(ownersTable).map(([id, name]) => ({
+                        value: id,
+                        display: `${name} (${id})`
+                    }));
+                    break;
+                    
+                case 'strain':
+                    // Show first 20 strains as options
+                    options = Object.entries(strainsTable).slice(0, 20).map(([id, name]) => ({
+                        value: id.padStart(5, '0'),
+                        display: `${name} (${id.padStart(5, '0')})`
+                    }));
+                    break;
+                    
+                case 'media':
+                    options = Object.entries(mediaTypesTable).map(([id, name]) => ({
+                        value: id,
+                        display: `${name} (${id})`
+                    }));
+                    break;
+                    
+                case 'stage':
+                    options = Object.entries(stagesTable).map(([id, name]) => ({
+                        value: id,
+                        display: `${name} (Stage ${id})`
+                    }));
+                    break;
+                    
+                case 'tissue':
+                    // Common tissue counts
+                    options = [1, 5, 10, 15, 20, 25, 30, 50].map(count => ({
+                        value: count.toString(),
+                        display: `${count} samples`
+                    }));
+                    break;
+                    
+                case 'date':
+                    // Today and recent dates
+                    const today = new Date();
+                    options = [];
+                    for (let i = 0; i < 7; i++) {
+                        const date = new Date(today);
+                        date.setDate(date.getDate() - i);
+                        const dateStr = date.toISOString().slice(0, 10).replace(/-/g, '');
+                        options.push({
+                            value: dateStr,
+                            display: i === 0 ? 'Today' : date.toLocaleDateString()
+                        });
+                    }
+                    break;
+            }
+            
+            // Create option buttons
+            options.forEach(option => {
+                const btn = document.createElement('button');
+                btn.className = 'option-btn';
+                btn.textContent = option.display;
+                btn.onclick = () => selectBuilderOption(option.value);
+                optionsDiv.appendChild(btn);
+            });
+        }
+
+        function selectBuilderOption(value) {
+            document.getElementById('builderInput').value = value;
+            validateAndProceedBuilder();
+        }
+
+        function validateBuilderValue(step, value) {
+            switch(step) {
+                case 'container':
+                    return value.match(/^\d+$/);
+                    
+                case 'owner':
+                    return value.match(/^[A-Z]+$/i);
+                    
+                case 'strain':
+                    return value.match(/^\d{1,5}$/);
+                    
+                case 'media':
+                    return value.match(/^[A-Z]+$/i);
+                    
+                case 'stage':
+                    return value.match(/^[1-9]$/);
+                    
+                case 'tissue':
+                    return value.match(/^\d{1,2}$/) && parseInt(value) > 0 && parseInt(value) <= 99;
+                    
+                case 'date':
+                    return value.match(/^\d{8}$/);
+                    
+                default:
+                    return false;
+            }
+        }
+
+        function validateAndProceedBuilder() {
+            const input = document.getElementById('builderInput').value.trim();
+            const step = builderState.steps[builderState.currentStep];
+            
+            if (!input) {
+                showBuilderFeedback('Please enter a value', 'error');
+                return;
+            }
+            
+            // Validate format
+            if (!validateBuilderValue(step, input)) {
+                showBuilderFeedback(`Invalid format for ${step}`, 'error');
+                return;
+            }
+            
+            // Store the value
+            builderState.values[step] = step === 'container' ? input : input.toUpperCase();
+            
+            // Store metadata if available
+            switch(step) {
+                case 'owner':
+                    builderState.metadata.ownerName = ownersTable[input] || input;
+                    break;
+                case 'strain':
+                    const strainId = input.padStart(5, '0');
+                    builderState.values.strain = strainId;
+                    builderState.metadata.strainName = strainsTable[parseInt(strainId)] || 'Unknown Strain';
+                    break;
+                case 'media':
+                    builderState.metadata.mediaName = mediaTypesTable[input] || input;
+                    break;
+                case 'stage':
+                    builderState.metadata.stageName = stagesTable[parseInt(input)] || `Stage ${input}`;
+                    break;
+            }
+            
+            // Show success feedback
+            showBuilderFeedback(`✅ ${step} set: ${input}`, 'success');
+            
+            // Clear the input field for next entry
+            document.getElementById('builderInput').value = '';
+            
+            // Move to next step
+            setTimeout(() => {
+                nextBuilderStep();
+            }, 300);
+        }
+
+        function nextBuilderStep() {
+            // If there's input that hasn't been processed, validate it first
+            const currentInput = document.getElementById('builderInput').value.trim();
+            if (currentInput && !builderState.values[builderState.steps[builderState.currentStep]]) {
+                validateAndProceedBuilder();
+                return;
+            }
+            
+            // If empty and value not set, show error
+            if (!builderState.values[builderState.steps[builderState.currentStep]]) {
+                showBuilderFeedback('Please complete this step', 'error');
+                return;
+            }
+            
+            // Mark current step as completed
+            document.getElementById(`step-${builderState.steps[builderState.currentStep]}`).classList.remove('active');
+            document.getElementById(`step-${builderState.steps[builderState.currentStep]}`).classList.add('completed');
+            
+            // Move to next step
+            builderState.currentStep++;
+            
+            if (builderState.currentStep < builderState.steps.length) {
+                // Update to next step
+                document.getElementById(`step-${builderState.steps[builderState.currentStep]}`).classList.add('active');
+                updateBuilderStep();
+            } else {
+                // Generate barcode
+                generateBarcode();
+            }
+        }
+
+        function generateBarcode() {
+            const values = builderState.values;
+            
+            // Build the barcode (excluding container from barcode)
+            const barcode = values.owner + 
+                           values.strain + 
+                           values.media + 
+                           values.stage + 
+                           values.tissue + 
+                           values.date;
+            
+            // Display the container and barcode
+            document.getElementById('finalContainerId').textContent = values.container;
+            document.getElementById('barcodeDisplay').textContent = barcode;
+            
+            // Create breakdown
+            const breakdown = document.getElementById('barcodeBreakdown');
+            breakdown.innerHTML = `
+                <div class="breakdown-part">
+                    <strong>Owner:</strong> ${values.owner} (${builderState.metadata.ownerName})
+                </div>
+                <div class="breakdown-part">
+                    <strong>Strain:</strong> ${values.strain} (${builderState.metadata.strainName})
+                </div>
+                <div class="breakdown-part">
+                    <strong>Media:</strong> ${values.media} (${builderState.metadata.mediaName})
+                </div>
+                <div class="breakdown-part">
+                    <strong>Stage:</strong> ${values.stage} (${builderState.metadata.stageName})
+                </div>
+                <div class="breakdown-part">
+                    <strong>Tissue:</strong> ${values.tissue} samples
+                </div>
+                <div class="breakdown-part">
+                    <strong>Date:</strong> ${formatDate(values.date)}
+                </div>
+            `;
+            
+            // Show the barcode section
+            document.getElementById('generatedBarcode').classList.add('show');
+            
+            // Store the generated barcode and metadata
+            currentContainer = values.container;
+            currentSample = barcode;
+            currentMetadata = {
+                ...builderState.metadata,
+                tissueCount: values.tissue,
+                date: values.date,
+                formattedDate: formatDate(values.date),
+                strain: builderState.metadata.strainName,
+                owner: builderState.metadata.ownerName,
+                stage: builderState.metadata.stageName,
+                mediaType: builderState.metadata.mediaName
+            };
+            
+            showNotification(`Barcode generated: ${barcode}`, 'success');
+        }
+
+        function useGeneratedBarcode() {
+            // Process the entry
+            processEntry();
+            
+            // Reset builder for next barcode
+            setTimeout(() => {
+                resetBuilder();
+            }, 1000);
+        }
+
+        function showBuilderFeedback(message, type) {
+            const feedback = document.getElementById('builderFeedback');
+            feedback.textContent = message;
+            feedback.className = `scan-feedback feedback-${type}`;
+            feedback.style.display = 'block';
+            
+            setTimeout(() => {
+                feedback.style.display = 'none';
+            }, 2000);
+        }
+
+        function focusBuilderInput() {
+            setTimeout(() => {
+                document.getElementById('builderInput').focus();
+            }, 100);
+        }
+
+        // Excel Data Loader
+        class ExcelDataLoader {
+            async loadExcelData(file) {
+                try {
+                    const data = await file.arrayBuffer();
+                    const workbook = XLSX.read(data);
+
+                    this.loadStrains(workbook.Sheets['Strains']);
+                    this.loadOwners(workbook.Sheets['Owners']);
+                    this.loadStages(workbook.Sheets['Stages']);
+                    this.loadLocations(workbook.Sheets['Locations']);
+                    this.loadMediaTypes(workbook.Sheets['Media_Types']);
+
+                    console.log('=== EXCEL DATA LOADED ===');
+                    console.log(`Strains: ${Object.keys(strainsTable).length}`);
+                    console.log(`Owners: ${Object.keys(ownersTable).length}`);
+                    console.log(`Stages: ${Object.keys(stagesTable).length}`);
+                    
+                    // Update builder options if in builder mode
+                    if (currentMode === 'builder') {
+                        updateBuilderStep();
+                    }
+                    
+                    return true;
+                } catch (error) {
+                    console.error('Error loading Excel data:', error);
+                    showNotification('Error loading Excel file: ' + error.message, 'error');
+                    return false;
+                }
+            }
+
+            loadStrains(sheet) {
+                if (!sheet) return;
+                const data = XLSX.utils.sheet_to_json(sheet);
+                data.forEach(row => {
+                    if (row['Strain ID'] && row['Strain']) {
+                        strainsTable[parseInt(row['Strain ID'])] = row['Strain'];
+                    }
+                });
+            }
+
+            loadOwners(sheet) {
+                if (!sheet) return;
+                const data = XLSX.utils.sheet_to_json(sheet);
+                data.forEach(row => {
+                    if (row['Owner ID'] && row['Owner']) {
+                        ownersTable[row['Owner ID']] = row['Owner'];
+                    }
+                });
+            }
+
+            loadStages(sheet) {
+                if (!sheet) return;
+                const data = XLSX.utils.sheet_to_json(sheet);
+                data.forEach(row => {
+                    if (row['Propogation Stages ID'] && row['Propogation Stages']) {
+                        stagesTable[parseInt(row['Propogation Stages ID'])] = row['Propogation Stages'];
+                    }
+                });
+            }
+
+            loadLocations(sheet) {
+                if (!sheet) return;
+                const data = XLSX.utils.sheet_to_json(sheet);
+                locationsTable = data.map(row => row['Locations']).filter(Boolean);
+            }
+
+            loadMediaTypes(sheet) {
+                if (!sheet) return;
+                const data = XLSX.utils.sheet_to_json(sheet);
+                data.forEach(row => {
+                    if (row['Media ID'] && row['Media Type']) {
+                        mediaTypesTable[row['Media ID']] = row['Media Type'];
+                    }
+                });
+            }
+        }
+
+        function formatDate(dateString) {
+            if (dateString && dateString.length === 8) {
+                const year = dateString.substring(0, 4);
+                const month = dateString.substring(4, 6);
+                const day = dateString.substring(6, 8);
+                return `${month}/${day}/${year}`;
+            }
+            return dateString;
+        }
+
+        // Common functions
+        function processEntry() {
+            if (!currentContainer || !currentSample) {
+                showNotification('Missing container or sample data', 'error');
+                return;
+            }
+
+            // Update highest container ID if needed
+            const containerId = parseInt(currentContainer);
+            if (!isNaN(containerId) && containerId > highestContainerId) {
+                highestContainerId = containerId;
+            }
+
+            // Get container lineage
+            const lineage = getContainerLineage(currentContainer);
+
+            // Create inventory entry with formatted data for Excel
+            const inventoryEntry = {
+                timestamp: new Date(),
+                containerId: currentContainer,
+                containerLineage: lineage.length > 0 ? lineage.join(' ← ') : null,
+                sampleBarcode: currentSample,
+                strain: currentMetadata ? (currentMetadata.strain || currentMetadata.strainName) : 'Unknown Strain',
+                strainId: currentMetadata ? currentMetadata.strainId : 'Unknown',
+                owner: currentMetadata ? (currentMetadata.ownerName || currentMetadata.owner) : 'Unknown',
+                ownerId: currentMetadata ? currentMetadata.owner : 'Unknown',
+                stage: currentMetadata ? (currentMetadata.stageName || currentMetadata.stage) : 'Unknown',
+                stageId: currentMetadata ? currentMetadata.stage : 'Unknown',
+                mediaType: currentMetadata ? (currentMetadata.mediaName || currentMetadata.mediaType) : 'Not specified',
+                mediaId: currentMetadata ? currentMetadata.mediaType : 'N/A',
+                tissueCount: currentMetadata ? currentMetadata.tissueCount : 'Not specified',
+                date: currentMetadata ? (currentMetadata.formattedDate || currentMetadata.date) : 'Not specified',
+                status: currentMetadata ? 'Complete' : 'Incomplete Data'
+            };
+
+            // Add to inventory
+            inventoryLog.unshift(inventoryEntry);
+            sessionCounter++;
+
+            // Update displays
+            updateInventoryTable();
+            updateStats();
+            
+            console.log('✅ Entry processed:', inventoryEntry);
+            showNotification(`Entry processed: ${inventoryEntry.strain}`, 'success');
+            
+            // Auto-clear for next entry
+            setTimeout(() => {
+                clearCurrent();
+            }, 2000);
+        }
+
+        function clearCurrent() {
+            currentContainer = null;
+            currentSample = null;
+            currentMetadata = null;
+            
+            if (currentMode === 'transfer') {
+                clearTransfer();
+            }
+            
+            showNotification('Ready for next entry', 'info');
+        }
+
+        function resetAll() {
+            if (confirm('Reset everything? This will clear the current entry but keep the inventory log.')) {
+                clearCurrent();
+                if (currentMode === 'builder') {
+                    resetBuilder();
+                }
+            }
+        }
+
+        function updateInventoryTable() {
+            const tbody = document.getElementById('inventoryTableBody');
+            tbody.innerHTML = '';
+
+            inventoryLog.slice(0, 100).forEach((entry, index) => {
+                const row = tbody.insertRow();
+                if (index === 0) row.classList.add('current-entry');
+                
+                // Determine status color
+                let statusColor = '#d4edda';
+                let statusTextColor = '#155724';
+                if (entry.status === 'Incomplete Data') {
+                    statusColor = '#fff3cd';
+                    statusTextColor = '#856404';
+                } else if (entry.status === 'Split Transfer') {
+                    statusColor = '#e3f2fd';
+                    statusTextColor = '#1976d2';
+                }
+                
+                // Format lineage display
+                let lineageDisplay = '';
+                if (entry.containerLineage) {
+                    lineageDisplay = `<span class="lineage-badge" title="Container history: ${entry.containerLineage}">
+                        ${entry.containerLineage.split(' ← ').length} transfers
+                    </span>`;
+                }
+                
+                row.innerHTML = `
+                    <td style="font-family: monospace; font-weight: bold;">${entry.containerId}</td>
+                    <td>${lineageDisplay}</td>
+                    <td style="font-family: monospace; font-size: 0.8rem; max-width: 120px; overflow: hidden; text-overflow: ellipsis;" title="${entry.sampleBarcode}">${entry.sampleBarcode}</td>
+                    <td style="font-weight: 600;" title="${entry.strain} (ID: ${entry.strainId})">${entry.strain}</td>
+                    <td title="${entry.owner} (${entry.ownerId})">${entry.owner}</td>
+                    <td title="${entry.stage} (${entry.stageId})">${entry.stage}</td>
+                    <td title="${entry.mediaType} (${entry.mediaId})">${entry.mediaType}</td>
+                    <td style="text-align: center;">${entry.tissueCount}</td>
+                    <td style="font-size: 0.8rem;">${entry.date}</td>
+                    <td><span style="padding: 2px 6px; border-radius: 3px; font-size: 0.7rem; font-weight: bold; 
+                         background: ${statusColor}; color: ${statusTextColor};">
+                         ${entry.status}</span></td>
+                `;
+            });
+        }
+
+        function updateStats() {
+            document.getElementById('totalProcessed').textContent = inventoryLog.length;
+            document.getElementById('sessionCount').textContent = sessionCounter;
+            
+            const uniqueStrains = new Set(inventoryLog.map(entry => entry.strain)).size;
+            document.getElementById('uniqueStrains').textContent = uniqueStrains;
+        }
+
+        function exportInventory() {
+            if (inventoryLog.length === 0) {
+                showNotification('No inventory data to export', 'error');
+                return;
+            }
+
+            const excelData = inventoryLog.map(entry => ({
+                'Container ID': entry.containerId,
+                'Container Lineage': entry.containerLineage || 'Original',
+                'Sample Barcode': entry.sampleBarcode,
+                'Strain Name': entry.strain,
+                'Strain ID': entry.strainId,
+                'Owner Name': entry.owner,
+                'Owner ID': entry.ownerId,
+                'Propagation Stage': entry.stage,
+                'Stage ID': entry.stageId,
+                'Media Type': entry.mediaType,
+                'Media ID': entry.mediaId,
+                'Tissue Count': entry.tissueCount,
+                'Sample Date': entry.date,
+                'Processing Timestamp': entry.timestamp.toLocaleString(),
+                'Status': entry.status
+            }));
+
+            // Add transfer history sheet
+            const wb = XLSX.utils.book_new();
+            const ws = XLSX.utils.json_to_sheet(excelData);
+            
+            // Auto-size columns
+            const range = XLSX.utils.decode_range(ws['!ref']);
+            const colWidths = [];
+            for (let C = range.s.c; C <= range.e.c; ++C) {
+                let maxWidth = 10;
+                for (let R = range.s.r; R <= range.e.r; ++R) {
+                    const cellAddress = XLSX.utils.encode_cell({r: R, c: C});
+                    const cell = ws[cellAddress];
+                    if (cell && cell.v) {
+                        maxWidth = Math.max(maxWidth, cell.v.toString().length);
+                    }
+                }
+                colWidths[C] = {wch: Math.min(maxWidth + 2, 50)};
+            }
+            ws['!cols'] = colWidths;
+
+            XLSX.utils.book_append_sheet(wb, ws, 'Inventory Log');
+
+            // Add transfer history sheet if there are transfers
+            if (transferHistory.length > 0) {
+                const transferData = transferHistory.map(transfer => ({
+                    'Transfer Date': transfer.timestamp.toLocaleString(),
+                    'Source Container': transfer.source,
+                    'Destination': transfer.destination,
+                    'Transfer Type': transfer.transferType,
+                    'Tissues Transferred': transfer.tissuesTransferred,
+                    'New Containers': transfer.newContainers ? transfer.newContainers.join(', ') : 'N/A',
+                    'Tissues per Container': transfer.tissuesPerContainer || 'N/A'
+                }));
+                
+                const transferWs = XLSX.utils.json_to_sheet(transferData);
+                XLSX.utils.book_append_sheet(wb, transferWs, 'Transfer History');
+            }
+
+            const fileName = `Lab_Inventory_${new Date().toISOString().slice(0, 10)}.xlsx`;
+            XLSX.writeFile(wb, fileName);
+            
+            let message = `Exported ${inventoryLog.length} records to ${fileName}`;
+            if (transferHistory.length > 0) message += ` (${transferHistory.length} transfers)`;
+            
+            showNotification(message, 'success');
+        }
+
+        function clearInventory() {
+            if (confirm('Clear all inventory data? This cannot be undone.')) {
+                inventoryLog = [];
+                sessionCounter = 0;
+                transferHistory = [];
+                containerLineage = {};
+                highestContainerId = 0;
+                updateInventoryTable();
+                updateStats();
+                updateTransferHistory();
+                showNotification('Inventory log cleared', 'info');
+            }
+        }
+
+        function showNotification(message, type) {
+            const notification = document.getElementById('notification');
+            notification.textContent = message;
+            notification.className = `notification ${type}`;
+            notification.classList.add('show');
+
+            setTimeout(() => {
+                notification.classList.remove('show');
+            }, 4000);
+        }
+
+        async function handleFileUpload(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            showNotification('Loading Excel file...', 'info');
+
+            const dataLoader = new ExcelDataLoader();
+            const success = await dataLoader.loadExcelData(file);
+            
+            if (success) {
+                isDataLoaded = true;
+                
+                // Update UI
+                document.getElementById('dataStatus').innerHTML = `
+                    <span>✅ Excel data loaded: ${Object.keys(strainsTable).length} strains, ${Object.keys(ownersTable).length} owners</span>
+                    <span style="font-size: 0.8rem;">File: ${file.name}</span>
+                `;
+                document.getElementById('dataStatus').classList.add('loaded');
+
+                showNotification(`Excel data loaded! Ready for barcode building.`, 'success');
+                
+                // Update builder if active
+                if (currentMode === 'builder') {
+                    updateBuilderStep();
+                }
+            }
+        }
+
+        // Initialize application
+        function initializeApp() {
+            // Scan existing inventory to find highest container ID
+            inventoryLog.forEach(entry => {
+                const containerId = parseInt(entry.containerId);
+                if (!isNaN(containerId) && containerId > highestContainerId) {
+                    highestContainerId = containerId;
+                }
+            });
+
+            // Setup event listeners
+            document.getElementById('fileInput').addEventListener('change', handleFileUpload);
+            
+            // Builder input handling
+            document.getElementById('builderInput').addEventListener('keypress', function(e) {
+                if (e.key === 'Enter') {
+                    validateAndProceedBuilder();
+                }
+            });
+
+            // Transfer input handling
+            document.getElementById('sourceContainerInput').addEventListener('keypress', function(e) {
+                if (e.key === 'Enter') {
+                    handleSourceContainerScan();
+                }
+            });
+            
+            document.getElementById('destContainerInput').addEventListener('keypress', function(e) {
+                if (e.key === 'Enter') {
+                    handleDestContainerScan();
+                }
+            });
+
+            // Focus appropriate input based on mode
+            if (currentMode === 'builder') {
+                focusBuilderInput();
+            } else if (currentMode === 'transfer') {
+                document.getElementById('sourceContainerInput').focus();
+            }
+            
+            // Keep input focused
+            setInterval(() => {
+                if (currentMode === 'builder' && document.activeElement.id !== 'builderInput') {
+                    document.getElementById('builderInput').focus();
+                } else if (currentMode === 'transfer') {
+                    if (!transferState.source && document.activeElement.id !== 'sourceContainerInput') {
+                        document.getElementById('sourceContainerInput').focus();
+                    } else if (transferState.source && !transferState.destination && transferState.mode === 'single' && document.activeElement.id !== 'destContainerInput') {
+                        document.getElementById('destContainerInput').focus();
+                    }
+                }
+            }, 2000);
+
+            updateStats();
+            
+            if (currentMode === 'builder') {
+                updateBuilderStep();
+            } else if (currentMode === 'transfer') {
+                checkReadyToTransfer();
+            }
+            
+            showNotification('Lab system ready! Load Excel data to begin.', 'info');
+        }
+
+        // Initialize when page loads
+        window.addEventListener('load', initializeApp);
+    </script>
+</body>
+</html>
