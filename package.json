@@ -1,0 +1,20 @@
+{
+  "name": "lab-scanner-system",
+  "version": "1.0.0",
+  "description": "Lab Barcode Builder & Transfer System",
+  "main": "public/index.html",
+  "scripts": {
+    "start": "python3 -m http.server 8000 --directory public",
+    "test": "echo \"Running tests...\" && npm run test:unit",
+    "test:unit": "echo \"Unit tests will be implemented\"",
+    "test:integration": "echo \"Integration tests will be implemented\"",
+    "test:e2e": "echo \"E2E tests will be implemented\"",
+    "validate": "echo \"Validating build...\" && npm run start"
+  },
+  "keywords": ["lab", "barcode", "scanner", "container", "transfer"],
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {
+    "http-server": "^14.1.1"
+  }
+}

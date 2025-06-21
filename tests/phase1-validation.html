@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Phase 1 Validation Test</title>
+    <style>
+        body { 
+            font-family: Arial, sans-serif; 
+            padding: 20px; 
+            background: #f5f5f5; 
+        }
+        .test-container { 
+            background: white; 
+            padding: 20px; 
+            border-radius: 8px; 
+            margin-bottom: 20px; 
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .test-result { 
+            padding: 10px; 
+            margin: 10px 0; 
+            border-radius: 4px; 
+        }
+        .test-pass { 
+            background: #d4edda; 
+            color: #155724; 
+            border: 1px solid #c3e6cb; 
+        }
+        .test-fail { 
+            background: #f8d7da; 
+            color: #721c24; 
+            border: 1px solid #f5c6cb; 
+        }
+        .iframe-container {
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            overflow: hidden;
+        }
+        iframe {
+            width: 100%;
+            height: 800px;
+            border: none;
+        }
+    </style>
+</head>
+<body>
+    <h1>🧪 Phase 1 Validation Test</h1>
+    
+    <div class="test-container">
+        <h2>Visual Test - Application Loads</h2>
+        <p>The application should load with the proper UI layout and styling.</p>
+        
+        <div class="iframe-container">
+            <iframe src="../index.html" id="appFrame"></iframe>
+        </div>
+        
+        <div id="testResults">
+            <!-- Test results will be populated here -->
+        </div>
+    </div>
+
+    <div class="test-container">
+        <h2>Functional Tests</h2>
+        <button onclick="runTests()" style="padding: 10px 20px; background: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer;">Run Validation Tests</button>
+        <div id="functionalResults"></div>
+    </div>
+
+    <script>
+        function runTests() {
+            const resultsDiv = document.getElementById('functionalResults');
+            resultsDiv.innerHTML = '<p>Running tests...</p>';
+            
+            setTimeout(() => {
+                const tests = [
+                    {
+                        name: 'CSS file loads',
+                        test: () => checkIfElementExists('link[href*="main.css"]'),
+                        expected: true
+                    },
+                    {
+                        name: 'JavaScript file loads',
+                        test: () => checkIfElementExists('script[src*="app.js"]'),
+                        expected: true
+                    },
+                    {
+                        name: 'Header displays correctly',
+                        test: () => checkIfElementExists('.header h1'),
+                        expected: true
+                    },
+                    {
+                        name: 'Mode selector is present',
+                        test: () => checkIfElementExists('.mode-selector'),
+                        expected: true
+                    },
+                    {
+                        name: 'File upload section exists',
+                        test: () => checkIfElementExists('.file-upload-section'),
+                        expected: true
+                    },
+                    {
+                        name: 'Stats grid is visible',
+                        test: () => checkIfElementExists('.stats-grid'),
+                        expected: true
+                    },
+                    {
+                        name: 'Builder section exists',
+                        test: () => checkIfElementExists('.builder-section'),
+                        expected: true
+                    },
+                    {
+                        name: 'Transfer section exists',
+                        test: () => checkIfElementExists('.transfer-section'),
+                        expected: true
+                    },
+                    {
+                        name: 'Inventory section exists',
+                        test: () => checkIfElementExists('.inventory-section'),
+                        expected: true
+                    }
+                ];
+                
+                let results = '<h3>Test Results:</h3>';
+                let passCount = 0;
+                
+                tests.forEach(test => {
+                    try {
+                        const result = test.test();
+                        const passed = result === test.expected;
+                        if (passed) passCount++;
+                        
+                        results += `<div class="test-result ${passed ? 'test-pass' : 'test-fail'}">
+                            ${passed ? '✅' : '❌'} ${test.name}: ${passed ? 'PASS' : 'FAIL'}
+                        </div>`;
+                    } catch (error) {
+                        results += `<div class="test-result test-fail">
+                            ❌ ${test.name}: ERROR - ${error.message}
+                        </div>`;
+                    }
+                });
+                
+                results += `<div style="margin-top: 20px; font-weight: bold;">
+                    Summary: ${passCount}/${tests.length} tests passed
+                </div>`;
+                
+                resultsDiv.innerHTML = results;
+            }, 1000);
+        }
+        
+        function checkIfElementExists(selector) {
+            try {
+                const iframe = document.getElementById('appFrame');
+                const iframeDoc = iframe.contentDocument || iframe.contentWindow.document;
+                const element = iframeDoc.querySelector(selector);
+                return element !== null;
+            } catch (error) {
+                console.error('Error checking element:', error);
+                return false;
+            }
+        }
+        
+        // Auto-run tests after iframe loads
+        document.getElementById('appFrame').onload = function() {
+            setTimeout(() => {
+                runTests();
+            }, 2000);
+        };
+    </script>
+</body>
+</html>

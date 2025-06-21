@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Lab Barcode Builder & Transfer System</title>
+    <link rel="stylesheet" href="assets/css/main.css">
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🧪 Lab Barcode Builder & Transfer System</h1>
+            <p>Create barcodes and manage container transfers with tissue splitting</p>
+        </div>
+
+        <div class="mode-selector">
+            <button class="mode-btn active" onclick="switchMode('builder')">
+                🏗️ Barcode Builder
+            </button>
+            <button class="mode-btn" onclick="switchMode('transfer')">
+                🔄 Container Transfer
+            </button>
+        </div>
+
+        <div class="file-upload-section">
+            <div class="upload-area" onclick="document.getElementById('fileInput').click()">
+                <input type="file" id="fileInput" accept=".xlsx,.xls" style="display: none;">
+                <h3>📄 Load Your Excel Data File</h3>
+                <p>Click here or drag your "barcode test.xlsx" file to load all reference tables</p>
+            </div>
+            
+            <div class="data-status" id="dataStatus">
+                <span>❌ Excel data not loaded</span>
+                <button class="btn btn-secondary" onclick="document.getElementById('fileInput').click()">Load Excel File</button>
+            </div>
+        </div>
+
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div style="font-size: 1.5rem; font-weight: 700;" id="totalProcessed">0</div>
+                <div style="font-size: 0.8rem;">Processed</div>
+            </div>
+            <div class="stat-card">
+                <div style="font-size: 1.5rem; font-weight: 700;" id="uniqueStrains">0</div>
+                <div style="font-size: 0.8rem;">Strains</div>
+            </div>
+            <div class="stat-card">
+                <div style="font-size: 1.5rem; font-weight: 700;" id="sessionCount">0</div>
+                <div style="font-size: 0.8rem;">This Session</div>
+            </div>
+            <div class="stat-card">
+                <div style="font-size: 1.5rem; font-weight: 700;" id="currentMode">Builder</div>
+                <div style="font-size: 0.8rem;">Current Mode</div>
+            </div>
+        </div>
+
+        <div class="main-content">
+            <!-- Barcode Builder Section -->
+            <div class="builder-section active" id="builderSection">
+                <h2 style="margin-bottom: 20px; color: #2c3e50;">🏗️ Barcode Builder</h2>
+                
+                <div class="builder-progress">
+                    <div class="progress-step active" id="step-container">
+                        <div class="progress-circle">1</div>
+                        <div class="progress-label">Container</div>
+                    </div>
+                    <div class="progress-step" id="step-owner">
+                        <div class="progress-circle">2</div>
+                        <div class="progress-label">Owner</div>
+                    </div>
+                    <div class="progress-step" id="step-strain">
+                        <div class="progress-circle">3</div>
+                        <div class="progress-label">Strain</div>
+                    </div>
+                    <div class="progress-step" id="step-media">
+                        <div class="progress-circle">4</div>
+                        <div class="progress-label">Media</div>
+                    </div>
+                    <div class="progress-step" id="step-stage">
+                        <div class="progress-circle">5</div>
+                        <div class="progress-label">Stage</div>
+                    </div>
+                    <div class="progress-step" id="step-tissue">
+                        <div class="progress-circle">6</div>
+                        <div class="progress-label">Tissue</div>
+                    </div>
+                    <div class="progress-step" id="step-date">
+                        <div class="progress-circle">7</div>
+                        <div class="progress-label">Date</div>
+                    </div>
+                </div>
+
+                <div class="builder-input-section">
+                    <div class="builder-prompt" id="builderPrompt">
+                        Enter or scan the Container ID:
+                    </div>
+                    <div class="builder-hint" id="builderHint">
+                        Scan or type the container number
+                    </div>
+
+                    <div class="input-group">
+                        <input type="text" id="builderInput" class="barcode-input" 
+                               placeholder="Scan or type here..." autocomplete="off">
+                    </div>
+
+                    <div class="builder-options" id="builderOptions">
+                        <!-- Options will be populated dynamically -->
+                    </div>
+
+                    <div class="scan-feedback" id="builderFeedback">
+                        Feedback will appear here
+                    </div>
+
+                    <button class="btn btn-primary" id="builderNextBtn" onclick="nextBuilderStep()">
+                        Next Step →
+                    </button>
+                    <button class="btn btn-secondary" onclick="resetBuilder()">
+                        Start Over
+                    </button>
+                </div>
+
+                <div class="generated-barcode" id="generatedBarcode">
+                    <h3 style="margin-bottom: 10px;">✅ Barcode Generated!</h3>
+                    <div style="font-weight: 600; color: #28a745; margin-bottom: 10px;">
+                        Container: <span id="finalContainerId" style="font-family: monospace;"></span>
+                    </div>
+                    <div class="barcode-display" id="barcodeDisplay">
+                        <!-- Generated barcode will appear here -->
+                    </div>
+                    <div class="barcode-breakdown" id="barcodeBreakdown">
+                        <!-- Breakdown will appear here -->
+                    </div>
+                    <button class="btn btn-success" onclick="useGeneratedBarcode()" style="margin-top: 15px;">
+                        Save to Inventory
+                    </button>
+                </div>
+            </div>
+
+            <!-- Container Transfer Section -->
+            <div class="transfer-section" id="transferSection">
+                <h2 style="margin-bottom: 20px; color: #2c3e50;">🔄 Container Transfer</h2>
+                
+                <div class="transfer-flow">
+                    <div class="transfer-container" id="sourceContainer">
+                        <h3>📦 Source Container</h3>
+                        <p style="margin: 10px 0; font-size: 1.5rem; font-weight: bold;" id="sourceContainerValue">-</p>
+                        <div style="font-size: 0.9rem; color: #6c757d;" id="sourceSummary">Scan to see contents</div>
+                        <input type="text" id="sourceContainerInput" class="barcode-input" 
+                               placeholder="Scan source..." autocomplete="off" style="margin-top: 10px;">
+                    </div>
+                    
+                    <div class="transfer-arrow">→</div>
+                    
+                    <div class="transfer-container" id="destContainer">
+                        <h3>📦 Destination</h3>
+                        <p style="margin: 10px 0; font-size: 1.5rem; font-weight: bold;" id="destContainerValue">-</p>
+                        <div style="font-size: 0.9rem; color: #6c757d;" id="destSummary">Single or multiple containers</div>
+                        <input type="text" id="destContainerInput" class="barcode-input" 
+                               placeholder="Scan destination..." autocomplete="off" style="margin-top: 10px;">
+                    </div>
+                </div>
+
+                <div class="scan-feedback" id="transferFeedback">
+                    Transfer feedback will appear here
+                </div>
+
+                <div class="transfer-options" id="transferOptions">
+                    <h3 style="margin-bottom: 15px;">🌱 Transfer Options</h3>
+                    
+                    <div class="transfer-mode-toggle">
+                        <div class="mode-option selected" id="singleTransferOption" onclick="selectTransferMode('single')">
+                            <h4>📦 Single Container</h4>
+                            <p style="font-size: 0.9rem; color: #6c757d; margin-top: 5px;">
+                                Move all samples to one destination
+                            </p>
+                        </div>
+                        <div class="mode-option" id="splitTransferOption" onclick="selectTransferMode('split')">
+                            <h4>🌱 Split Tissues</h4>
+                            <p style="font-size: 0.9rem; color: #6c757d; margin-top: 5px;">
+                                Divide samples across new containers
+                            </p>
+                        </div>
+                    </div>
+
+                    <div id="singleTransferDetails" style="display: block;">
+                        <p style="text-align: center; color: #6c757d;">
+                            Ready to transfer <span id="singleTransferCount" style="font-weight: bold;">0</span> samples
+                        </p>
+                    </div>
+
+                    <div id="splitTransferDetails" style="display: none;">
+                        <div style="text-align: center;">
+                            <label>Number of New Containers:</label>
+                            <div class="tissue-counter">
+                                <button class="counter-btn" id="decreaseBtn" onclick="adjustSplitCount(-1)">-</button>
+                                <div class="tissue-count-display" id="splitCount">2</div>
+                                <button class="counter-btn" id="increaseBtn" onclick="adjustSplitCount(1)">+</button>
+                            </div>
+                            <div style="font-size: 0.8rem; color: #6c757d; margin-top: 5px;" id="splitHint">
+                                Each container will get equal tissues
+                            </div>
+                        </div>
+
+                        <div class="split-preview" id="splitPreview" style="display: none;">
+                            <div id="splitSummary">
+                                <!-- Split summary will appear here -->
+                            </div>
+                            <div class="new-containers-list" id="newContainersList">
+                                <!-- New container IDs will appear here -->
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div style="margin-top: 25px;">
+                    <button class="btn btn-primary" id="transferBtn" onclick="processTransfer()" disabled>
+                        Process Transfer
+                    </button>
+                    <button class="btn btn-secondary" onclick="clearTransfer()">
+                        Clear Transfer
+                    </button>
+                </div>
+
+                <div class="transfer-history" id="transferHistory" style="display: none;">
+                    <h3 style="margin-bottom: 10px;">📋 Recent Transfers</h3>
+                    <div id="transferHistoryList">
+                        <!-- Transfer history will be populated here -->
+                    </div>
+                </div>
+            </div>
+
+            <div class="inventory-section">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                    <h2 style="color: #2c3e50;">📦 Inventory Log</h2>
+                    <div>
+                        <button class="btn btn-success" onclick="exportInventory()">Export Excel</button>
+                        <button class="btn btn-secondary" onclick="clearInventory()">Clear Log</button>
+                    </div>
+                </div>
+
+                <div style="max-height: 600px; overflow-y: auto; border: 1px solid #e9ecef; border-radius: 6px;">
+                    <table class="inventory-table">
+                        <thead>
+                            <tr>
+                                <th>Container</th>
+                                <th>Lineage</th>
+                                <th>Sample Barcode</th>
+                                <th>Strain</th>
+                                <th>Owner</th>
+                                <th>Stage</th>
+                                <th>Media</th>
+                                <th>Count</th>
+                                <th>Date</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody id="inventoryTableBody">
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="notification" class="notification"></div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="assets/js/app.js"></script>
+</body>
+</html>
