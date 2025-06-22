@@ -1,0 +1,587 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Phase 4 Validation Test - Barcode Builder Feature</title>
+    <style>
+        body { 
+            font-family: Arial, sans-serif; 
+            padding: 20px; 
+            background: #f5f5f5; 
+        }
+        .test-container { 
+            background: white; 
+            padding: 20px; 
+            border-radius: 8px; 
+            margin-bottom: 20px; 
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .test-result { 
+            padding: 10px; 
+            margin: 10px 0; 
+            border-radius: 4px; 
+        }
+        .test-pass { 
+            background: #d4edda; 
+            color: #155724; 
+            border: 1px solid #c3e6cb; 
+        }
+        .test-fail { 
+            background: #f8d7da; 
+            color: #721c24; 
+            border: 1px solid #f5c6cb; 
+        }
+        .test-warn {
+            background: #fff3cd;
+            color: #856404;
+            border: 1px solid #ffeaa7;
+        }
+        .iframe-container {
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            overflow: hidden;
+            margin: 20px 0;
+        }
+        iframe {
+            width: 100%;
+            height: 700px;
+            border: none;
+        }
+        .console-output {
+            background: #f8f9fa;
+            border: 1px solid #e9ecef;
+            border-radius: 4px;
+            padding: 10px;
+            margin-top: 10px;
+            font-family: monospace;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+        .test-section {
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            padding: 15px;
+            margin: 10px 0;
+        }
+        .step-test {
+            background: #f8f9fa;
+            border: 1px solid #e9ecef;
+            border-radius: 4px;
+            padding: 10px;
+            margin: 5px 0;
+        }
+    </style>
+</head>
+<body>
+    <h1>🧪 Phase 4 Validation Test - Barcode Builder Feature</h1>
+    
+    <div class="test-container">
+        <h2>Application Load Test</h2>
+        <p>The application should load with the new barcode builder modules.</p>
+        
+        <div class="iframe-container">
+            <iframe src="../index.html" id="appFrame"></iframe>
+        </div>
+    </div>
+
+    <div class="test-container">
+        <h2>Automated Barcode Builder Tests</h2>
+        <button onclick="runAllTests()" style="padding: 10px 20px; background: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer;">Run Complete Test Suite</button>
+        <div id="testResults"></div>
+    </div>
+
+    <div class="test-container">
+        <h2>Interactive Builder Test</h2>
+        <p>Manual testing of the barcode builder workflow:</p>
+        <button onclick="startInteractiveTest()" style="padding: 10px 20px; background: #28a745; color: white; border: none; border-radius: 4px; cursor: pointer;">Start Interactive Test</button>
+        <div id="interactiveResults"></div>
+    </div>
+
+    <div class="test-container">
+        <h2>Console Output Monitor</h2>
+        <div id="consoleOutput" class="console-output">
+            Console monitoring will appear here...
+        </div>
+    </div>
+
+    <script>
+        let testResults = [];
+        let consoleMessages = [];
+        let iframeWindow = null;
+        let iframeDoc = null;
+
+        // Test data for builder workflow
+        const testData = {
+            container: '1234',
+            owner: 'LW',
+            strain: '00001',
+            media: 'IA',
+            stage: '1',
+            tissue: '15',
+            date: '20250622'
+        };
+
+        function captureConsoleOutput() {
+            const iframe = document.getElementById('appFrame');
+            try {
+                iframeWindow = iframe.contentWindow;
+                iframeDoc = iframe.contentDocument || iframeWindow.document;
+                
+                if (iframeWindow && iframeWindow.console) {
+                    const originalLog = iframeWindow.console.log;
+                    const originalError = iframeWindow.console.error;
+                    const originalWarn = iframeWindow.console.warn;
+                    
+                    iframeWindow.console.log = function(...args) {
+                        consoleMessages.push({type: 'log', message: args.join(' ')});
+                        updateConsoleDisplay();
+                        originalLog.apply(this, args);
+                    };
+                    
+                    iframeWindow.console.error = function(...args) {
+                        consoleMessages.push({type: 'error', message: args.join(' ')});
+                        updateConsoleDisplay();
+                        originalError.apply(this, args);
+                    };
+                    
+                    iframeWindow.console.warn = function(...args) {
+                        consoleMessages.push({type: 'warn', message: args.join(' ')});
+                        updateConsoleDisplay();
+                        originalWarn.apply(this, args);
+                    };
+                }
+            } catch (error) {
+                console.log('Could not capture iframe console output:', error);
+            }
+        }
+
+        function updateConsoleDisplay() {
+            const output = document.getElementById('consoleOutput');
+            output.innerHTML = consoleMessages.map(msg => 
+                `<div style="color: ${getMessageColor(msg.type)}">[${msg.type.toUpperCase()}] ${msg.message}</div>`
+            ).join('');
+            output.scrollTop = output.scrollHeight;
+        }
+
+        function getMessageColor(type) {
+            switch(type) {
+                case 'error': return '#dc3545';
+                case 'warn': return '#ffc107';
+                case 'log': return '#28a745';
+                default: return '#000';
+            }
+        }
+
+        function runAllTests() {
+            const resultsDiv = document.getElementById('testResults');
+            resultsDiv.innerHTML = '<p>Running comprehensive Phase 4 tests...</p>';
+            
+            testResults = [];
+            
+            setTimeout(() => {
+                // Test 1: Builder modules loading
+                runBuilderModuleTests();
+                
+                // Test 2: Builder initialization
+                runBuilderInitializationTests();
+                
+                // Test 3: Step management
+                runStepManagementTests();
+                
+                // Test 4: Barcode generation
+                runBarcodeGenerationTests();
+                
+                // Test 5: UI integration
+                runUIIntegrationTests();
+                
+                // Test 6: Data validation
+                runDataValidationTests();
+                
+                // Display results
+                displayTestResults();
+            }, 1000);
+        }
+
+        function runBuilderModuleTests() {
+            addTest('BuilderStepManager exists', () => !!iframeWindow.BuilderStepManager);
+            addTest('BuilderBarcodeGenerator exists', () => !!iframeWindow.BuilderBarcodeGenerator);
+            addTest('BarcodeBuilder exists', () => !!iframeWindow.BarcodeBuilder);
+            
+            if (iframeWindow.BuilderStepManager) {
+                addTest('BuilderStepManager.getStepConfig exists', () => 
+                    typeof iframeWindow.BuilderStepManager.getStepConfig === 'function');
+                addTest('BuilderStepManager.updateStep exists', () => 
+                    typeof iframeWindow.BuilderStepManager.updateStep === 'function');
+                addTest('BuilderStepManager.validateAndProceed exists', () => 
+                    typeof iframeWindow.BuilderStepManager.validateAndProceed === 'function');
+            }
+            
+            if (iframeWindow.BuilderBarcodeGenerator) {
+                addTest('BuilderBarcodeGenerator.generateBarcode exists', () => 
+                    typeof iframeWindow.BuilderBarcodeGenerator.generateBarcode === 'function');
+                addTest('BuilderBarcodeGenerator.saveToInventory exists', () => 
+                    typeof iframeWindow.BuilderBarcodeGenerator.saveToInventory === 'function');
+            }
+            
+            if (iframeWindow.BarcodeBuilder) {
+                addTest('BarcodeBuilder.initialize exists', () => 
+                    typeof iframeWindow.BarcodeBuilder.initialize === 'function');
+                addTest('BarcodeBuilder.nextStep exists', () => 
+                    typeof iframeWindow.BarcodeBuilder.nextStep === 'function');
+                addTest('BarcodeBuilder.reset exists', () => 
+                    typeof iframeWindow.BarcodeBuilder.reset === 'function');
+            }
+        }
+
+        function runBuilderInitializationTests() {
+            addTest('Builder state is initialized', () => {
+                const state = iframeWindow.appState?.builderState;
+                return state && state.steps && state.values && state.metadata;
+            });
+            
+            addTest('Builder steps array is correct', () => {
+                const steps = iframeWindow.appState?.builderState?.steps;
+                const expectedSteps = ['container', 'owner', 'strain', 'media', 'stage', 'tissue', 'date'];
+                return steps && JSON.stringify(steps) === JSON.stringify(expectedSteps);
+            });
+            
+            addTest('Builder initial step is 0', () => {
+                return iframeWindow.appState?.builderState?.currentStep === 0;
+            });
+            
+            addTest('Builder input element exists', () => {
+                return !!iframeDoc.getElementById('builderInput');
+            });
+            
+            addTest('Builder options element exists', () => {
+                return !!iframeDoc.getElementById('builderOptions');
+            });
+            
+            addTest('Builder feedback element exists', () => {
+                return !!iframeDoc.getElementById('builderFeedback');
+            });
+        }
+
+        function runStepManagementTests() {
+            if (!iframeWindow.BuilderStepManager) {
+                addTest('Step management - module not available', () => false);
+                return;
+            }
+            
+            // Test step configuration
+            addTest('Container step config is valid', () => {
+                const config = iframeWindow.BuilderStepManager.getStepConfig('container');
+                return config && config.prompt && config.validation;
+            });
+            
+            addTest('Owner step config is valid', () => {
+                const config = iframeWindow.BuilderStepManager.getStepConfig('owner');
+                return config && config.prompt && config.validation;
+            });
+            
+            // Test step navigation
+            addTest('Can get current step info', () => {
+                try {
+                    const info = iframeWindow.BarcodeBuilder.getCurrentStepInfo();
+                    return info && info.stepName && info.totalSteps;
+                } catch (error) {
+                    return false;
+                }
+            });
+            
+            // Test validation
+            addTest('Validation works for container step', () => {
+                try {
+                    return iframeWindow.DataUtils.validateInput('container', '1234') === true &&
+                           iframeWindow.DataUtils.validateInput('container', 'abc') === false;
+                } catch (error) {
+                    return false;
+                }
+            });
+        }
+
+        function runBarcodeGenerationTests() {
+            if (!iframeWindow.BuilderBarcodeGenerator) {
+                addTest('Barcode generation - module not available', () => false);
+                return;
+            }
+            
+            // Test validation of required values
+            addTest('validateAllValues works correctly', () => {
+                try {
+                    const validValues = {
+                        container: '1234',
+                        owner: 'LW',
+                        strain: '00001',
+                        media: 'IA',
+                        stage: '1',
+                        tissue: '15',
+                        date: '20250622'
+                    };
+                    const invalidValues = { container: '1234' }; // missing required fields
+                    
+                    return iframeWindow.BuilderBarcodeGenerator.validateAllValues(validValues) === true &&
+                           iframeWindow.BuilderBarcodeGenerator.validateAllValues(invalidValues) === false;
+                } catch (error) {
+                    return false;
+                }
+            });
+            
+            // Test metadata building
+            addTest('buildMetadata works correctly', () => {
+                try {
+                    const values = { tissue: '15', date: '20250622' };
+                    const metadata = { ownerName: 'Test Owner' };
+                    const result = iframeWindow.BuilderBarcodeGenerator.buildMetadata(values, metadata);
+                    
+                    return result && result.tissueCount === '15' && result.ownerName === 'Test Owner';
+                } catch (error) {
+                    return false;
+                }
+            });
+        }
+
+        function runUIIntegrationTests() {
+            // Test progress steps exist
+            const progressSteps = ['container', 'owner', 'strain', 'media', 'stage', 'tissue', 'date'];
+            progressSteps.forEach(step => {
+                addTest(`Progress step ${step} element exists`, () => {
+                    return !!iframeDoc.getElementById(`step-${step}`);
+                });
+            });
+            
+            // Test builder prompt and hint elements
+            addTest('Builder prompt element exists', () => {
+                return !!iframeDoc.getElementById('builderPrompt');
+            });
+            
+            addTest('Builder hint element exists', () => {
+                return !!iframeDoc.getElementById('builderHint');
+            });
+            
+            // Test generated barcode section
+            addTest('Generated barcode section exists', () => {
+                return !!iframeDoc.getElementById('generatedBarcode');
+            });
+            
+            addTest('Barcode display element exists', () => {
+                return !!iframeDoc.getElementById('barcodeDisplay');
+            });
+            
+            addTest('Barcode breakdown element exists', () => {
+                return !!iframeDoc.getElementById('barcodeBreakdown');
+            });
+        }
+
+        function runDataValidationTests() {
+            if (!iframeWindow.DataUtils) {
+                addTest('Data validation - DataUtils not available', () => false);
+                return;
+            }
+            
+            // Test different input validations
+            const validationTests = [
+                { step: 'container', valid: '1234', invalid: 'abc' },
+                { step: 'owner', valid: 'LW', invalid: '123' },
+                { step: 'strain', valid: '00001', invalid: 'abcde' },
+                { step: 'media', valid: 'IA', invalid: '123' },
+                { step: 'stage', valid: '1', invalid: '0' },
+                { step: 'tissue', valid: '15', invalid: '0' },
+                { step: 'date', valid: '20250622', invalid: '2025-06-22' }
+            ];
+            
+            validationTests.forEach(test => {
+                addTest(`${test.step} validation works`, () => {
+                    try {
+                        return iframeWindow.DataUtils.validateInput(test.step, test.valid) === true &&
+                               iframeWindow.DataUtils.validateInput(test.step, test.invalid) === false;
+                    } catch (error) {
+                        return false;
+                    }
+                });
+            });
+        }
+
+        function startInteractiveTest() {
+            const resultsDiv = document.getElementById('interactiveResults');
+            resultsDiv.innerHTML = '<div class="test-section"><h3>Interactive Builder Test</h3><p>Testing builder workflow step by step...</p></div>';
+            
+            // Test each step of the builder workflow
+            setTimeout(() => runInteractiveWorkflowTest(), 1000);
+        }
+
+        function runInteractiveWorkflowTest() {
+            const resultsDiv = document.getElementById('interactiveResults');
+            let html = '<div class="test-section"><h3>Interactive Workflow Test Results</h3>';
+            
+            try {
+                // Reset builder first
+                if (iframeWindow.BarcodeBuilder) {
+                    iframeWindow.BarcodeBuilder.reset();
+                    html += '<div class="step-test">✅ Builder reset successfully</div>';
+                } else {
+                    html += '<div class="step-test">❌ BarcodeBuilder not available</div>';
+                    resultsDiv.innerHTML = html + '</div>';
+                    return;
+                }
+                
+                // Test step progression simulation
+                const steps = ['container', 'owner', 'strain', 'media', 'stage', 'tissue', 'date'];
+                const stepData = testData;
+                
+                steps.forEach((step, index) => {
+                    try {
+                        // Check if we can get step config
+                        const config = iframeWindow.BuilderStepManager.getStepConfig(step);
+                        if (config) {
+                            html += `<div class="step-test">✅ Step ${index + 1} (${step}): Configuration valid</div>`;
+                        } else {
+                            html += `<div class="step-test">❌ Step ${index + 1} (${step}): No configuration</div>`;
+                        }
+                        
+                        // Test validation for this step
+                        const isValid = iframeWindow.DataUtils.validateInput(step, stepData[step]);
+                        if (isValid) {
+                            html += `<div class="step-test">✅ Step ${index + 1} (${step}): Validation passes for "${stepData[step]}"</div>`;
+                        } else {
+                            html += `<div class="step-test">❌ Step ${index + 1} (${step}): Validation fails for "${stepData[step]}"</div>`;
+                        }
+                    } catch (error) {
+                        html += `<div class="step-test">❌ Step ${index + 1} (${step}): Error - ${error.message}</div>`;
+                    }
+                });
+                
+                // Test barcode generation with complete data
+                try {
+                    // Set all values in builder state
+                    Object.keys(stepData).forEach(key => {
+                        iframeWindow.StateManager.setState(`builderState.values.${key}`, stepData[key]);
+                    });
+                    
+                    // Try to generate barcode
+                    const canGenerate = iframeWindow.BarcodeBuilder.isReadyToGenerate();
+                    if (canGenerate) {
+                        html += '<div class="step-test">✅ Ready to generate barcode with complete data</div>';
+                        
+                        // Test validation of all values
+                        const values = iframeWindow.appState.builderState.values;
+                        const allValid = iframeWindow.BuilderBarcodeGenerator.validateAllValues(values);
+                        if (allValid) {
+                            html += '<div class="step-test">✅ All values validation passes</div>';
+                        } else {
+                            html += '<div class="step-test">❌ All values validation fails</div>';
+                        }
+                    } else {
+                        html += '<div class="step-test">❌ Not ready to generate barcode</div>';
+                    }
+                } catch (error) {
+                    html += `<div class="step-test">❌ Barcode generation test error: ${error.message}</div>`;
+                }
+                
+            } catch (error) {
+                html += `<div class="step-test">❌ Interactive test error: ${error.message}</div>`;
+            }
+            
+            html += '</div>';
+            resultsDiv.innerHTML = html;
+        }
+
+        function addTest(name, testFunction) {
+            try {
+                const result = testFunction();
+                testResults.push({
+                    name: name,
+                    passed: result,
+                    error: null
+                });
+            } catch (error) {
+                testResults.push({
+                    name: name,
+                    passed: false,
+                    error: error.message
+                });
+            }
+        }
+
+        function displayTestResults() {
+            const resultsDiv = document.getElementById('testResults');
+            let passCount = 0;
+            
+            let html = '<h3>Automated Test Results:</h3>';
+            
+            // Group tests by category
+            const categories = {
+                'Module Loading': [],
+                'Initialization': [],
+                'Step Management': [],
+                'Barcode Generation': [],
+                'UI Integration': [],
+                'Data Validation': [],
+                'Other': []
+            };
+            
+            testResults.forEach(test => {
+                if (test.passed) passCount++;
+                
+                let category = 'Other';
+                if (test.name.includes('exists') || test.name.includes('module')) category = 'Module Loading';
+                else if (test.name.includes('initialized') || test.name.includes('initial')) category = 'Initialization';
+                else if (test.name.includes('step') || test.name.includes('Step')) category = 'Step Management';
+                else if (test.name.includes('barcode') || test.name.includes('Barcode')) category = 'Barcode Generation';
+                else if (test.name.includes('element') || test.name.includes('UI')) category = 'UI Integration';
+                else if (test.name.includes('validation') || test.name.includes('Validation')) category = 'Data Validation';
+                
+                categories[category].push(test);
+            });
+            
+            // Display results by category
+            Object.keys(categories).forEach(category => {
+                if (categories[category].length > 0) {
+                    html += `<h4>${category}:</h4>`;
+                    categories[category].forEach(test => {
+                        const cssClass = test.passed ? 'test-pass' : 'test-fail';
+                        const icon = test.passed ? '✅' : '❌';
+                        const errorMsg = test.error ? ` (Error: ${test.error})` : '';
+                        
+                        html += `<div class="test-result ${cssClass}">
+                            ${icon} ${test.name}: ${test.passed ? 'PASS' : 'FAIL'}${errorMsg}
+                        </div>`;
+                    });
+                }
+            });
+            
+            // Add summary
+            const successRate = Math.round((passCount / testResults.length) * 100);
+            const summaryClass = successRate >= 90 ? 'test-pass' : successRate >= 70 ? 'test-warn' : 'test-fail';
+            
+            html += `<div class="test-result ${summaryClass}" style="margin-top: 20px; font-weight: bold;">
+                📊 Summary: ${passCount}/${testResults.length} tests passed (${successRate}%)
+            </div>`;
+            
+            // Check for console errors
+            const errors = consoleMessages.filter(msg => msg.type === 'error');
+            if (errors.length > 0) {
+                html += `<div class="test-result test-fail">
+                    ⚠️ ${errors.length} JavaScript error(s) detected in console
+                </div>`;
+            } else {
+                html += `<div class="test-result test-pass">
+                    ✅ No JavaScript errors detected
+                </div>`;
+            }
+            
+            resultsDiv.innerHTML = html;
+        }
+
+        // Initialize when iframe loads
+        document.getElementById('appFrame').onload = function() {
+            setTimeout(() => {
+                captureConsoleOutput();
+                // Auto-run tests after a delay
+                setTimeout(runAllTests, 2000);
+            }, 1000);
+        };
+    </script>
+</body>
+</html>

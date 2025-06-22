@@ -17,7 +17,14 @@ const requiredFiles = [
     'src/js/core/notifications.js',
     'src/js/utils/dataUtils.js',
     'src/js/utils/uiUtils.js',
-    'tests/phase3-validation.html'
+    'src/js/modules/builder/stepManager.js',
+    'src/js/modules/builder/barcodeGenerator.js',
+    'src/js/modules/builder/builderMain.js',
+    'src/js/modules/transfer/inputManager.js',
+    'src/js/modules/transfer/transferProcessor.js',
+    'src/js/modules/transfer/transferMain.js',
+    'tests/phase3-validation.html',
+    'tests/phase4-validation.html'
 ];
 
 let filesExist = 0;
@@ -41,7 +48,13 @@ const jsFiles = [
     'src/js/core/state.js',
     'src/js/core/notifications.js',
     'src/js/utils/dataUtils.js',
-    'src/js/utils/uiUtils.js'
+    'src/js/utils/uiUtils.js',
+    'src/js/modules/builder/stepManager.js',
+    'src/js/modules/builder/barcodeGenerator.js',
+    'src/js/modules/builder/builderMain.js',
+    'src/js/modules/transfer/inputManager.js',
+    'src/js/modules/transfer/transferProcessor.js',
+    'src/js/modules/transfer/transferMain.js'
 ];
 
 let modulesValid = 0;
@@ -68,6 +81,7 @@ if (fs.existsSync('index.html')) {
     const checks = [
         { name: 'Has CSS link', test: () => htmlContent.includes('src/styles/main.css') },
         { name: 'Has JS modules', test: () => htmlContent.includes('src/js/core/state.js') },
+        { name: 'Has builder modules', test: () => htmlContent.includes('src/js/modules/builder/stepManager.js') },
         { name: 'Has builder section', test: () => htmlContent.includes('builderSection') },
         { name: 'Has transfer section', test: () => htmlContent.includes('transferSection') },
         { name: 'Has notification div', test: () => htmlContent.includes('id="notification"') }

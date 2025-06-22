@@ -31,6 +31,11 @@ function initializeApp() {
         BarcodeBuilder.initialize();
     }
     
+    // Initialize transfer module
+    if (window.ContainerTransfer) {
+        ContainerTransfer.initialize();
+    }
+    
     // Show initial status
     NotificationSystem.info('Lab system ready! Load Excel data to begin.');
     
@@ -154,17 +159,15 @@ function handleBuilderInput() {
 
 function handleSourceContainerInput() {
     const input = document.getElementById('sourceContainerInput').value.trim();
-    if (input) {
-        NotificationSystem.info('Transfer input functionality will be implemented in Phase 5');
-        console.log('Source container input:', input);
+    if (input && window.ContainerTransfer) {
+        ContainerTransfer.handleSourceInput(input);
     }
 }
 
 function handleDestContainerInput() {
     const input = document.getElementById('destContainerInput').value.trim();
-    if (input) {
-        NotificationSystem.info('Destination input functionality will be implemented in Phase 5');
-        console.log('Destination container input:', input);
+    if (input && window.ContainerTransfer) {
+        ContainerTransfer.handleDestInput(input);
     }
 }
 
@@ -186,55 +189,52 @@ function useGeneratedBarcode() {
 }
 
 function selectTransferMode(mode) {
-    StateManager.setState('transferState.mode', mode);
-    
-    // Update UI
-    UIUtils.removeClass('singleTransferOption', 'selected');
-    UIUtils.removeClass('splitTransferOption', 'selected');
-    
-    if (mode === 'single') {
-        UIUtils.addClass('singleTransferOption', 'selected');
-        UIUtils.showElement('singleTransferDetails', true);
-        UIUtils.showElement('splitTransferDetails', false);
+    if (window.ContainerTransfer) {
+        ContainerTransfer.handleModeChange(mode);
     } else {
-        UIUtils.addClass('splitTransferOption', 'selected');
-        UIUtils.showElement('singleTransferDetails', false);
-        UIUtils.showElement('splitTransferDetails', true);
+        // Fallback for legacy support
+        StateManager.setState('transferState.mode', mode);
+        console.log('Transfer mode set to:', mode);
     }
-    
-    console.log('Transfer mode set to:', mode);
 }
 
 function adjustSplitCount(change) {
     const currentCount = StateManager.getState('transferState.splitCount');
     const newCount = Math.max(2, Math.min(10, currentCount + change));
     
-    StateManager.setState('transferState.splitCount', newCount);
-    UIUtils.updateContent('splitCount', newCount);
-    
-    // Update button states
-    const decreaseBtn = document.getElementById('decreaseBtn');
-    const increaseBtn = document.getElementById('increaseBtn');
-    
-    if (decreaseBtn) decreaseBtn.disabled = newCount <= 2;
-    if (increaseBtn) increaseBtn.disabled = newCount >= 10;
+    if (window.ContainerTransfer) {
+        ContainerTransfer.handleSplitCountChange(newCount);
+    } else {
+        // Fallback for legacy support
+        StateManager.setState('transferState.splitCount', newCount);
+        UIUtils.updateContent('splitCount', newCount);
+    }
 }
 
 function processTransfer() {
-    NotificationSystem.info('Transfer functionality will be implemented in Phase 5');
+    if (window.ContainerTransfer) {
+        ContainerTransfer.processTransfer();
+    } else {
+        NotificationSystem.info('Transfer functionality not available');
+    }
 }
 
 function clearTransfer() {
-    StateManager.resetTransferState();
-    UIUtils.clearInput('sourceContainerInput');
-    UIUtils.clearInput('destContainerInput');
-    UIUtils.updateContent('sourceContainerValue', '-');
-    UIUtils.updateContent('destContainerValue', '-');
-    UIUtils.updateContent('sourceSummary', 'Scan to see contents');
-    UIUtils.updateContent('destSummary', 'Single or multiple containers');
-    UIUtils.removeClass('sourceContainer', 'filled');
-    UIUtils.removeClass('destContainer', 'filled');
-    NotificationSystem.info('Transfer cleared');
+    if (window.ContainerTransfer) {
+        ContainerTransfer.clearTransfer();
+    } else {
+        // Fallback for legacy support
+        StateManager.resetTransferState();
+        UIUtils.clearInput('sourceContainerInput');
+        UIUtils.clearInput('destContainerInput');
+        UIUtils.updateContent('sourceContainerValue', '-');
+        UIUtils.updateContent('destContainerValue', '-');
+        UIUtils.updateContent('sourceSummary', 'Scan to see contents');
+        UIUtils.updateContent('destSummary', 'Single or multiple containers');
+        UIUtils.removeClass('sourceContainer', 'filled');
+        UIUtils.removeClass('destContainer', 'filled');
+        NotificationSystem.info('Transfer cleared');
+    }
 }
 
 function exportInventory() {

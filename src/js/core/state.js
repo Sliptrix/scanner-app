@@ -53,13 +53,10 @@ window.appState = {
     
     // Container Transfer state
     transferState: {
-        source: null,
-        sourceData: null,
-        destination: null,
         mode: 'single', // 'single' or 'split'
         splitCount: 2,
-        maxSplitCount: 10,
-        totalTissueCount: 0
+        sourceContainer: null,
+        destContainer: null
     }
 };
 
@@ -117,13 +114,10 @@ window.StateManager = {
     
     resetTransferState: function() {
         window.appState.transferState = {
-            source: null,
-            sourceData: null,
-            destination: null,
             mode: 'single',
             splitCount: 2,
-            maxSplitCount: 10,
-            totalTissueCount: 0
+            sourceContainer: null,
+            destContainer: null
         };
         console.log('Transfer state reset');
     },
