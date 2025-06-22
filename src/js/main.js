@@ -26,6 +26,11 @@ function initializeApp() {
     // Update initial stats
     UIUtils.updateStats();
     
+    // Initialize builder module if in builder mode
+    if (window.appState.mode === 'builder') {
+        BarcodeBuilder.initialize();
+    }
+    
     // Show initial status
     NotificationSystem.info('Lab system ready! Load Excel data to begin.');
     
@@ -141,13 +146,10 @@ function loadExcelFile(file) {
     reader.readAsArrayBuffer(file);
 }
 
-// Input handling functions (placeholder implementations for now)
+// Input handling functions
 function handleBuilderInput() {
-    const input = document.getElementById('builderInput').value.trim();
-    if (input) {
-        NotificationSystem.info('Builder input functionality will be implemented in Phase 4');
-        console.log('Builder input:', input);
-    }
+    // Builder input is now handled by BuilderStepManager
+    BuilderStepManager.handleInput();
 }
 
 function handleSourceContainerInput() {
@@ -172,18 +174,15 @@ function switchMode(mode) {
 }
 
 function nextBuilderStep() {
-    NotificationSystem.info('Builder step functionality will be implemented in Phase 4');
+    BarcodeBuilder.nextStep();
 }
 
 function resetBuilder() {
-    StateManager.resetBuilderState();
-    UIUtils.clearInput('builderInput');
-    UIUtils.showElement('generatedBarcode', false);
-    NotificationSystem.info('Builder reset');
+    BarcodeBuilder.reset();
 }
 
 function useGeneratedBarcode() {
-    NotificationSystem.info('Barcode save functionality will be implemented in Phase 4');
+    BarcodeBuilder.saveBarcode();
 }
 
 function selectTransferMode(mode) {

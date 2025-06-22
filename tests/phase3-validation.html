@@ -1,0 +1,412 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Phase 3 Validation Test - Core Infrastructure</title>
+    <style>
+        body { 
+            font-family: Arial, sans-serif; 
+            padding: 20px; 
+            background: #f5f5f5; 
+        }
+        .test-container { 
+            background: white; 
+            padding: 20px; 
+            border-radius: 8px; 
+            margin-bottom: 20px; 
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .test-result { 
+            padding: 10px; 
+            margin: 10px 0; 
+            border-radius: 4px; 
+        }
+        .test-pass { 
+            background: #d4edda; 
+            color: #155724; 
+            border: 1px solid #c3e6cb; 
+        }
+        .test-fail { 
+            background: #f8d7da; 
+            color: #721c24; 
+            border: 1px solid #f5c6cb; 
+        }
+        .test-warn {
+            background: #fff3cd;
+            color: #856404;
+            border: 1px solid #ffeaa7;
+        }
+        .iframe-container {
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            overflow: hidden;
+            margin: 20px 0;
+        }
+        iframe {
+            width: 100%;
+            height: 600px;
+            border: none;
+        }
+        .test-section {
+            margin: 20px 0;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+        }
+        .console-output {
+            background: #f8f9fa;
+            border: 1px solid #e9ecef;
+            border-radius: 4px;
+            padding: 10px;
+            margin-top: 10px;
+            font-family: monospace;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+    </style>
+</head>
+<body>
+    <h1>🧪 Phase 3 Validation Test - Core Infrastructure</h1>
+    
+    <div class="test-container">
+        <h2>Application Load Test</h2>
+        <p>The application should load with the new modular JavaScript architecture.</p>
+        
+        <div class="iframe-container">
+            <iframe src="../index.html" id="appFrame"></iframe>
+        </div>
+    </div>
+
+    <div class="test-container">
+        <h2>Automated Functionality Tests</h2>
+        <button onclick="runAllTests()" style="padding: 10px 20px; background: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer;">Run All Tests</button>
+        <div id="testResults"></div>
+    </div>
+
+    <div class="test-container">
+        <h2>Console Output Monitor</h2>
+        <p>Monitor for any JavaScript errors or warnings:</p>
+        <div id="consoleOutput" class="console-output">
+            Console monitoring will appear here...
+        </div>
+    </div>
+
+    <script>
+        let testResults = [];
+        let consoleMessages = [];
+
+        // Capture console output from iframe
+        function captureConsoleOutput() {
+            const iframe = document.getElementById('appFrame');
+            try {
+                const iframeWindow = iframe.contentWindow;
+                if (iframeWindow && iframeWindow.console) {
+                    const originalLog = iframeWindow.console.log;
+                    const originalError = iframeWindow.console.error;
+                    const originalWarn = iframeWindow.console.warn;
+                    
+                    iframeWindow.console.log = function(...args) {
+                        consoleMessages.push({type: 'log', message: args.join(' ')});
+                        updateConsoleDisplay();
+                        originalLog.apply(this, args);
+                    };
+                    
+                    iframeWindow.console.error = function(...args) {
+                        consoleMessages.push({type: 'error', message: args.join(' ')});
+                        updateConsoleDisplay();
+                        originalError.apply(this, args);
+                    };
+                    
+                    iframeWindow.console.warn = function(...args) {
+                        consoleMessages.push({type: 'warn', message: args.join(' ')});
+                        updateConsoleDisplay();
+                        originalWarn.apply(this, args);
+                    };
+                }
+            } catch (error) {
+                console.log('Could not capture iframe console output:', error);
+            }
+        }
+
+        function updateConsoleDisplay() {
+            const output = document.getElementById('consoleOutput');
+            output.innerHTML = consoleMessages.map(msg => 
+                `<div style="color: ${getMessageColor(msg.type)}">[${msg.type.toUpperCase()}] ${msg.message}</div>`
+            ).join('');
+            output.scrollTop = output.scrollHeight;
+        }
+
+        function getMessageColor(type) {
+            switch(type) {
+                case 'error': return '#dc3545';
+                case 'warn': return '#ffc107';
+                case 'log': return '#28a745';
+                default: return '#000';
+            }
+        }
+
+        function runAllTests() {
+            const resultsDiv = document.getElementById('testResults');
+            resultsDiv.innerHTML = '<p>Running comprehensive Phase 3 tests...</p>';
+            
+            testResults = [];
+            
+            setTimeout(() => {
+                // Test 1: Core infrastructure loading
+                runInfrastructureTests();
+                
+                // Test 2: State management
+                runStateManagementTests();
+                
+                // Test 3: Notification system
+                runNotificationTests();
+                
+                // Test 4: UI utilities
+                runUIUtilityTests();
+                
+                // Test 5: Data utilities
+                runDataUtilityTests();
+                
+                // Test 6: Event handling
+                runEventHandlingTests();
+                
+                // Display results
+                displayTestResults();
+            }, 1000);
+        }
+
+        function runInfrastructureTests() {
+            const iframe = document.getElementById('appFrame');
+            const iframeDoc = iframe.contentDocument || iframe.contentWindow.document;
+            const iframeWindow = iframe.contentWindow;
+            
+            // Test core modules exist
+            addTest('StateManager exists', () => !!iframeWindow.StateManager);
+            addTest('NotificationSystem exists', () => !!iframeWindow.NotificationSystem);
+            addTest('DataUtils exists', () => !!iframeWindow.DataUtils);
+            addTest('UIUtils exists', () => !!iframeWindow.UIUtils);
+            addTest('appState exists', () => !!iframeWindow.appState);
+            
+            // Test core elements exist
+            addTest('Builder section exists', () => !!iframeDoc.getElementById('builderSection'));
+            addTest('Transfer section exists', () => !!iframeDoc.getElementById('transferSection'));
+            addTest('Notification element exists', () => !!iframeDoc.getElementById('notification'));
+            addTest('Stats grid exists', () => !!iframeDoc.querySelector('.stats-grid'));
+        }
+
+        function runStateManagementTests() {
+            const iframe = document.getElementById('appFrame');
+            const iframeWindow = iframe.contentWindow;
+            
+            if (iframeWindow.StateManager) {
+                addTest('StateManager.getState works', () => {
+                    return iframeWindow.StateManager.getState('mode') === 'builder';
+                });
+                
+                addTest('StateManager.setState works', () => {
+                    iframeWindow.StateManager.setState('testValue', 'test123');
+                    return iframeWindow.appState.testValue === 'test123';
+                });
+                
+                addTest('StateManager.resetBuilderState works', () => {
+                    iframeWindow.StateManager.resetBuilderState();
+                    return iframeWindow.appState.builderState.currentStep === 0;
+                });
+                
+                addTest('StateManager.resetTransferState works', () => {
+                    iframeWindow.StateManager.resetTransferState();
+                    return iframeWindow.appState.transferState.mode === 'single';
+                });
+            } else {
+                addTest('StateManager not available', () => false);
+            }
+        }
+
+        function runNotificationTests() {
+            const iframe = document.getElementById('appFrame');
+            const iframeWindow = iframe.contentWindow;
+            
+            if (iframeWindow.NotificationSystem) {
+                addTest('NotificationSystem.showNotification exists', () => {
+                    return typeof iframeWindow.NotificationSystem.showNotification === 'function';
+                });
+                
+                addTest('NotificationSystem methods exist', () => {
+                    return typeof iframeWindow.NotificationSystem.success === 'function' &&
+                           typeof iframeWindow.NotificationSystem.error === 'function' &&
+                           typeof iframeWindow.NotificationSystem.info === 'function';
+                });
+                
+                // Test notification display
+                addTest('Notification can be shown', () => {
+                    try {
+                        iframeWindow.NotificationSystem.info('Test notification');
+                        return true;
+                    } catch (error) {
+                        return false;
+                    }
+                });
+            } else {
+                addTest('NotificationSystem not available', () => false);
+            }
+        }
+
+        function runUIUtilityTests() {
+            const iframe = document.getElementById('appFrame');
+            const iframeWindow = iframe.contentWindow;
+            
+            if (iframeWindow.UIUtils) {
+                addTest('UIUtils.switchMode exists', () => {
+                    return typeof iframeWindow.UIUtils.switchMode === 'function';
+                });
+                
+                addTest('UIUtils.updateStats exists', () => {
+                    return typeof iframeWindow.UIUtils.updateStats === 'function';
+                });
+                
+                addTest('UIUtils.updateDataStatus exists', () => {
+                    return typeof iframeWindow.UIUtils.updateDataStatus === 'function';
+                });
+                
+                // Test mode switching
+                addTest('Mode switching works', () => {
+                    try {
+                        iframeWindow.UIUtils.switchMode('transfer');
+                        return iframeWindow.appState.mode === 'transfer';
+                    } catch (error) {
+                        return false;
+                    }
+                });
+            } else {
+                addTest('UIUtils not available', () => false);
+            }
+        }
+
+        function runDataUtilityTests() {
+            const iframe = document.getElementById('appFrame');
+            const iframeWindow = iframe.contentWindow;
+            
+            if (iframeWindow.DataUtils) {
+                addTest('DataUtils.formatDate exists', () => {
+                    return typeof iframeWindow.DataUtils.formatDate === 'function';
+                });
+                
+                addTest('DataUtils.validateInput exists', () => {
+                    return typeof iframeWindow.DataUtils.validateInput === 'function';
+                });
+                
+                addTest('DataUtils.getNextContainerId exists', () => {
+                    return typeof iframeWindow.DataUtils.getNextContainerId === 'function';
+                });
+                
+                // Test date formatting
+                addTest('Date formatting works', () => {
+                    const result = iframeWindow.DataUtils.formatDate('20250622');
+                    return result === '06/22/2025';
+                });
+                
+                // Test validation
+                addTest('Input validation works', () => {
+                    return iframeWindow.DataUtils.validateInput('container', '1234') === true &&
+                           iframeWindow.DataUtils.validateInput('container', 'abc') === false;
+                });
+            } else {
+                addTest('DataUtils not available', () => false);
+            }
+        }
+
+        function runEventHandlingTests() {
+            const iframe = document.getElementById('appFrame');
+            const iframeDoc = iframe.contentDocument || iframe.contentWindow.document;
+            const iframeWindow = iframe.contentWindow;
+            
+            // Test global functions exist
+            addTest('switchMode global function exists', () => {
+                return typeof iframeWindow.switchMode === 'function';
+            });
+            
+            addTest('resetBuilder global function exists', () => {
+                return typeof iframeWindow.resetBuilder === 'function';
+            });
+            
+            addTest('clearTransfer global function exists', () => {
+                return typeof iframeWindow.clearTransfer === 'function';
+            });
+            
+            // Test file input exists
+            addTest('File input element exists', () => {
+                return !!iframeDoc.getElementById('fileInput');
+            });
+            
+            // Test builder input exists
+            addTest('Builder input element exists', () => {
+                return !!iframeDoc.getElementById('builderInput');
+            });
+        }
+
+        function addTest(name, testFunction) {
+            try {
+                const result = testFunction();
+                testResults.push({
+                    name: name,
+                    passed: result,
+                    error: null
+                });
+            } catch (error) {
+                testResults.push({
+                    name: name,
+                    passed: false,
+                    error: error.message
+                });
+            }
+        }
+
+        function displayTestResults() {
+            const resultsDiv = document.getElementById('testResults');
+            let passCount = 0;
+            
+            let html = '<h3>Test Results:</h3>';
+            
+            testResults.forEach(test => {
+                if (test.passed) passCount++;
+                
+                const cssClass = test.passed ? 'test-pass' : 'test-fail';
+                const icon = test.passed ? '✅' : '❌';
+                const errorMsg = test.error ? ` (Error: ${test.error})` : '';
+                
+                html += `<div class="test-result ${cssClass}">
+                    ${icon} ${test.name}: ${test.passed ? 'PASS' : 'FAIL'}${errorMsg}
+                </div>`;
+            });
+            
+            // Add summary
+            const successRate = Math.round((passCount / testResults.length) * 100);
+            const summaryClass = successRate >= 90 ? 'test-pass' : successRate >= 70 ? 'test-warn' : 'test-fail';
+            
+            html += `<div class="test-result ${summaryClass}" style="margin-top: 20px; font-weight: bold;">
+                📊 Summary: ${passCount}/${testResults.length} tests passed (${successRate}%)
+            </div>`;
+            
+            // Check for console errors
+            const errors = consoleMessages.filter(msg => msg.type === 'error');
+            if (errors.length > 0) {
+                html += `<div class="test-result test-fail">
+                    ⚠️ ${errors.length} JavaScript error(s) detected in console
+                </div>`;
+            }
+            
+            resultsDiv.innerHTML = html;
+        }
+
+        // Initialize when iframe loads
+        document.getElementById('appFrame').onload = function() {
+            setTimeout(() => {
+                captureConsoleOutput();
+                // Auto-run tests after a delay
+                setTimeout(runAllTests, 2000);
+            }, 1000);
+        };
+    </script>
+</body>
+</html>
