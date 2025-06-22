@@ -1,0 +1,359 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Phase 5 Validation - Container Transfer Feature</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: #333;
+            min-height: 100vh;
+        }
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+            background: white;
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+        h1 { color: #2c3e50; text-align: center; margin-bottom: 30px; }
+        h2 { color: #34495e; border-bottom: 2px solid #3498db; padding-bottom: 10px; }
+        .test-section {
+            margin: 20px 0;
+            padding: 20px;
+            border: 1px solid #e9ecef;
+            border-radius: 8px;
+            background: #f8f9fa;
+        }
+        .test-result {
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 6px;
+            font-weight: bold;
+        }
+        .test-pass { background: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+        .test-fail { background: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+        .test-warning { background: #fff3cd; color: #856404; border: 1px solid #ffeaa7; }
+        .manual-test {
+            background: #e2e3e5;
+            padding: 15px;
+            border-radius: 6px;
+            margin: 10px 0;
+        }
+        .manual-test h4 { margin-top: 0; color: #495057; }
+        button {
+            background: #3498db;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 5px;
+        }
+        button:hover { background: #2980b9; }
+        button:disabled { background: #95a5a6; cursor: not-allowed; }
+        #results { margin-top: 30px; }
+        .phase-summary {
+            background: linear-gradient(135deg, #74b9ff, #0984e3);
+            color: white;
+            padding: 20px;
+            border-radius: 8px;
+            text-align: center;
+            margin: 20px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🧪 Phase 5 Validation: Container Transfer Feature</h1>
+        
+        <div class="phase-summary">
+            <h3>🌱 Container Transfer & Tissue Splitting Validation</h3>
+            <p>Testing comprehensive transfer functionality including single transfers and tissue splitting capabilities</p>
+        </div>
+
+        <div class="test-section">
+            <h2>🔧 Module Loading Tests</h2>
+            <button onclick="runModuleTests()">Run Module Tests</button>
+            <div id="moduleResults"></div>
+        </div>
+
+        <div class="test-section">
+            <h2>🎯 Transfer Input Manager Tests</h2>
+            <button onclick="runInputManagerTests()">Run Input Manager Tests</button>
+            <div id="inputManagerResults"></div>
+        </div>
+
+        <div class="test-section">
+            <h2>🔄 Transfer Processor Tests</h2>
+            <button onclick="runTransferProcessorTests()">Run Transfer Processor Tests</button>
+            <div id="transferProcessorResults"></div>
+        </div>
+
+        <div class="test-section">
+            <h2>🌱 Container Transfer Integration Tests</h2>
+            <button onclick="runIntegrationTests()">Run Integration Tests</button>
+            <div id="integrationResults"></div>
+        </div>
+
+        <div class="test-section">
+            <h2>🧪 Manual Functional Tests</h2>
+            
+            <div class="manual-test">
+                <h4>1. Test Container Input Validation</h4>
+                <p>1. Switch to Transfer mode in main application</p>
+                <p>2. Try entering various container IDs in source input</p>
+                <p>3. Verify validation messages appear for invalid inputs</p>
+                <p>4. Confirm valid container IDs are accepted</p>
+                <button onclick="markManualTest(1, true)">✅ Pass</button>
+                <button onclick="markManualTest(1, false)">❌ Fail</button>
+                <div id="manual1"></div>
+            </div>
+
+            <div class="manual-test">
+                <h4>2. Test Single Container Transfer</h4>
+                <p>1. Load Excel data with sample containers</p>
+                <p>2. Enter a valid source container ID</p>
+                <p>3. Enter a valid destination container ID</p>
+                <p>4. Select 'Single Container' transfer mode</p>
+                <p>5. Process transfer and verify inventory updates</p>
+                <button onclick="markManualTest(2, true)">✅ Pass</button>
+                <button onclick="markManualTest(2, false)">❌ Fail</button>
+                <div id="manual2"></div>
+            </div>
+
+            <div class="manual-test">
+                <h4>3. Test Tissue Splitting</h4>
+                <p>1. Enter a source container with multiple samples</p>
+                <p>2. Select 'Split Tissues' transfer mode</p>
+                <p>3. Adjust split count (2-10 containers)</p>
+                <p>4. Verify split preview shows correct distribution</p>
+                <p>5. Process split and verify new containers created</p>
+                <button onclick="markManualTest(3, true)">✅ Pass</button>
+                <button onclick="markManualTest(3, false)">❌ Fail</button>
+                <div id="manual3"></div>
+            </div>
+
+            <div class="manual-test">
+                <h4>4. Test Transfer History</h4>
+                <p>1. Perform several transfer operations</p>
+                <p>2. Verify transfer history appears</p>
+                <p>3. Check history shows correct details</p>
+                <p>4. Confirm timestamps and sample counts</p>
+                <button onclick="markManualTest(4, true)">✅ Pass</button>
+                <button onclick="markManualTest(4, false)">❌ Fail</button>
+                <div id="manual4"></div>
+            </div>
+        </div>
+
+        <div id="results"></div>
+    </div>
+
+    <!-- Load application scripts in correct order -->
+    <script src="../src/js/core/state.js"></script>
+    <script src="../src/js/core/notifications.js"></script>
+    <script src="../src/js/utils/dataUtils.js"></script>
+    <script src="../src/js/utils/uiUtils.js"></script>
+    <script src="../src/js/modules/transfer/inputManager.js"></script>
+    <script src="../src/js/modules/transfer/transferProcessor.js"></script>
+    <script src="../src/js/modules/transfer/transferMain.js"></script>
+
+    <script>
+        let testResults = {
+            total: 0,
+            passed: 0,
+            failed: 0,
+            manualTests: {}
+        };
+
+        function addResult(container, testName, passed, message) {
+            testResults.total++;
+            if (passed) {
+                testResults.passed++;
+            } else {
+                testResults.failed++;
+            }
+
+            const div = document.createElement('div');
+            div.className = passed ? 'test-result test-pass' : 'test-result test-fail';
+            div.innerHTML = `${passed ? '✅' : '❌'} ${testName}: ${message}`;
+            document.getElementById(container).appendChild(div);
+        }
+
+        function runModuleTests() {
+            const container = 'moduleResults';
+            document.getElementById(container).innerHTML = '';
+
+            // Test 1: Check if transfer modules are loaded
+            addResult(container, 'Transfer Input Manager Module', 
+                typeof window.TransferInputManager !== 'undefined',
+                typeof window.TransferInputManager !== 'undefined' ? 'Module loaded successfully' : 'Module not found');
+
+            addResult(container, 'Transfer Processor Module', 
+                typeof window.TransferProcessor !== 'undefined',
+                typeof window.TransferProcessor !== 'undefined' ? 'Module loaded successfully' : 'Module not found');
+
+            addResult(container, 'Container Transfer Module', 
+                typeof window.ContainerTransfer !== 'undefined',
+                typeof window.ContainerTransfer !== 'undefined' ? 'Module loaded successfully' : 'Module not found');
+
+            // Test 2: Check if modules have required methods
+            if (window.TransferInputManager) {
+                const hasInitialize = typeof window.TransferInputManager.initialize === 'function';
+                addResult(container, 'Input Manager API', hasInitialize,
+                    hasInitialize ? 'All required methods present' : 'Missing required methods');
+            }
+
+            if (window.TransferProcessor) {
+                const hasProcess = typeof window.TransferProcessor.processTransfer === 'function';
+                addResult(container, 'Transfer Processor API', hasProcess,
+                    hasProcess ? 'All required methods present' : 'Missing required methods');
+            }
+
+            if (window.ContainerTransfer) {
+                const hasInit = typeof window.ContainerTransfer.initialize === 'function';
+                addResult(container, 'Container Transfer API', hasInit,
+                    hasInit ? 'All required methods present' : 'Missing required methods');
+            }
+        }
+
+        function runInputManagerTests() {
+            const container = 'inputManagerResults';
+            document.getElementById(container).innerHTML = '';
+
+            if (!window.TransferInputManager) {
+                addResult(container, 'Input Manager Tests', false, 'TransferInputManager not loaded');
+                return;
+            }
+
+            try {
+                // Test container ID validation
+                const validId = window.TransferInputManager.validateContainerId('12345');
+                addResult(container, 'Container ID Validation (Valid)', validId,
+                    validId ? 'Valid container ID accepted' : 'Valid container ID rejected');
+
+                const invalidId = !window.TransferInputManager.validateContainerId('invalid');
+                addResult(container, 'Container ID Validation (Invalid)', invalidId,
+                    invalidId ? 'Invalid container ID rejected' : 'Invalid container ID accepted');
+
+                // Test initialization
+                window.TransferInputManager.initialize();
+                addResult(container, 'Input Manager Initialization', true, 'Initialized without errors');
+
+            } catch (error) {
+                addResult(container, 'Input Manager Tests', false, 'Error: ' + error.message);
+            }
+        }
+
+        function runTransferProcessorTests() {
+            const container = 'transferProcessorResults';
+            document.getElementById(container).innerHTML = '';
+
+            if (!window.TransferProcessor) {
+                addResult(container, 'Transfer Processor Tests', false, 'TransferProcessor not loaded');
+                return;
+            }
+
+            try {
+                // Test initialization
+                window.TransferProcessor.initialize();
+                addResult(container, 'Transfer Processor Initialization', true, 'Initialized without errors');
+
+                // Test preview split function
+                const hasPreview = typeof window.TransferProcessor.previewSplit === 'function';
+                addResult(container, 'Preview Split Function', hasPreview,
+                    hasPreview ? 'Preview split function available' : 'Preview split function missing');
+
+                // Test transfer history function
+                const hasHistory = typeof window.TransferProcessor.updateTransferHistoryDisplay === 'function';
+                addResult(container, 'Transfer History Function', hasHistory,
+                    hasHistory ? 'Transfer history function available' : 'Transfer history function missing');
+
+            } catch (error) {
+                addResult(container, 'Transfer Processor Tests', false, 'Error: ' + error.message);
+            }
+        }
+
+        function runIntegrationTests() {
+            const container = 'integrationResults';
+            document.getElementById(container).innerHTML = '';
+
+            if (!window.ContainerTransfer) {
+                addResult(container, 'Integration Tests', false, 'ContainerTransfer not loaded');
+                return;
+            }
+
+            try {
+                // Test full initialization
+                window.ContainerTransfer.initialize();
+                addResult(container, 'Full Module Initialization', true, 'All modules initialized successfully');
+
+                // Test state management integration
+                const hasState = typeof window.StateManager !== 'undefined';
+                addResult(container, 'State Management Integration', hasState,
+                    hasState ? 'StateManager available for integration' : 'StateManager not available');
+
+                // Test transfer state setup
+                if (hasState) {
+                    const transferState = window.StateManager.getState('transferState');
+                    const hasTransferState = transferState !== undefined;
+                    addResult(container, 'Transfer State Setup', hasTransferState,
+                        hasTransferState ? 'Transfer state properly configured' : 'Transfer state not found');
+                }
+
+                // Test mode switching
+                window.ContainerTransfer.handleModeChange('single');
+                window.ContainerTransfer.handleModeChange('split');
+                addResult(container, 'Mode Switching', true, 'Mode switching works without errors');
+
+                // Test split count handling
+                window.ContainerTransfer.handleSplitCountChange(3);
+                addResult(container, 'Split Count Management', true, 'Split count management works without errors');
+
+            } catch (error) {
+                addResult(container, 'Integration Tests', false, 'Error: ' + error.message);
+            }
+        }
+
+        function markManualTest(testNumber, passed) {
+            testResults.manualTests[testNumber] = passed;
+            const container = `manual${testNumber}`;
+            const message = passed ? '✅ Manual test passed' : '❌ Manual test failed';
+            const className = passed ? 'test-result test-pass' : 'test-result test-fail';
+            
+            document.getElementById(container).innerHTML = `<div class="${className}">${message}</div>`;
+            updateSummary();
+        }
+
+        function updateSummary() {
+            const manualPassed = Object.values(testResults.manualTests).filter(r => r).length;
+            const manualTotal = Object.keys(testResults.manualTests).length;
+            
+            const totalTests = testResults.total + manualTotal;
+            const totalPassed = testResults.passed + manualPassed;
+            const successRate = totalTests > 0 ? Math.round((totalPassed / totalTests) * 100) : 0;
+
+            document.getElementById('results').innerHTML = `
+                <div class="phase-summary">
+                    <h3>📊 Phase 5 Validation Results</h3>
+                    <p><strong>Automated Tests:</strong> ${testResults.passed}/${testResults.total} passed</p>
+                    <p><strong>Manual Tests:</strong> ${manualPassed}/${manualTotal} completed</p>
+                    <p><strong>Overall Success Rate:</strong> ${totalPassed}/${totalTests} (${successRate}%)</p>
+                    <p><strong>Status:</strong> ${successRate >= 90 ? '✅ PHASE 5 READY' : successRate >= 70 ? '⚠️ NEEDS REVIEW' : '❌ ISSUES FOUND'}</p>
+                </div>
+            `;
+        }
+
+        // Initialize on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('Phase 5 Validation Test Page Loaded');
+            updateSummary();
+        });
+    </script>
+</body>
+</html>
