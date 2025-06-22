@@ -56,10 +56,16 @@ window.TransferInputManager = (function() {
 
         updateSourceDisplay(containerId, containerData);
         
-        // Trigger smart suggestions display if in split mode
+        // Trigger smart suggestions and auto-set split count if in split mode
         const transferMode = StateManager.getState('transferState.mode');
-        if (transferMode === 'split' && window.ContainerTransfer) {
-            ContainerTransfer.updateSplitPreview();
+        if (transferMode === 'split') {
+            // Auto-generate split count suggestions based on sample count
+            autoGenerateSplitSuggestions(containerData);
+            
+            // Update split preview
+            if (window.ContainerTransfer) {
+                ContainerTransfer.updateSplitPreview();
+            }
         }
         
         NotificationSystem.success(`Source container ${containerId} loaded`);
@@ -75,12 +81,18 @@ window.TransferInputManager = (function() {
 
     // Handle destination container input processing
     function processDestContainer(containerId) {
+        // For split mode, destination is auto-generated, so skip manual input
+        const transferMode = StateManager.getState('transferState.mode');
+        if (transferMode === 'split') {
+            NotificationSystem.info('Split mode auto-generates destination containers');
+            return true;
+        }
+        
         if (!validateContainerId(containerId)) {
             return false;
         }
 
         // Check if destination already exists (for single mode)
-        const transferMode = StateManager.getState('transferState.mode');
         const existingContainer = findContainerInInventory(containerId);
         
         if (transferMode === 'single') {
@@ -129,7 +141,13 @@ window.TransferInputManager = (function() {
     // Find container data in inventory
     function findContainerInInventory(containerId) {
         const inventory = StateManager.getState('inventory');
-        const containers = inventory.filter(item => item.containerId === containerId);
+        // Handle both string and integer container IDs
+        const numericId = parseInt(containerId);
+        const containers = inventory.filter(item => 
+            item.containerId === containerId || 
+            item.containerId === numericId ||
+            parseInt(item.containerId) === numericId
+        );
         
         if (containers.length === 0) {
             return null;
@@ -294,6 +312,96 @@ window.TransferInputManager = (function() {
         }
     }
 
+    // Auto-generate split suggestions based on sample count
+    function autoGenerateSplitSuggestions(containerData) {
+        if (!containerData || !containerData.totalSamples) {
+            return;
+        }
+        
+        const totalSamples = containerData.totalSamples;
+        
+        // Auto-set split count to optimal value
+        let optimalSplitCount = 2; // Default minimum
+        
+        // Logic: choose a split count that gives even distribution
+        if (totalSamples >= 4) {
+            // For 4+ samples, prefer half-split (2 samples per container) or 3-way split
+            if (totalSamples % 2 === 0) {
+                optimalSplitCount = Math.min(totalSamples / 2, 10);
+            } else {
+                optimalSplitCount = Math.min(3, 10);
+            }
+        } else if (totalSamples >= 2) {
+            optimalSplitCount = 2;
+        }
+        
+        // Set the optimal split count
+        StateManager.setState('transferState.splitCount', optimalSplitCount);
+        
+        // Update UI to show the auto-selected count
+        const splitCountElement = document.getElementById('splitCount');
+        if (splitCountElement) {
+            splitCountElement.textContent = optimalSplitCount;
+        }
+        
+        // Update split count display buttons
+        const decreaseBtn = document.getElementById('decreaseBtn');
+        const increaseBtn = document.getElementById('increaseBtn');
+        
+        if (decreaseBtn) decreaseBtn.disabled = optimalSplitCount <= 2;
+        if (increaseBtn) increaseBtn.disabled = optimalSplitCount >= 10;
+        
+        // Display suggestions
+        displaySmartSuggestions(containerData);
+    }
+    
+    // Display smart suggestions in the UI
+    function displaySmartSuggestions(containerData) {
+        const totalSamples = containerData.totalSamples;
+        const suggestions = [];
+        
+        // Generate suggestions
+        if (totalSamples >= 2) {
+            suggestions.push({ count: 2, label: '2-way split', description: `${Math.ceil(totalSamples/2)} samples each` });
+        }
+        if (totalSamples >= 3) {
+            suggestions.push({ count: 3, label: '3-way split', description: `${Math.ceil(totalSamples/3)} samples each` });
+        }
+        if (totalSamples >= 4) {
+            suggestions.push({ count: 4, label: '4-way split', description: `${Math.ceil(totalSamples/4)} samples each` });
+        }
+        
+        // One container per sample (if reasonable)
+        if (totalSamples > 1 && totalSamples <= 10) {
+            suggestions.push({ count: totalSamples, label: '1 sample per container', description: '1 sample each' });
+        }
+        
+        // Two samples per container
+        if (totalSamples >= 4 && totalSamples % 2 === 0) {
+            const halfSplit = totalSamples / 2;
+            if (halfSplit >= 2 && halfSplit <= 10) {
+                suggestions.push({ count: halfSplit, label: '2 samples per container', description: '2 samples each' });
+            }
+        }
+        
+        // Display suggestions in UI
+        const suggestionsElement = document.getElementById('smartSuggestions');
+        if (suggestionsElement && suggestions.length > 0) {
+            const suggestionsHTML = suggestions.map(suggestion => `
+                <button class="suggestion-btn" onclick="window.ContainerTransfer.applySuggestion(${suggestion.count})">
+                    <span class="suggestion-label">${suggestion.label}</span>
+                    <span class="suggestion-description">${suggestion.description}</span>
+                </button>
+            `).join('');
+            
+            suggestionsElement.innerHTML = `
+                <div class="suggestions-header">💡 Smart Suggestions for ${totalSamples} samples:</div>
+                <div class="suggestions-buttons">${suggestionsHTML}</div>
+            `;
+            suggestionsElement.style.display = 'block';
+        }
+    }
+
     // Clear all transfer inputs
     function clearInputs() {
         UIUtils.clearInput('sourceContainerInput');
@@ -306,6 +414,12 @@ window.TransferInputManager = (function() {
         
         UIUtils.removeClass('sourceContainer', 'filled');
         UIUtils.removeClass('destContainer', 'filled');
+        
+        // Hide smart suggestions
+        const suggestionsElement = document.getElementById('smartSuggestions');
+        if (suggestionsElement) {
+            suggestionsElement.style.display = 'none';
+        }
         
         updateTransferButtonState();
     }

@@ -48,9 +48,20 @@ const transferMainContent = fs.readFileSync(path.join(__dirname, '../src/js/modu
 eval(stateContent);
 eval(notificationsContent);
 eval(uiUtilsContent);
+
+// Create global aliases to make modules work in Node.js
+global.StateManager = window.StateManager;
+global.NotificationSystem = window.NotificationSystem;
+global.UIUtils = window.UIUtils;
+
 eval(inputManagerContent);
 eval(transferProcessorContent);
 eval(transferMainContent);
+
+// Create aliases for all modules after they are loaded
+global.ContainerTransfer = window.ContainerTransfer;
+global.TransferProcessor = window.TransferProcessor;
+global.TransferInputManager = window.TransferInputManager;
 
 // Initialize modules safely
 try {

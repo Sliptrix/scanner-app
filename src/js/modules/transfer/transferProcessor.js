@@ -30,6 +30,12 @@ window.TransferProcessor = (function() {
             NotificationSystem.error('Destination container must be specified for single transfer mode');
             return false;
         }
+        
+        // For split mode, we don't need a destination container as it's auto-generated
+        if (transferMode === 'split' && !StateManager.getState('transferState.splitCount')) {
+            NotificationSystem.error('Split count must be specified for split transfer mode');
+            return false;
+        }
 
         if (!sourceContainer.data || !sourceContainer.data.samples) {
             NotificationSystem.error('Source container has no samples to transfer');
@@ -41,7 +47,7 @@ window.TransferProcessor = (function() {
             if (transferMode === 'single') {
                 result = processSingleTransfer(sourceContainer, destContainer);
             } else {
-                result = processSplitTransfer(sourceContainer, destContainer);
+                result = processSplitTransfer(sourceContainer);
             }
 
             if (result.success) {
@@ -102,7 +108,7 @@ window.TransferProcessor = (function() {
     }
 
     // Process split transfer (tissue splitting)
-    function processSplitTransfer(sourceContainer, destContainer) {
+    function processSplitTransfer(sourceContainer) {
         const samples = sourceContainer.data.samples;
         const splitCount = StateManager.getState('transferState.splitCount');
         

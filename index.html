@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Lab Barcode Builder & Transfer System</title>
-    <link rel="stylesheet" href="src/styles/main.css">
+    <link rel="stylesheet" href="src/styles/main-consolidated.css">
 </head>
 <body>
     <div class="container">
@@ -142,13 +142,16 @@
                 
                 <div class="transfer-flow">
                     <div class="transfer-container" id="sourceContainer">
-                        <h3>📦 Source Container</h3>
+                        <h3>🏺 Source Container</h3>
                         <p style="margin: 10px 0; font-size: 1.5rem; font-weight: bold;" id="sourceContainerValue">-</p>
-                        <div style="font-size: 0.9rem; color: #6c757d;" id="sourceSummary">Scan to see contents</div>
-                        <div class="sample-count-highlight" id="sourceSampleCount" style="display: none;">
-                            <span class="sample-count-number" id="sourceSampleCountNumber">0</span>
+                        <div style="font-size: 0.9rem; color: #6c757d;" id="sourceSummary">Source container info</div>
+                        
+                        <!-- Prominent sample count display -->
+                        <div id="sourceSampleCount" class="sample-count-highlight" style="display: none; margin: 10px 0;">
+                            <span id="sourceSampleCountNumber" class="sample-count-number">0</span>
                             <span class="sample-count-label">tissue samples</span>
                         </div>
+                        
                         <input type="text" id="sourceContainerInput" class="barcode-input" 
                                placeholder="Scan source..." autocomplete="off" style="margin-top: 10px;">
                     </div>
@@ -193,6 +196,11 @@
                     </div>
 
                     <div id="splitTransferDetails" style="display: none;">
+                        <!-- Smart suggestions panel -->
+                        <div id="smartSuggestions" class="smart-suggestions" style="display: none; margin-bottom: 20px;">
+                            <!-- Smart suggestions will be populated here -->
+                        </div>
+                        
                         <div style="text-align: center;">
                             <label>Number of New Containers:</label>
                             <div class="tissue-counter">
