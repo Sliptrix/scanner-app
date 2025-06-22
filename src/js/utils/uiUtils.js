@@ -185,5 +185,15 @@ window.UIUtils = {
                 }
             }
         }, 2000);
+    },
+    
+    // Rebuild inventory table (Phase 6 compatibility)
+    rebuildInventoryTable: function() {
+        if (window.InventoryTableManager && typeof window.InventoryTableManager.rebuildTable === 'function') {
+            window.InventoryTableManager.rebuildTable();
+        } else {
+            // Fallback for basic table rebuild
+            console.log('InventoryTableManager not available, using fallback');
+        }
     }
 };

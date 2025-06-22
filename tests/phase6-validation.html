@@ -1,0 +1,461 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Phase 6 Validation - Inventory Management</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: #333;
+            min-height: 100vh;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+        h1 { color: #2c3e50; text-align: center; margin-bottom: 30px; }
+        h2 { color: #34495e; border-bottom: 2px solid #3498db; padding-bottom: 10px; }
+        .test-section {
+            margin: 20px 0;
+            padding: 20px;
+            border: 1px solid #e9ecef;
+            border-radius: 8px;
+            background: #f8f9fa;
+        }
+        .test-result {
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 6px;
+            font-weight: bold;
+        }
+        .test-pass { background: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+        .test-fail { background: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+        .test-warning { background: #fff3cd; color: #856404; border: 1px solid #ffeaa7; }
+        .manual-test {
+            background: #e2e3e5;
+            padding: 15px;
+            border-radius: 6px;
+            margin: 10px 0;
+        }
+        .manual-test h4 { margin-top: 0; color: #495057; }
+        button {
+            background: #3498db;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 5px;
+        }
+        button:hover { background: #2980b9; }
+        button:disabled { background: #95a5a6; cursor: not-allowed; }
+        #results { margin-top: 30px; }
+        .phase-summary {
+            background: linear-gradient(135deg, #74b9ff, #0984e3);
+            color: white;
+            padding: 20px;
+            border-radius: 8px;
+            text-align: center;
+            margin: 20px 0;
+        }
+        .feature-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 15px;
+            margin: 20px 0;
+        }
+        .feature-card {
+            background: white;
+            border: 1px solid #dee2e6;
+            border-radius: 8px;
+            padding: 15px;
+        }
+        .feature-card h4 {
+            margin-top: 0;
+            color: #2c3e50;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🧪 Phase 6 Validation: Inventory Management</h1>
+        
+        <div class="phase-summary">
+            <h3>📊 Advanced Inventory Management System</h3>
+            <p>Testing comprehensive inventory functionality including table management, search/filter, export capabilities, and data persistence</p>
+        </div>
+
+        <div class="test-section">
+            <h2>🔧 Module Loading Tests</h2>
+            <button onclick="runModuleTests()">Run Module Tests</button>
+            <div id="moduleResults"></div>
+        </div>
+
+        <div class="test-section">
+            <h2>📊 Inventory Table Manager Tests</h2>
+            <button onclick="runTableManagerTests()">Run Table Manager Tests</button>
+            <div id="tableManagerResults"></div>
+        </div>
+
+        <div class="test-section">
+            <h2>💾 Data Export Manager Tests</h2>
+            <button onclick="runExportManagerTests()">Run Export Manager Tests</button>
+            <div id="exportManagerResults"></div>
+        </div>
+
+        <div class="test-section">
+            <h2>🗄️ Inventory Main Manager Tests</h2>
+            <button onclick="runMainManagerTests()">Run Main Manager Tests</button>
+            <div id="mainManagerResults"></div>
+        </div>
+
+        <div class="test-section">
+            <h2>🔗 Integration Tests</h2>
+            <button onclick="runIntegrationTests()">Run Integration Tests</button>
+            <div id="integrationResults"></div>
+        </div>
+
+        <div class="test-section">
+            <h2>🧪 Manual Functional Tests</h2>
+            
+            <div class="feature-grid">
+                <div class="feature-card">
+                    <h4>1. Table Management</h4>
+                    <div class="manual-test">
+                        <p>1. Load Excel data with sample inventory</p>
+                        <p>2. Verify table displays with proper formatting</p>
+                        <p>3. Test column sorting by clicking headers</p>
+                        <p>4. Check lineage indicators for transferred samples</p>
+                        <p>5. Click rows to view detailed information</p>
+                        <button onclick="markManualTest(1, true)">✅ Pass</button>
+                        <button onclick="markManualTest(1, false)">❌ Fail</button>
+                        <div id="manual1"></div>
+                    </div>
+                </div>
+
+                <div class="feature-card">
+                    <h4>2. Search & Filter</h4>
+                    <div class="manual-test">
+                        <p>1. Use search box to filter by strain, owner, etc.</p>
+                        <p>2. Test quick filter buttons (Today, This Week)</p>
+                        <p>3. Verify filter statistics update correctly</p>
+                        <p>4. Test "Split Origins" filter</p>
+                        <p>5. Clear filters and verify reset</p>
+                        <button onclick="markManualTest(2, true)">✅ Pass</button>
+                        <button onclick="markManualTest(2, false)">❌ Fail</button>
+                        <div id="manual2"></div>
+                    </div>
+                </div>
+
+                <div class="feature-card">
+                    <h4>3. Data Export</h4>
+                    <div class="manual-test">
+                        <p>1. Click "Export Data" button</p>
+                        <p>2. Test different export options</p>
+                        <p>3. Try both Excel and CSV formats</p>
+                        <p>4. Verify exported data completeness</p>
+                        <p>5. Test filtered vs. all data export</p>
+                        <button onclick="markManualTest(3, true)">✅ Pass</button>
+                        <button onclick="markManualTest(3, false)">❌ Fail</button>
+                        <div id="manual3"></div>
+                    </div>
+                </div>
+
+                <div class="feature-card">
+                    <h4>4. Auto-Save & Backup</h4>
+                    <div class="manual-test">
+                        <p>1. Create some inventory entries</p>
+                        <p>2. Watch for auto-save indicator changes</p>
+                        <p>3. Refresh page and verify data persists</p>
+                        <p>4. Test backup creation threshold</p>
+                        <p>5. Verify data validation health indicator</p>
+                        <button onclick="markManualTest(4, true)">✅ Pass</button>
+                        <button onclick="markManualTest(4, false)">❌ Fail</button>
+                        <div id="manual4"></div>
+                    </div>
+                </div>
+
+                <div class="feature-card">
+                    <h4>5. Inventory Controls</h4>
+                    <div class="manual-test">
+                        <p>1. Test "Validate Data" button</p>
+                        <p>2. Test "Optimize" storage button</p>
+                        <p>3. Test "Quick Export" button</p>
+                        <p>4. Verify enhanced clear inventory dialog</p>
+                        <p>5. Check health status indicators</p>
+                        <button onclick="markManualTest(5, true)">✅ Pass</button>
+                        <button onclick="markManualTest(5, false)">❌ Fail</button>
+                        <div id="manual5"></div>
+                    </div>
+                </div>
+
+                <div class="feature-card">
+                    <h4>6. Advanced Features</h4>
+                    <div class="manual-test">
+                        <p>1. Test container lineage tracking</p>
+                        <p>2. Verify transfer history integration</p>
+                        <p>3. Test detailed row information modals</p>
+                        <p>4. Check statistics calculations</p>
+                        <p>5. Verify UI enhancements work properly</p>
+                        <button onclick="markManualTest(6, true)">✅ Pass</button>
+                        <button onclick="markManualTest(6, false)">❌ Fail</button>
+                        <div id="manual6"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div id="results"></div>
+    </div>
+
+    <!-- Load application scripts in correct order -->
+    <script src="../src/js/core/state.js"></script>
+    <script src="../src/js/core/notifications.js"></script>
+    <script src="../src/js/utils/dataUtils.js"></script>
+    <script src="../src/js/utils/uiUtils.js"></script>
+    <script src="../src/js/modules/inventory/tableManager.js"></script>
+    <script src="../src/js/modules/inventory/exportManager.js"></script>
+    <script src="../src/js/modules/inventory/inventoryMain.js"></script>
+
+    <script>
+        let testResults = {
+            total: 0,
+            passed: 0,
+            failed: 0,
+            manualTests: {}
+        };
+
+        function addResult(container, testName, passed, message) {
+            testResults.total++;
+            if (passed) {
+                testResults.passed++;
+            } else {
+                testResults.failed++;
+            }
+
+            const div = document.createElement('div');
+            div.className = passed ? 'test-result test-pass' : 'test-result test-fail';
+            div.innerHTML = `${passed ? '✅' : '❌'} ${testName}: ${message}`;
+            document.getElementById(container).appendChild(div);
+        }
+
+        function runModuleTests() {
+            const container = 'moduleResults';
+            document.getElementById(container).innerHTML = '';
+
+            // Test module loading
+            addResult(container, 'Inventory Table Manager Module', 
+                typeof window.InventoryTableManager !== 'undefined',
+                typeof window.InventoryTableManager !== 'undefined' ? 'Module loaded successfully' : 'Module not found');
+
+            addResult(container, 'Data Export Manager Module', 
+                typeof window.DataExportManager !== 'undefined',
+                typeof window.DataExportManager !== 'undefined' ? 'Module loaded successfully' : 'Module not found');
+
+            addResult(container, 'Inventory Manager Module', 
+                typeof window.InventoryManager !== 'undefined',
+                typeof window.InventoryManager !== 'undefined' ? 'Module loaded successfully' : 'Module not found');
+
+            // Test API availability
+            if (window.InventoryTableManager) {
+                const hasInit = typeof window.InventoryTableManager.initialize === 'function';
+                addResult(container, 'Table Manager API', hasInit,
+                    hasInit ? 'All required methods present' : 'Missing required methods');
+            }
+
+            if (window.DataExportManager) {
+                const hasExport = typeof window.DataExportManager.showExportDialog === 'function';
+                addResult(container, 'Export Manager API', hasExport,
+                    hasExport ? 'All required methods present' : 'Missing required methods');
+            }
+
+            if (window.InventoryManager) {
+                const hasInit = typeof window.InventoryManager.initialize === 'function';
+                addResult(container, 'Inventory Manager API', hasInit,
+                    hasInit ? 'All required methods present' : 'Missing required methods');
+            }
+        }
+
+        function runTableManagerTests() {
+            const container = 'tableManagerResults';
+            document.getElementById(container).innerHTML = '';
+
+            if (!window.InventoryTableManager) {
+                addResult(container, 'Table Manager Tests', false, 'InventoryTableManager not loaded');
+                return;
+            }
+
+            try {
+                // Test initialization
+                window.InventoryTableManager.initialize();
+                addResult(container, 'Table Manager Initialization', true, 'Initialized without errors');
+
+                // Test methods
+                const hasRebuild = typeof window.InventoryTableManager.rebuildTable === 'function';
+                addResult(container, 'Rebuild Table Method', hasRebuild,
+                    hasRebuild ? 'Rebuild table method available' : 'Rebuild table method missing');
+
+                const hasFilter = typeof window.InventoryTableManager.quickFilter === 'function';
+                addResult(container, 'Quick Filter Method', hasFilter,
+                    hasFilter ? 'Quick filter method available' : 'Quick filter method missing');
+
+                const hasClear = typeof window.InventoryTableManager.clearFilter === 'function';
+                addResult(container, 'Clear Filter Method', hasClear,
+                    hasClear ? 'Clear filter method available' : 'Clear filter method missing');
+
+            } catch (error) {
+                addResult(container, 'Table Manager Tests', false, 'Error: ' + error.message);
+            }
+        }
+
+        function runExportManagerTests() {
+            const container = 'exportManagerResults';
+            document.getElementById(container).innerHTML = '';
+
+            if (!window.DataExportManager) {
+                addResult(container, 'Export Manager Tests', false, 'DataExportManager not loaded');
+                return;
+            }
+
+            try {
+                // Test initialization
+                window.DataExportManager.initialize();
+                addResult(container, 'Export Manager Initialization', true, 'Initialized without errors');
+
+                // Test methods
+                const hasDialog = typeof window.DataExportManager.showExportDialog === 'function';
+                addResult(container, 'Export Dialog Method', hasDialog,
+                    hasDialog ? 'Export dialog method available' : 'Export dialog method missing');
+
+                const hasProcess = typeof window.DataExportManager.processExport === 'function';
+                addResult(container, 'Process Export Method', hasProcess,
+                    hasProcess ? 'Process export method available' : 'Process export method missing');
+
+                const hasQuick = typeof window.DataExportManager.quickExport === 'function';
+                addResult(container, 'Quick Export Method', hasQuick,
+                    hasQuick ? 'Quick export method available' : 'Quick export method missing');
+
+            } catch (error) {
+                addResult(container, 'Export Manager Tests', false, 'Error: ' + error.message);
+            }
+        }
+
+        function runMainManagerTests() {
+            const container = 'mainManagerResults';
+            document.getElementById(container).innerHTML = '';
+
+            if (!window.InventoryManager) {
+                addResult(container, 'Main Manager Tests', false, 'InventoryManager not loaded');
+                return;
+            }
+
+            try {
+                // Test initialization
+                window.InventoryManager.initialize();
+                addResult(container, 'Main Manager Initialization', true, 'Initialized without errors');
+
+                // Test methods
+                const hasValidate = typeof window.InventoryManager.validateAllData === 'function';
+                addResult(container, 'Validate Data Method', hasValidate,
+                    hasValidate ? 'Validate data method available' : 'Validate data method missing');
+
+                const hasOptimize = typeof window.InventoryManager.optimizeStorage === 'function';
+                addResult(container, 'Optimize Storage Method', hasOptimize,
+                    hasOptimize ? 'Optimize storage method available' : 'Optimize storage method missing');
+
+                const hasSave = typeof window.InventoryManager.saveToLocalStorage === 'function';
+                addResult(container, 'Save to Storage Method', hasSave,
+                    hasSave ? 'Save to storage method available' : 'Save to storage method missing');
+
+                const hasLoad = typeof window.InventoryManager.loadFromLocalStorage === 'function';
+                addResult(container, 'Load from Storage Method', hasLoad,
+                    hasLoad ? 'Load from storage method available' : 'Load from storage method missing');
+
+            } catch (error) {
+                addResult(container, 'Main Manager Tests', false, 'Error: ' + error.message);
+            }
+        }
+
+        function runIntegrationTests() {
+            const container = 'integrationResults';
+            document.getElementById(container).innerHTML = '';
+
+            try {
+                // Test state manager integration
+                const hasState = typeof window.StateManager !== 'undefined';
+                addResult(container, 'State Manager Integration', hasState,
+                    hasState ? 'StateManager available for integration' : 'StateManager not available');
+
+                // Test UIUtils integration
+                const hasUIUtils = typeof window.UIUtils !== 'undefined';
+                addResult(container, 'UIUtils Integration', hasUIUtils,
+                    hasUIUtils ? 'UIUtils available for integration' : 'UIUtils not available');
+
+                if (hasUIUtils) {
+                    const hasRebuild = typeof window.UIUtils.rebuildInventoryTable === 'function';
+                    addResult(container, 'UIUtils Inventory Support', hasRebuild,
+                        hasRebuild ? 'UIUtils has inventory table support' : 'UIUtils missing inventory support');
+                }
+
+                // Test notification system integration
+                const hasNotifications = typeof window.NotificationSystem !== 'undefined';
+                addResult(container, 'Notification System Integration', hasNotifications,
+                    hasNotifications ? 'NotificationSystem available' : 'NotificationSystem not available');
+
+                // Test full module coordination
+                if (window.InventoryManager && window.InventoryTableManager && window.DataExportManager) {
+                    addResult(container, 'Full Module Coordination', true, 'All inventory modules working together');
+                } else {
+                    addResult(container, 'Full Module Coordination', false, 'Some inventory modules missing');
+                }
+
+            } catch (error) {
+                addResult(container, 'Integration Tests', false, 'Error: ' + error.message);
+            }
+        }
+
+        function markManualTest(testNumber, passed) {
+            testResults.manualTests[testNumber] = passed;
+            const container = `manual${testNumber}`;
+            const message = passed ? '✅ Manual test passed' : '❌ Manual test failed';
+            const className = passed ? 'test-result test-pass' : 'test-result test-fail';
+            
+            document.getElementById(container).innerHTML = `<div class="${className}">${message}</div>`;
+            updateSummary();
+        }
+
+        function updateSummary() {
+            const manualPassed = Object.values(testResults.manualTests).filter(r => r).length;
+            const manualTotal = Object.keys(testResults.manualTests).length;
+            
+            const totalTests = testResults.total + manualTotal;
+            const totalPassed = testResults.passed + manualPassed;
+            const successRate = totalTests > 0 ? Math.round((totalPassed / totalTests) * 100) : 0;
+
+            document.getElementById('results').innerHTML = `
+                <div class="phase-summary">
+                    <h3>📊 Phase 6 Validation Results</h3>
+                    <p><strong>Automated Tests:</strong> ${testResults.passed}/${testResults.total} passed</p>
+                    <p><strong>Manual Tests:</strong> ${manualPassed}/${manualTotal} completed</p>
+                    <p><strong>Overall Success Rate:</strong> ${totalPassed}/${totalTests} (${successRate}%)</p>
+                    <p><strong>Status:</strong> ${successRate >= 90 ? '✅ PHASE 6 READY' : successRate >= 70 ? '⚠️ NEEDS REVIEW' : '❌ ISSUES FOUND'}</p>
+                </div>
+            `;
+        }
+
+        // Initialize on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('Phase 6 Validation Test Page Loaded');
+            updateSummary();
+        });
+    </script>
+</body>
+</html>

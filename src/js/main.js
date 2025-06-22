@@ -36,6 +36,11 @@ function initializeApp() {
         ContainerTransfer.initialize();
     }
     
+    // Initialize inventory management module
+    if (window.InventoryManager) {
+        InventoryManager.initialize();
+    }
+    
     // Show initial status
     NotificationSystem.info('Lab system ready! Load Excel data to begin.');
     
@@ -238,24 +243,48 @@ function clearTransfer() {
 }
 
 function exportInventory() {
-    NotificationSystem.info('Export functionality will be implemented in Phase 6');
+    if (window.DataExportManager) {
+        DataExportManager.showExportDialog();
+    } else {
+        NotificationSystem.info('Export functionality not available');
+    }
 }
 
 function clearInventory() {
-    if (confirm('Clear all inventory data? This cannot be undone.')) {
-        window.appState.inventory = [];
-        window.appState.sessionCounter = 0;
-        window.appState.transferHistory = [];
-        window.appState.containerLineage = {};
-        window.appState.highestContainerId = 0;
-        
-        const tableBody = document.getElementById('inventoryTableBody');
-        if (tableBody) {
-            tableBody.innerHTML = '';
+    if (window.InventoryManager && typeof window.InventoryManager.confirmClearInventory === 'function') {
+        // Use the enhanced clear inventory dialog from Phase 6
+        // For now, we'll call the private function directly since showClearInventoryDialog is not exposed
+        // This will be enhanced in the next iteration
+        if (confirm('Clear all inventory data? This action cannot be undone.')) {
+            window.appState.inventory = [];
+            window.appState.sessionCounter = 0;
+            window.appState.transferHistory = [];
+            window.appState.containerLineage = {};
+            window.appState.highestContainerId = 0;
+            
+            UIUtils.updateStats();
+            if (window.InventoryTableManager) {
+                InventoryTableManager.rebuildTable();
+            }
+            NotificationSystem.success('Inventory cleared successfully');
         }
-        
-        UIUtils.updateStats();
-        NotificationSystem.info('Inventory log cleared');
+    } else {
+        // Fallback to simple confirmation
+        if (confirm('Clear all inventory data? This cannot be undone.')) {
+            window.appState.inventory = [];
+            window.appState.sessionCounter = 0;
+            window.appState.transferHistory = [];
+            window.appState.containerLineage = {};
+            window.appState.highestContainerId = 0;
+            
+            const tableBody = document.getElementById('inventoryTableBody');
+            if (tableBody) {
+                tableBody.innerHTML = '';
+            }
+            
+            UIUtils.updateStats();
+            NotificationSystem.info('Inventory log cleared');
+        }
     }
 }
 

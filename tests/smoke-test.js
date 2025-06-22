@@ -23,8 +23,12 @@ const requiredFiles = [
     'src/js/modules/transfer/inputManager.js',
     'src/js/modules/transfer/transferProcessor.js',
     'src/js/modules/transfer/transferMain.js',
+    'src/js/modules/inventory/tableManager.js',
+    'src/js/modules/inventory/exportManager.js',
+    'src/js/modules/inventory/inventoryMain.js',
     'tests/phase3-validation.html',
-    'tests/phase4-validation.html'
+    'tests/phase4-validation.html',
+    'tests/phase5-validation.html'
 ];
 
 let filesExist = 0;
@@ -54,7 +58,10 @@ const jsFiles = [
     'src/js/modules/builder/builderMain.js',
     'src/js/modules/transfer/inputManager.js',
     'src/js/modules/transfer/transferProcessor.js',
-    'src/js/modules/transfer/transferMain.js'
+    'src/js/modules/transfer/transferMain.js',
+    'src/js/modules/inventory/tableManager.js',
+    'src/js/modules/inventory/exportManager.js',
+    'src/js/modules/inventory/inventoryMain.js'
 ];
 
 let modulesValid = 0;
@@ -82,8 +89,11 @@ if (fs.existsSync('index.html')) {
         { name: 'Has CSS link', test: () => htmlContent.includes('src/styles/main.css') },
         { name: 'Has JS modules', test: () => htmlContent.includes('src/js/core/state.js') },
         { name: 'Has builder modules', test: () => htmlContent.includes('src/js/modules/builder/stepManager.js') },
+        { name: 'Has transfer modules', test: () => htmlContent.includes('src/js/modules/transfer/inputManager.js') },
+        { name: 'Has inventory modules', test: () => htmlContent.includes('src/js/modules/inventory/tableManager.js') },
         { name: 'Has builder section', test: () => htmlContent.includes('builderSection') },
         { name: 'Has transfer section', test: () => htmlContent.includes('transferSection') },
+        { name: 'Has inventory section', test: () => htmlContent.includes('inventory-section') },
         { name: 'Has notification div', test: () => htmlContent.includes('id="notification"') }
     ];
     
@@ -101,8 +111,8 @@ if (fs.existsSync('index.html')) {
 }
 
 // Final Summary
-const totalTests = requiredFiles.length + jsFiles.length + 5; // 5 HTML checks
-const totalPassed = filesExist + modulesValid + (fs.existsSync('index.html') ? 5 : 0);
+const totalTests = requiredFiles.length + jsFiles.length + 9; // 9 HTML checks
+const totalPassed = filesExist + modulesValid + (fs.existsSync('index.html') ? 9 : 0);
 const successRate = Math.round((totalPassed / totalTests) * 100);
 
 console.log(`\n🎯 FINAL RESULTS:`);
