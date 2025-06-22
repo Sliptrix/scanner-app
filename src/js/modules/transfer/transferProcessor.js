@@ -21,8 +21,13 @@ window.TransferProcessor = (function() {
         const sourceContainer = StateManager.getState('transferState.sourceContainer');
         const destContainer = StateManager.getState('transferState.destContainer');
 
-        if (!sourceContainer || !destContainer) {
-            NotificationSystem.error('Both source and destination containers must be specified');
+        if (!sourceContainer) {
+            NotificationSystem.error('Source container must be specified');
+            return false;
+        }
+        
+        if (transferMode === 'single' && !destContainer) {
+            NotificationSystem.error('Destination container must be specified for single transfer mode');
             return false;
         }
 

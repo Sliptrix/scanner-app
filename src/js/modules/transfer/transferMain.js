@@ -93,12 +93,25 @@ window.ContainerTransfer = (function() {
         // Show preview
         UIUtils.showElement('splitPreview', true);
         
-        // Update summary
+        // Update summary with smart suggestions
+        const sourceContainer = StateManager.getState('transferState.sourceContainer');
+        const smartSuggestions = generateSmartSuggestions(sourceContainer);
+        
         summaryElement.innerHTML = `
             <div class="split-summary-content">
                 <strong>${preview.totalSamples}</strong> samples will be divided into 
                 <strong>${preview.splitCount}</strong> new containers
             </div>
+            ${smartSuggestions.length > 0 ? `
+                <div class="smart-suggestions">
+                    <div class="suggestions-header">💡 Smart Suggestions:</div>
+                    ${smartSuggestions.map(suggestion => `
+                        <button class="suggestion-btn" onclick="applySuggestion(${suggestion.count})">
+                            ${suggestion.label} (${suggestion.count} containers)
+                        </button>
+                    `).join('')}
+                </div>
+            ` : ''}
         `;
 
         // Update containers list
@@ -246,20 +259,26 @@ window.ContainerTransfer = (function() {
     function validateTransferReadiness() {
         const sourceContainer = StateManager.getState('transferState.sourceContainer');
         const destContainer = StateManager.getState('transferState.destContainer');
+        const mode = StateManager.getState('transferState.mode');
         
         if (!sourceContainer || !sourceContainer.data) {
             return { valid: false, message: 'Source container must be specified and found in inventory' };
         }
         
-        if (!destContainer || !destContainer.id) {
-            return { valid: false, message: 'Destination container must be specified' };
-        }
-        
-        const mode = StateManager.getState('transferState.mode');
         if (mode === 'single') {
+            if (!destContainer || !destContainer.id) {
+                return { valid: false, message: 'Destination container must be specified for single transfer' };
+            }
+            
             // For single mode, destination should exist
             if (!destContainer.exists) {
                 return { valid: false, message: 'Destination container not found in inventory for single transfer' };
+            }
+        } else if (mode === 'split') {
+            // Split mode only requires source container - destinations are auto-generated
+            const splitCount = StateManager.getState('transferState.splitCount');
+            if (!splitCount || splitCount < 2) {
+                return { valid: false, message: 'Split count must be at least 2 for split transfer' };
             }
         }
         
@@ -300,6 +319,50 @@ window.ContainerTransfer = (function() {
         return summary;
     }
 
+    // Generate smart suggestions based on sample count
+    function generateSmartSuggestions(sourceContainer) {
+        if (!sourceContainer || !sourceContainer.data) {
+            return [];
+        }
+        
+        const totalSamples = sourceContainer.data.totalSamples;
+        const suggestions = [];
+        
+        // Suggest equal distribution options
+        if (totalSamples >= 2) {
+            suggestions.push({ count: 2, label: '2-way split' });
+        }
+        if (totalSamples >= 3) {
+            suggestions.push({ count: 3, label: '3-way split' });
+        }
+        if (totalSamples >= 4) {
+            suggestions.push({ count: 4, label: '4-way split' });
+        }
+        
+        // Suggest one container per sample (if reasonable)
+        if (totalSamples > 1 && totalSamples <= 10) {
+            suggestions.push({ count: totalSamples, label: '1 sample per container' });
+        }
+        
+        // Suggest half split
+        if (totalSamples >= 4 && totalSamples % 2 === 0) {
+            suggestions.push({ count: totalSamples / 2, label: '2 samples per container' });
+        }
+        
+        return suggestions.filter(s => s.count >= 2 && s.count <= 10);
+    }
+    
+    // Apply a suggestion (called from UI)
+    function applySuggestion(count) {
+        StateManager.setState('transferState.splitCount', count);
+        updateSplitCountDisplay();
+        updateSplitPreview();
+        NotificationSystem.info(`Split count set to ${count} containers`);
+    }
+    
+    // Make applySuggestion available globally
+    window.applySuggestion = applySuggestion;
+
     // Public API
     return {
         initialize,
@@ -312,7 +375,9 @@ window.ContainerTransfer = (function() {
         activateTransferMode,
         validateTransferReadiness,
         getTransferSummary,
-        updateSplitPreview
+        updateSplitPreview,
+        generateSmartSuggestions,
+        applySuggestion
     };
 
 })();

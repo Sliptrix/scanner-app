@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Enhanced Transfer Functionality Demo</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: #333;
+            min-height: 100vh;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+        h1 { color: #2c3e50; text-align: center; margin-bottom: 30px; }
+        h2 { color: #34495e; border-bottom: 2px solid #3498db; padding-bottom: 10px; }
+        .demo-section {
+            margin: 20px 0;
+            padding: 20px;
+            border: 1px solid #e9ecef;
+            border-radius: 8px;
+            background: #f8f9fa;
+        }
+        .enhancement-highlight {
+            background: linear-gradient(135deg, #74b9ff, #0984e3);
+            color: white;
+            padding: 20px;
+            border-radius: 8px;
+            margin: 20px 0;
+        }
+        .demo-button {
+            background: #3498db;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 5px;
+        }
+        .demo-button:hover { background: #2980b9; }
+        .demo-output {
+            background: #f8f9fa;
+            border: 1px solid #e9ecef;
+            border-radius: 6px;
+            padding: 15px;
+            margin: 10px 0;
+            font-family: monospace;
+        }
+        .feature-list {
+            list-style-type: none;
+            padding: 0;
+        }
+        .feature-list li {
+            padding: 8px 0;
+            border-bottom: 1px solid #e9ecef;
+        }
+        .feature-list li:before {
+            content: "🚀 ";
+            margin-right: 8px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🧪 Enhanced Transfer Functionality Demo</h1>
+        
+        <div class="enhancement-highlight">
+            <h3>🌟 New Smart Suggestions Feature</h3>
+            <p>The transfer system now intelligently suggests container creation based on the number of tissue samples found in the source container!</p>
+        </div>
+
+        <div class="demo-section">
+            <h2>🔧 Key Enhancements</h2>
+            <ul class="feature-list">
+                <li>Automatic detection of sample count in source containers</li>
+                <li>Smart suggestions for optimal container splitting</li>
+                <li>Prominent sample count display for better visibility</li>
+                <li>Quick-apply buttons for common split scenarios</li>
+                <li>Sequential container numbering with auto-ID generation</li>
+            </ul>
+        </div>
+
+        <div class="demo-section">
+            <h2>🎯 Demonstration</h2>
+            <p>This demo shows how the enhanced system works with a mock container containing 4 tissue samples:</p>
+            
+            <button class="demo-button" onclick="setupMockData()">Setup Mock Data</button>
+            <button class="demo-button" onclick="demonstrateSmartSuggestions()">Show Smart Suggestions</button>
+            <button class="demo-button" onclick="simulateTransfer()">Simulate Transfer</button>
+            
+            <div id="demoOutput" class="demo-output">
+                Click "Setup Mock Data" to begin the demonstration
+            </div>
+        </div>
+
+        <div class="demo-section">
+            <h2>📋 Usage Instructions</h2>
+            <ol>
+                <li><strong>Load Excel Data:</strong> Start by loading your Excel file with tissue sample data</li>
+                <li><strong>Switch to Transfer Mode:</strong> Click the "Container Transfer" tab</li>
+                <li><strong>Scan Source Container:</strong> Enter a container ID that exists in your inventory</li>
+                <li><strong>View Smart Suggestions:</strong> If you switch to "Split Tissues" mode, you'll see intelligent suggestions</li>
+                <li><strong>Select Optimal Split:</strong> Click on any suggestion button to automatically set the split count</li>
+                <li><strong>Process Transfer:</strong> Complete the transfer to create new containers with sequential numbering</li>
+            </ol>
+        </div>
+
+        <div class="demo-section">
+            <h2>🧪 Sample Scenarios</h2>
+            
+            <div style="margin: 15px 0;">
+                <h4>Scenario 1: Container with 4 samples</h4>
+                <div class="demo-output">
+                    💡 Smart Suggestions:
+                    • 2-way split (2 containers)
+                    • 4-way split (4 containers) 
+                    • 1 sample per container (4 containers)
+                    • 2 samples per container (2 containers)
+                </div>
+            </div>
+
+            <div style="margin: 15px 0;">
+                <h4>Scenario 2: Container with 6 samples</h4>
+                <div class="demo-output">
+                    💡 Smart Suggestions:
+                    • 2-way split (2 containers)
+                    • 3-way split (3 containers)
+                    • 1 sample per container (6 containers)
+                    • 2 samples per container (3 containers)
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Load core scripts for demonstration -->
+    <script src="../src/js/core/state.js"></script>
+    <script src="../src/js/core/notifications.js"></script>
+    <script src="../src/js/utils/dataUtils.js"></script>
+    <script src="../src/js/utils/uiUtils.js"></script>
+    <script src="../src/js/modules/transfer/inputManager.js"></script>
+    <script src="../src/js/modules/transfer/transferProcessor.js"></script>
+    <script src="../src/js/modules/transfer/transferMain.js"></script>
+
+    <script>
+        let demoStep = 0;
+        const output = document.getElementById('demoOutput');
+
+        function setupMockData() {
+            output.innerHTML = "🔧 Setting up mock data...\n";
+            
+            // Initialize state manager if not already done
+            if (typeof StateManager !== 'undefined') {
+                StateManager.initialize();
+                
+                // Create mock inventory with container 5 having 4 tissue samples
+                const mockInventory = [
+                    {
+                        containerId: 5,
+                        sampleBarcode: "ABCD-EF01-1234-001",
+                        strain: "Strain A",
+                        owner: "Dr. Smith",
+                        stage: "T1",
+                        media: "MS",
+                        tissueCount: 1,
+                        date: "2024-06-22",
+                        status: "Active"
+                    },
+                    {
+                        containerId: 5,
+                        sampleBarcode: "ABCD-EF01-1234-002",
+                        strain: "Strain A",
+                        owner: "Dr. Smith",
+                        stage: "T1",
+                        media: "MS",
+                        tissueCount: 1,
+                        date: "2024-06-22",
+                        status: "Active"
+                    },
+                    {
+                        containerId: 5,
+                        sampleBarcode: "ABCD-EF01-1234-003",
+                        strain: "Strain A",
+                        owner: "Dr. Smith",
+                        stage: "T1",
+                        media: "MS",
+                        tissueCount: 1,
+                        date: "2024-06-22",
+                        status: "Active"
+                    },
+                    {
+                        containerId: 5,
+                        sampleBarcode: "ABCD-EF01-1234-004",
+                        strain: "Strain A",
+                        owner: "Dr. Smith",
+                        stage: "T1",
+                        media: "MS",
+                        tissueCount: 1,
+                        date: "2024-06-22",
+                        status: "Active"
+                    }
+                ];
+                
+                StateManager.setState('inventory', mockInventory);
+                StateManager.setState('highestContainerId', 5);
+                
+                output.innerHTML += "✅ Mock data setup complete!\n";
+                output.innerHTML += "📦 Container 5 created with 4 tissue samples\n";
+                output.innerHTML += "🔬 All samples from Strain A, owned by Dr. Smith\n\n";
+                output.innerHTML += "Ready for smart suggestions demonstration!";
+                
+                demoStep = 1;
+            } else {
+                output.innerHTML = "❌ StateManager not available. Please load in main application.";
+            }
+        }
+
+        function demonstrateSmartSuggestions() {
+            if (demoStep < 1) {
+                output.innerHTML = "⚠️ Please setup mock data first!";
+                return;
+            }
+            
+            output.innerHTML = "🧠 Generating smart suggestions for container 5 with 4 samples...\n\n";
+            
+            // Simulate the smart suggestions logic
+            const totalSamples = 4;
+            const suggestions = [];
+            
+            // Logic from generateSmartSuggestions
+            if (totalSamples >= 2) {
+                suggestions.push({ count: 2, label: '2-way split' });
+            }
+            if (totalSamples >= 3) {
+                suggestions.push({ count: 3, label: '3-way split' });
+            }
+            if (totalSamples >= 4) {
+                suggestions.push({ count: 4, label: '4-way split' });
+            }
+            
+            if (totalSamples > 1 && totalSamples <= 10) {
+                suggestions.push({ count: totalSamples, label: '1 sample per container' });
+            }
+            
+            if (totalSamples >= 4 && totalSamples % 2 === 0) {
+                suggestions.push({ count: totalSamples / 2, label: '2 samples per container' });
+            }
+            
+            output.innerHTML += "💡 Smart Suggestions Generated:\n";
+            suggestions.forEach((suggestion, index) => {
+                output.innerHTML += `${index + 1}. ${suggestion.label} (${suggestion.count} containers)\n`;
+            });
+            
+            output.innerHTML += "\n🎯 When user clicks '2-way split':\n";
+            output.innerHTML += "   • Container 6: 2 samples\n";
+            output.innerHTML += "   • Container 7: 2 samples\n\n";
+            
+            output.innerHTML += "🎯 When user clicks '1 sample per container':\n";
+            output.innerHTML += "   • Container 6: 1 sample\n";
+            output.innerHTML += "   • Container 7: 1 sample\n";
+            output.innerHTML += "   • Container 8: 1 sample\n";
+            output.innerHTML += "   • Container 9: 1 sample\n";
+            
+            demoStep = 2;
+        }
+
+        function simulateTransfer() {
+            if (demoStep < 2) {
+                output.innerHTML = "⚠️ Please run smart suggestions demo first!";
+                return;
+            }
+            
+            output.innerHTML = "🔄 Simulating transfer with 2-way split...\n\n";
+            
+            output.innerHTML += "📋 Transfer Process:\n";
+            output.innerHTML += "1. ✅ Source container 5 validated (4 samples found)\n";
+            output.innerHTML += "2. ✅ Split mode selected: 2 containers\n";
+            output.innerHTML += "3. ✅ Sequential container IDs generated: 6, 7\n";
+            output.innerHTML += "4. ✅ Sample distribution calculated:\n";
+            output.innerHTML += "   • Container 6: 2 samples\n";
+            output.innerHTML += "   • Container 7: 2 samples\n";
+            output.innerHTML += "5. ✅ Transfer completed successfully!\n\n";
+            
+            output.innerHTML += "📊 Result Summary:\n";
+            output.innerHTML += "• Source container 5 samples transferred\n";
+            output.innerHTML += "• New containers 6 and 7 created\n";
+            output.innerHTML += "• Inventory updated with new entries\n";
+            output.innerHTML += "• Transfer history recorded\n";
+            output.innerHTML += "• Container lineage tracking updated\n\n";
+            
+            output.innerHTML += "🎉 Enhanced transfer functionality demonstration complete!";
+        }
+
+        // Initialize demo
+        window.addEventListener('load', function() {
+            output.innerHTML = "🚀 Enhanced Transfer Functionality Demo Ready!\n\n";
+            output.innerHTML += "This demonstration shows the new smart suggestions feature that:\n";
+            output.innerHTML += "• Automatically detects sample count in source containers\n";
+            output.innerHTML += "• Suggests optimal container splitting options\n";
+            output.innerHTML += "• Creates sequential container numbering\n";
+            output.innerHTML += "• Provides one-click application of suggestions\n\n";
+            output.innerHTML += "Click 'Setup Mock Data' to begin!";
+        });
+    </script>
+</body>
+</html>

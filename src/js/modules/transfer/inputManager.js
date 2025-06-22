@@ -55,6 +55,13 @@ window.TransferInputManager = (function() {
         });
 
         updateSourceDisplay(containerId, containerData);
+        
+        // Trigger smart suggestions display if in split mode
+        const transferMode = StateManager.getState('transferState.mode');
+        if (transferMode === 'split' && window.ContainerTransfer) {
+            ContainerTransfer.updateSplitPreview();
+        }
+        
         NotificationSystem.success(`Source container ${containerId} loaded`);
         
         // Focus destination input if empty
@@ -168,11 +175,27 @@ window.TransferInputManager = (function() {
                     Owner: <strong>${containerData.owner}</strong>
                 `;
             }
+            
+            // Show prominent sample count
+            const sampleCountElement = document.getElementById('sourceSampleCount');
+            const sampleCountNumberElement = document.getElementById('sourceSampleCountNumber');
+            if (sampleCountElement && sampleCountNumberElement) {
+                sampleCountNumberElement.textContent = containerData.totalSamples;
+                sampleCountElement.style.display = 'block';
+            }
+            
             UIUtils.addClass('sourceContainer', 'filled');
         } else {
             if (summaryElement) {
                 summaryElement.textContent = 'Container not found in inventory';
             }
+            
+            // Hide sample count display
+            const sampleCountElement = document.getElementById('sourceSampleCount');
+            if (sampleCountElement) {
+                sampleCountElement.style.display = 'none';
+            }
+            
             UIUtils.removeClass('sourceContainer', 'filled');
         }
 
@@ -219,10 +242,21 @@ window.TransferInputManager = (function() {
         const transferBtn = document.getElementById('transferBtn');
         const sourceContainer = StateManager.getState('transferState.sourceContainer');
         const destContainer = StateManager.getState('transferState.destContainer');
+        const transferMode = StateManager.getState('transferState.mode');
 
         if (transferBtn) {
-            const canTransfer = sourceContainer && destContainer && 
-                               sourceContainer.data && destContainer.id;
+            let canTransfer = false;
+            
+            if (sourceContainer && sourceContainer.data) {
+                if (transferMode === 'split') {
+                    // Split mode only requires source container
+                    canTransfer = true;
+                } else {
+                    // Single mode requires both source and destination
+                    canTransfer = destContainer && destContainer.id;
+                }
+            }
+            
             transferBtn.disabled = !canTransfer;
         }
 

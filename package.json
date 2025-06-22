@@ -5,16 +5,24 @@
   "main": "public/index.html",
   "scripts": {
     "start": "python3 -m http.server 8000 --directory public",
-    "test": "echo \"Running tests...\" && npm run test:unit",
-    "test:unit": "echo \"Unit tests will be implemented\"",
+    "test": "echo \"Running tests...\" && npm run test:unit && npm run test:smoke",
+    "test:unit": "node tests/transfer-split-mode.test.js",
     "test:integration": "echo \"Integration tests will be implemented\"",
     "test:e2e": "echo \"E2E tests will be implemented\"",
+    "test:smoke": "node tests/smoke-test.js",
     "validate": "echo \"Validating build...\" && npm run start"
   },
-  "keywords": ["lab", "barcode", "scanner", "container", "transfer"],
+  "keywords": [
+    "lab",
+    "barcode",
+    "scanner",
+    "container",
+    "transfer"
+  ],
   "author": "",
   "license": "MIT",
   "devDependencies": {
-    "http-server": "^14.1.1"
+    "http-server": "^14.1.1",
+    "jsdom": "^26.1.0"
   }
 }
