@@ -1,0 +1,425 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Enhanced Barcode System Demo</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+        
+        .demo-container {
+            background: white;
+            border-radius: 12px;
+            padding: 30px;
+            margin-bottom: 20px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+        
+        .demo-section {
+            margin: 30px 0;
+            padding: 20px;
+            border: 2px solid #e9ecef;
+            border-radius: 8px;
+        }
+        
+        .demo-section h3 {
+            margin-top: 0;
+            color: #2c3e50;
+        }
+        
+        .input-group {
+            margin: 15px 0;
+        }
+        
+        .input-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 600;
+        }
+        
+        .input-group input {
+            width: 100%;
+            padding: 10px;
+            border: 2px solid #e9ecef;
+            border-radius: 6px;
+            font-size: 16px;
+        }
+        
+        .btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: 600;
+            margin: 5px;
+            transition: all 0.3s ease;
+        }
+        
+        .btn-primary {
+            background: #007bff;
+            color: white;
+        }
+        
+        .btn-primary:hover {
+            background: #0056b3;
+        }
+        
+        .btn-success {
+            background: #28a745;
+            color: white;
+        }
+        
+        .btn-warning {
+            background: #ffc107;
+            color: #212529;
+        }
+        
+        .result-box {
+            margin: 20px 0;
+            padding: 15px;
+            border-radius: 6px;
+            font-family: monospace;
+            background: #f8f9fa;
+            border: 1px solid #e9ecef;
+        }
+        
+        .barcode-visual {
+            text-align: center;
+            margin: 20px 0;
+            padding: 20px;
+            border: 2px dashed #007bff;
+            border-radius: 8px;
+        }
+        
+        .error {
+            background: #f8d7da;
+            color: #721c24;
+            border-color: #f5c6cb;
+        }
+        
+        .success {
+            background: #d4edda;
+            color: #155724;
+            border-color: #c3e6cb;
+        }
+    </style>
+</head>
+<body>
+    <div class="demo-container">
+        <h1>🏷️ Enhanced Barcode System Demo</h1>
+        <p>Test the new Code128 generation, scanning, and event logging capabilities</p>
+        
+        <!-- Code128 Generation Demo -->
+        <div class="demo-section">
+            <h3>📦 Code128 Barcode Generation</h3>
+            <p>Enter the seven required fields to generate a Code128 barcode:</p>
+            
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px;">
+                <div class="input-group">
+                    <label>Owner (2-3 letters):</label>
+                    <input type="text" id="owner" value="LW" maxlength="3">
+                </div>
+                <div class="input-group">
+                    <label>Strain (5 digits):</label>
+                    <input type="text" id="strain" value="00123" maxlength="5">
+                </div>
+                <div class="input-group">
+                    <label>Media (2-3 letters):</label>
+                    <input type="text" id="media" value="MS" maxlength="3">
+                </div>
+                <div class="input-group">
+                    <label>Stage (1 digit):</label>
+                    <input type="text" id="stage" value="2" maxlength="1">
+                </div>
+                <div class="input-group">
+                    <label>Tissue Count (1-2 digits):</label>
+                    <input type="text" id="tissue" value="15" maxlength="2">
+                </div>
+                <div class="input-group">
+                    <label>Date (YYYYMMDD):</label>
+                    <input type="text" id="date" value="20240623" maxlength="8">
+                </div>
+            </div>
+            
+            <button class="btn btn-primary" onclick="generateCode128()">Generate Code128 Barcode</button>
+            
+            <div id="generationResult" class="result-box" style="display: none;"></div>
+            <div id="barcodeVisual" class="barcode-visual" style="display: none;"></div>
+        </div>
+        
+        <!-- Barcode Scanning Demo -->
+        <div class="demo-section">
+            <h3>🔍 Barcode Scanning & Parsing</h3>
+            <p>Enter a composite barcode string to parse it back into fields:</p>
+            
+            <div class="input-group">
+                <label>Composite Barcode String:</label>
+                <input type="text" id="scanInput" placeholder="e.g., LW00123MS21520240623">
+            </div>
+            
+            <button class="btn btn-success" onclick="parseBarcode()">Parse Barcode</button>
+            <button class="btn btn-warning" onclick="useGeneratedBarcode()">Use Generated Barcode</button>
+            
+            <div id="scanResult" class="result-box" style="display: none;"></div>
+        </div>
+        
+        <!-- Event Logging Demo -->
+        <div class="demo-section">
+            <h3>📊 Event Logging</h3>
+            <p>View recent barcode events and export logs:</p>
+            
+            <button class="btn btn-primary" onclick="showEventHistory()">Show Event History</button>
+            <button class="btn btn-success" onclick="exportEventLog()">Export Event Log</button>
+            <button class="btn btn-warning" onclick="clearEventLog()">Clear Event Log</button>
+            
+            <div id="eventResult" class="result-box" style="display: none;"></div>
+        </div>
+    </div>
+
+    <!-- Load the barcode modules -->
+    <script src="../src/js/modules/barcode/code128Generator.js"></script>
+    <script src="../src/js/modules/barcode/barcodeScanner.js"></script>
+    <script src="../src/js/modules/barcode/eventLogger.js"></script>
+
+    <script>
+        // Mock app state for demo
+        window.appState = {
+            ownersTable: { 'LW': 'Lab Worker', 'DR': 'Dr. Smith', 'JD': 'Jane Doe' },
+            strainsTable: { '00123': 'Test Strain Alpha', '00456': 'Test Strain Beta' },
+            mediaTypesTable: { 'MS': 'Murashige & Skoog', 'IA': 'Indole Acetic' },
+            stagesTable: { '1': 'Initiation', '2': 'Multiplication', '3': 'Rooting' },
+            sessionId: 'demo_session_' + Date.now()
+        };
+
+        let lastGeneratedBarcode = null;
+
+        // Code128 Generation
+        function generateCode128() {
+            const fields = {
+                owner: document.getElementById('owner').value.trim(),
+                strain: document.getElementById('strain').value.trim(),
+                media: document.getElementById('media').value.trim(),
+                stage: document.getElementById('stage').value.trim(),
+                tissue: document.getElementById('tissue').value.trim(),
+                date: document.getElementById('date').value.trim()
+            };
+
+            console.log('Generating Code128 with fields:', fields);
+
+            try {
+                const result = Code128BarcodeGenerator.generateCode128Barcode(fields);
+                lastGeneratedBarcode = result;
+
+                const resultDiv = document.getElementById('generationResult');
+                const visualDiv = document.getElementById('barcodeVisual');
+
+                if (result.success) {
+                    resultDiv.className = 'result-box success';
+                    resultDiv.innerHTML = `
+                        <strong>✅ Code128 Barcode Generated Successfully!</strong><br>
+                        <strong>Type:</strong> ${result.type}<br>
+                        <strong>Composite String:</strong> ${result.data}<br>
+                        <strong>Human Readable:</strong> ${result.humanReadable}<br>
+                        <strong>Timestamp:</strong> ${result.timestamp}<br>
+                        <strong>Metadata:</strong> ${JSON.stringify(result.metadata, null, 2)}
+                    `;
+
+                    // Show visual barcode
+                    if (result.svg) {
+                        visualDiv.innerHTML = `
+                            <h4>Visual Barcode:</h4>
+                            ${result.svg}
+                        `;
+                        visualDiv.style.display = 'block';
+                    }
+                } else {
+                    resultDiv.className = 'result-box error';
+                    resultDiv.innerHTML = `
+                        <strong>❌ Generation Failed:</strong><br>
+                        ${result.error}
+                    `;
+                    visualDiv.style.display = 'none';
+                }
+
+                resultDiv.style.display = 'block';
+
+            } catch (error) {
+                console.error('Generation error:', error);
+                const resultDiv = document.getElementById('generationResult');
+                resultDiv.className = 'result-box error';
+                resultDiv.innerHTML = `<strong>❌ Error:</strong> ${error.message}`;
+                resultDiv.style.display = 'block';
+            }
+        }
+
+        // Barcode Parsing
+        function parseBarcode() {
+            const barcodeData = document.getElementById('scanInput').value.trim();
+
+            if (!barcodeData) {
+                alert('Please enter a barcode string to parse');
+                return;
+            }
+
+            console.log('Parsing barcode:', barcodeData);
+
+            try {
+                const result = BarcodeScanner.parseCompositeBarcode(barcodeData, 'manual');
+
+                const resultDiv = document.getElementById('scanResult');
+
+                if (result.success) {
+                    resultDiv.className = 'result-box success';
+                    resultDiv.innerHTML = `
+                        <strong>✅ Barcode Parsed Successfully!</strong><br>
+                        <strong>Input Method:</strong> ${result.inputMethod}<br>
+                        <strong>Clean Data:</strong> ${result.cleanData}<br>
+                        <strong>Parsed Fields:</strong><br>
+                        ${JSON.stringify(result.fields, null, 2)}<br>
+                        <strong>Validation:</strong> ${result.validation.valid ? '✅ Valid' : '❌ Invalid'}<br>
+                        <strong>Metadata:</strong><br>
+                        ${JSON.stringify(result.metadata, null, 2)}
+                    `;
+                } else {
+                    resultDiv.className = 'result-box error';
+                    resultDiv.innerHTML = `
+                        <strong>❌ Parsing Failed:</strong><br>
+                        ${result.error}
+                    `;
+                }
+
+                resultDiv.style.display = 'block';
+
+            } catch (error) {
+                console.error('Parsing error:', error);
+                const resultDiv = document.getElementById('scanResult');
+                resultDiv.className = 'result-box error';
+                resultDiv.innerHTML = `<strong>❌ Error:</strong> ${error.message}`;
+                resultDiv.style.display = 'block';
+            }
+        }
+
+        // Use generated barcode for parsing
+        function useGeneratedBarcode() {
+            if (!lastGeneratedBarcode || !lastGeneratedBarcode.success) {
+                alert('Please generate a barcode first');
+                return;
+            }
+
+            document.getElementById('scanInput').value = lastGeneratedBarcode.data;
+            parseBarcode();
+        }
+
+        // Event History
+        function showEventHistory() {
+            try {
+                const history = BarcodeEventLogger.getEventHistory({ limit: 10 });
+
+                const resultDiv = document.getElementById('eventResult');
+                resultDiv.className = 'result-box';
+
+                if (history.length === 0) {
+                    resultDiv.innerHTML = '<strong>📋 Event History:</strong><br>No events logged yet.';
+                } else {
+                    let historyHtml = '<strong>📋 Recent Events:</strong><br>';
+                    history.forEach((event, index) => {
+                        historyHtml += `
+                            <div style="margin: 10px 0; padding: 10px; border: 1px solid #ddd; border-radius: 4px;">
+                                <strong>${index + 1}. ${event.type}</strong> - ${event.event_id}<br>
+                                <small>Timestamp: ${event.timestamp}</small><br>
+                                ${event.composite_string ? `Data: ${event.composite_string}` : ''}
+                                ${event.scanned_data ? `Scanned: ${event.scanned_data}` : ''}
+                            </div>
+                        `;
+                    });
+                    resultDiv.innerHTML = historyHtml;
+                }
+
+                resultDiv.style.display = 'block';
+
+            } catch (error) {
+                console.error('Event history error:', error);
+                const resultDiv = document.getElementById('eventResult');
+                resultDiv.className = 'result-box error';
+                resultDiv.innerHTML = `<strong>❌ Error:</strong> ${error.message}`;
+                resultDiv.style.display = 'block';
+            }
+        }
+
+        // Export Event Log
+        function exportEventLog() {
+            try {
+                const exportData = BarcodeEventLogger.exportEventLog();
+
+                // Create downloadable file
+                const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `barcode_event_log_${new Date().toISOString().slice(0, 10)}.json`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+
+                const resultDiv = document.getElementById('eventResult');
+                resultDiv.className = 'result-box success';
+                resultDiv.innerHTML = `
+                    <strong>✅ Event Log Exported!</strong><br>
+                    <strong>Total Events:</strong> ${exportData.summary.total_events}<br>
+                    <strong>Generation Events:</strong> ${exportData.summary.generation_events}<br>
+                    <strong>Scan Events:</strong> ${exportData.summary.scan_events}<br>
+                    <strong>Export Time:</strong> ${exportData.summary.export_timestamp}
+                `;
+                resultDiv.style.display = 'block';
+
+            } catch (error) {
+                console.error('Export error:', error);
+                const resultDiv = document.getElementById('eventResult');
+                resultDiv.className = 'result-box error';
+                resultDiv.innerHTML = `<strong>❌ Error:</strong> ${error.message}`;
+                resultDiv.style.display = 'block';
+            }
+        }
+
+        // Clear Event Log
+        function clearEventLog() {
+            if (confirm('Are you sure you want to clear all event logs?')) {
+                try {
+                    BarcodeEventLogger.clearAllEvents();
+
+                    const resultDiv = document.getElementById('eventResult');
+                    resultDiv.className = 'result-box success';
+                    resultDiv.innerHTML = '<strong>✅ Event log cleared successfully!</strong>';
+                    resultDiv.style.display = 'block';
+
+                } catch (error) {
+                    console.error('Clear error:', error);
+                    const resultDiv = document.getElementById('eventResult');
+                    resultDiv.className = 'result-box error';
+                    resultDiv.innerHTML = `<strong>❌ Error:</strong> ${error.message}`;
+                    resultDiv.style.display = 'block';
+                }
+            }
+        }
+
+        // Initialize when page loads
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('Enhanced Barcode Demo loaded');
+            console.log('Available modules:', {
+                Code128BarcodeGenerator: typeof Code128BarcodeGenerator,
+                BarcodeScanner: typeof BarcodeScanner,
+                BarcodeEventLogger: typeof BarcodeEventLogger
+            });
+        });
+    </script>
+</body>
+</html>

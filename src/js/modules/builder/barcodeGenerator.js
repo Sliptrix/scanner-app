@@ -13,30 +13,187 @@ window.BuilderBarcodeGenerator = {
             return false;
         }
         
-        // Build the barcode (excluding container from barcode)
-        const barcode = values.owner + 
-                       values.strain + 
-                       values.media + 
-                       values.stage + 
-                       values.tissue + 
-                       values.date;
+        // Generate enhanced Code128 barcode
+        const barcodeResult = this.generateEnhancedBarcode(values, metadata);
         
-        // Display the generated barcode
-        this.displayBarcode(values.container, barcode, values, metadata);
+        if (!barcodeResult.success) {
+            NotificationSystem.error(`Barcode generation failed: ${barcodeResult.error}`);
+            return false;
+        }
+        
+        // Display the generated barcode with Code128 visual
+        this.displayEnhancedBarcode(values.container, barcodeResult, values, metadata);
         
         // Store in global state for processing
         window.appState.currentContainer = values.container;
-        window.appState.currentSample = barcode;
+        window.appState.currentSample = barcodeResult.data;
         window.appState.currentMetadata = this.buildMetadata(values, metadata);
+        window.appState.currentBarcodeResult = barcodeResult;
         
-        NotificationSystem.success(`Barcode generated: ${barcode}`);
-        console.log('Barcode generated:', {
+        NotificationSystem.success(`Enhanced Code128 barcode generated: ${barcodeResult.data}`);
+        console.log('Enhanced barcode generated:', {
             container: values.container,
-            barcode: barcode,
+            barcode: barcodeResult.data,
+            type: barcodeResult.type,
             metadata: window.appState.currentMetadata
         });
         
         return true;
+    },
+    
+    // Generate enhanced Code128 barcode using the new generator
+    generateEnhancedBarcode: function(values, metadata) {
+        try {
+            // Prepare fields for Code128 generator (excluding container)
+            const fields = {
+                owner: values.owner,
+                strain: values.strain,
+                media: values.media,
+                stage: values.stage,
+                tissue: values.tissue,
+                date: values.date
+            };
+            
+            // Use the enhanced Code128 generator
+            if (window.Code128BarcodeGenerator) {
+                return window.Code128BarcodeGenerator.generateCode128Barcode(fields);
+            } else {
+                // Fallback to basic generation if enhanced generator not available
+                return this.generateBasicBarcode(fields);
+            }
+            
+        } catch (error) {
+            console.error('Enhanced barcode generation failed:', error);
+            return {
+                success: false,
+                error: error.message
+            };
+        }
+    },
+    
+    // Fallback basic barcode generation
+    generateBasicBarcode: function(fields) {
+        const compositeString = fields.owner + fields.strain + fields.media + 
+                               fields.stage + fields.tissue + fields.date;
+        
+        return {
+            success: true,
+            type: 'BASIC',
+            data: compositeString,
+            fields: fields,
+            timestamp: new Date().toISOString()
+        };
+    },
+    
+    // Display enhanced barcode with Code128 visual
+    displayEnhancedBarcode: function(container, barcodeResult, values, metadata) {
+        // Display container and barcode data
+        UIUtils.updateContent('finalContainerId', container);
+        
+        // Create enhanced barcode display
+        const barcodeDisplay = document.getElementById('barcodeDisplay');
+        if (barcodeDisplay && barcodeResult.success) {
+            let displayHtml = `
+                <div class="barcode-visual-container">
+                    <div class="barcode-type-badge">${barcodeResult.type}</div>
+                    <div class="barcode-data-display">
+                        <div class="barcode-string">${barcodeResult.data}</div>
+                    </div>
+            `;
+            
+            // Add visual barcode (prefer SVG over base64 for consistency)
+            if (barcodeResult.svg) {
+                displayHtml += `
+                    <div class="barcode-visual-display">
+                        <div class="barcode-svg-container">
+                            ${barcodeResult.svg}
+                        </div>
+                    </div>
+                `;
+            } else if (barcodeResult.base64) {
+                displayHtml += `
+                    <div class="barcode-visual-display">
+                        <div class="barcode-image-container">
+                            <img src="${barcodeResult.base64}" alt="Generated barcode" class="barcode-image"/>
+                        </div>
+                    </div>
+                `;
+            }
+            
+            displayHtml += `
+                    <div class="barcode-metadata">
+                        <small>Generated: ${new Date(barcodeResult.timestamp).toLocaleString()}</small>
+                    </div>
+                </div>
+            `;
+            
+            barcodeDisplay.innerHTML = displayHtml;
+        }
+        
+        // Create detailed breakdown
+        this.displayEnhancedBreakdown(values, metadata, barcodeResult);
+        
+        // Show the barcode section
+        UIUtils.showElement('generatedBarcode', true);
+        
+        // Scroll to barcode section
+        const barcodeSection = document.getElementById('generatedBarcode');
+        if (barcodeSection) {
+            barcodeSection.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }
+    },
+    
+    // Display enhanced barcode breakdown with Code128 info
+    displayEnhancedBreakdown: function(values, metadata, barcodeResult) {
+        const breakdownDiv = document.getElementById('barcodeBreakdown');
+        if (!breakdownDiv) return;
+        
+        let breakdown = `
+            <div class="barcode-info-header">
+                <h4>Barcode Composition</h4>
+            </div>
+            <div class="breakdown-grid">
+                <div class="breakdown-part">
+                    <strong>Owner:</strong> ${values.owner} 
+                    <span class="metadata-name">(${metadata.ownerName || values.owner})</span>
+                </div>
+                <div class="breakdown-part">
+                    <strong>Strain:</strong> ${values.strain} 
+                    <span class="metadata-name">(${metadata.strainName || 'Unknown'})</span>
+                </div>
+                <div class="breakdown-part">
+                    <strong>Media:</strong> ${values.media} 
+                    <span class="metadata-name">(${metadata.mediaName || values.media})</span>
+                </div>
+                <div class="breakdown-part">
+                    <strong>Stage:</strong> ${values.stage} 
+                    <span class="metadata-name">(${metadata.stageName || `Stage ${values.stage}`})</span>
+                </div>
+                <div class="breakdown-part">
+                    <strong>Tissue:</strong> ${values.tissue} samples
+                </div>
+                <div class="breakdown-part">
+                    <strong>Date:</strong> ${DataUtils.formatDate(values.date)}
+                </div>
+            </div>
+        `;
+        
+        // Add technical details if Code128 was used
+        if (barcodeResult.type === 'CODE128' && barcodeResult.metadata) {
+            breakdown += `
+                <div class="barcode-tech-info">
+                    <h5>Technical Information</h5>
+                    <div class="tech-details">
+                        <div><strong>Barcode Type:</strong> ${barcodeResult.type}</div>
+                        <div><strong>Composite String:</strong> <code>${barcodeResult.data}</code></div>
+                        <div><strong>Human Readable:</strong> ${barcodeResult.includesText ? 'Yes' : 'No'}</div>
+                        <div><strong>Generated:</strong> ${new Date(barcodeResult.timestamp).toLocaleString()}</div>
+                    </div>
+                </div>
+            `;
+        }
+        
+        breakdownDiv.innerHTML = breakdown;
     },
     
     // Validate all required values are present
