@@ -1,0 +1,501 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Vertical Slice 1 Demo - Automatic Split Mode Container Generation</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+        
+        .demo-container {
+            background: white;
+            border-radius: 10px;
+            padding: 30px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+        
+        .demo-header {
+            text-align: center;
+            margin-bottom: 30px;
+            border-bottom: 2px solid #eee;
+            padding-bottom: 20px;
+        }
+        
+        .demo-header h1 {
+            color: #2c3e50;
+            margin: 0;
+        }
+        
+        .demo-header p {
+            color: #6c757d;
+            margin: 10px 0 0 0;
+        }
+        
+        .feature-showcase {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 30px;
+            margin-bottom: 30px;
+        }
+        
+        .demo-section {
+            background: #f8f9fa;
+            border-radius: 8px;
+            padding: 20px;
+            border-left: 4px solid #007bff;
+        }
+        
+        .demo-section h3 {
+            margin-top: 0;
+            color: #2c3e50;
+        }
+        
+        .demo-input {
+            width: 100%;
+            padding: 10px;
+            border: 2px solid #dee2e6;
+            border-radius: 6px;
+            font-size: 16px;
+            margin: 10px 0;
+        }
+        
+        .demo-input:focus {
+            outline: none;
+            border-color: #007bff;
+        }
+        
+        .demo-button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            margin: 5px;
+        }
+        
+        .demo-button:hover {
+            background: #0056b3;
+        }
+        
+        .demo-button:disabled {
+            background: #6c757d;
+            cursor: not-allowed;
+        }
+        
+        .demo-output {
+            background: #e3f2fd;
+            border: 1px solid #1976d2;
+            border-radius: 6px;
+            padding: 15px;
+            margin: 10px 0;
+            font-family: monospace;
+            font-size: 14px;
+            white-space: pre-wrap;
+        }
+        
+        .sample-count-highlight {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 15px;
+            border-radius: 8px;
+            text-align: center;
+            margin: 15px 0;
+            font-weight: bold;
+        }
+        
+        .sample-count-number {
+            font-size: 2.5em;
+            display: block;
+            line-height: 1;
+        }
+        
+        .sample-count-label {
+            font-size: 0.9em;
+            opacity: 0.9;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        
+        .smart-suggestions {
+            background: #f8f9fa;
+            border: 2px solid #6c757d;
+            border-radius: 8px;
+            padding: 15px;
+            margin: 15px 0;
+            text-align: center;
+        }
+        
+        .suggestions-header {
+            font-weight: bold;
+            color: #495057;
+            margin-bottom: 10px;
+        }
+        
+        .suggestion-btn {
+            display: inline-block;
+            margin: 3px;
+            padding: 8px 12px;
+            background: #007bff;
+            color: white;
+            border: none;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            min-width: 120px;
+        }
+        
+        .suggestion-btn:hover {
+            background: #0056b3;
+            transform: translateY(-1px);
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        
+        .step-indicator {
+            background: #28a745;
+            color: white;
+            padding: 8px 15px;
+            border-radius: 6px;
+            display: inline-block;
+            margin: 5px 0;
+            font-weight: bold;
+        }
+        
+        .results-section {
+            background: #d4edda;
+            border: 2px solid #28a745;
+            border-radius: 8px;
+            padding: 20px;
+            margin-top: 30px;
+        }
+        
+        .results-section h3 {
+            color: #155724;
+            margin-top: 0;
+        }
+        
+        .progress-indicator {
+            background: #fff3cd;
+            border: 1px solid #ffc107;
+            border-radius: 6px;
+            padding: 10px;
+            margin: 10px 0;
+            text-align: center;
+            font-weight: bold;
+            color: #856404;
+        }
+    </style>
+</head>
+<body>
+    <div class="demo-container">
+        <div class="demo-header">
+            <h1>🧪 Vertical Slice 1 Demo</h1>
+            <p>Automatic Split Mode Container Generation Based on Tissue Sample Count</p>
+        </div>
+        
+        <div class="feature-showcase">
+            <div class="demo-section">
+                <h3>📊 Load Sample Data</h3>
+                <p>First, let's load some test data to demonstrate the feature:</p>
+                <button class="demo-button" onclick="loadTestData()">Load Test Container Data</button>
+                <div id="dataStatus" class="progress-indicator" style="display: none;">
+                    Test data loaded successfully!
+                </div>
+            </div>
+            
+            <div class="demo-section">
+                <h3>🔍 Test Container Lookup</h3>
+                <p>Enter a container ID to see the automatic detection:</p>
+                <input type="text" class="demo-input" id="containerInput" placeholder="Enter container ID (try: 1)" value="1">
+                <button class="demo-button" onclick="testContainerLookup()">Look up Container</button>
+            </div>
+        </div>
+        
+        <div class="demo-section">
+            <h3>🌱 Automatic Split Mode Container Generation</h3>
+            <p>This demonstrates how the system automatically determines the optimal number of containers based on tissue samples:</p>
+            
+            <div class="step-indicator">Step 1: Source Container Detection</div>
+            <div id="sourceDisplay" class="demo-output">No container loaded yet...</div>
+            
+            <!-- Sample count highlighting -->
+            <div id="sampleCountDisplay" style="display: none;">
+                <div class="sample-count-highlight">
+                    <span id="sampleCountNumber" class="sample-count-number">0</span>
+                    <span class="sample-count-label">tissue samples detected</span>
+                </div>
+            </div>
+            
+            <div class="step-indicator">Step 2: Smart Suggestions</div>
+            <div id="smartSuggestions" class="smart-suggestions" style="display: none;">
+                <!-- Smart suggestions will be populated here -->
+            </div>
+            
+            <div class="step-indicator">Step 3: Split Preview</div>
+            <div id="splitPreview" class="demo-output">Select a suggestion to see the split preview...</div>
+            
+            <div class="step-indicator">Step 4: Process Transfer</div>
+            <button class="demo-button" id="processBtn" onclick="processSplitTransfer()" disabled>Process Split Transfer</button>
+        </div>
+        
+        <div id="results" class="results-section" style="display: none;">
+            <h3>✅ Transfer Results</h3>
+            <div id="transferResults" class="demo-output"></div>
+        </div>
+    </div>
+
+    <!-- Load the actual application modules -->
+    <!-- Core Infrastructure -->
+    <script src="../src/js/core/state.js"></script>
+    <script src="../src/js/core/notifications.js"></script>
+    <script src="../src/js/utils/dataUtils.js"></script>
+    <script src="../src/js/utils/uiUtils.js"></script>
+    <!-- Transfer Module -->
+    <script src="../src/js/modules/transfer/inputManager.js"></script>
+    <script src="../src/js/modules/transfer/transferProcessor.js"></script>
+    <script src="../src/js/modules/transfer/transferMain.js"></script>
+
+    <script>
+        // Initialize the modules
+        try {
+            if (window.TransferInputManager) {
+                window.TransferInputManager.initialize();
+            }
+            if (window.TransferProcessor) {
+                window.TransferProcessor.initialize();
+            }
+            if (window.ContainerTransfer) {
+                window.ContainerTransfer.initialize();
+            }
+        } catch (error) {
+            console.log('Some modules initialized with limitations due to missing DOM elements');
+        }
+        
+        // Demo state
+        let currentContainer = null;
+        let currentSplitCount = 2;
+        
+        // Load test data
+        function loadTestData() {
+            const testData = [
+                { containerId: 1, strain: 'Purple Haze', owner: 'Lab Tech A', stage: 'Vegetative', media: 'Rockwool', tissue: 'Tissue-001', date: '2024-01-01' },
+                { containerId: 1, strain: 'Purple Haze', owner: 'Lab Tech A', stage: 'Vegetative', media: 'Rockwool', tissue: 'Tissue-002', date: '2024-01-01' },
+                { containerId: 1, strain: 'Purple Haze', owner: 'Lab Tech A', stage: 'Vegetative', media: 'Rockwool', tissue: 'Tissue-003', date: '2024-01-01' },
+                { containerId: 1, strain: 'Blue Dream', owner: 'Lab Tech A', stage: 'Vegetative', media: 'Rockwool', tissue: 'Tissue-004', date: '2024-01-01' },
+                { containerId: 1, strain: 'Blue Dream', owner: 'Lab Tech A', stage: 'Vegetative', media: 'Rockwool', tissue: 'Tissue-005', date: '2024-01-01' },
+                
+                { containerId: 2, strain: 'OG Kush', owner: 'Lab Tech B', stage: 'Flowering', media: 'Coco Coir', tissue: 'Tissue-006', date: '2024-01-02' },
+                { containerId: 2, strain: 'OG Kush', owner: 'Lab Tech B', stage: 'Flowering', media: 'Coco Coir', tissue: 'Tissue-007', date: '2024-01-02' },
+                { containerId: 2, strain: 'OG Kush', owner: 'Lab Tech B', stage: 'Flowering', media: 'Coco Coir', tissue: 'Tissue-008', date: '2024-01-02' },
+                
+                { containerId: 3, strain: 'Sour Diesel', owner: 'Lab Tech C', stage: 'Rooting', media: 'Perlite', tissue: 'Tissue-009', date: '2024-01-03' },
+                { containerId: 3, strain: 'Sour Diesel', owner: 'Lab Tech C', stage: 'Rooting', media: 'Perlite', tissue: 'Tissue-010', date: '2024-01-03' },
+                { containerId: 3, strain: 'Sour Diesel', owner: 'Lab Tech C', stage: 'Rooting', media: 'Perlite', tissue: 'Tissue-011', date: '2024-01-03' },
+                { containerId: 3, strain: 'Sour Diesel', owner: 'Lab Tech C', stage: 'Rooting', media: 'Perlite', tissue: 'Tissue-012', date: '2024-01-03' },
+            ];
+            
+            // Load data into the state management system
+            window.StateManager.setState('inventory', testData);
+            window.StateManager.setState('highestContainerId', 3);
+            window.StateManager.setState('transferState.mode', 'split');
+            
+            // Show success message
+            document.getElementById('dataStatus').style.display = 'block';
+            
+            // Auto-lookup first container
+            setTimeout(() => {
+                testContainerLookup();
+            }, 500);
+        }
+        
+        // Test container lookup
+        function testContainerLookup() {
+            const containerId = document.getElementById('containerInput').value;
+            
+            if (!containerId) {
+                alert('Please enter a container ID');
+                return;
+            }
+            
+            // Use the actual transfer input manager to look up the container
+            const containerData = window.TransferInputManager.findContainerInInventory(containerId);
+            
+            if (containerData) {
+                currentContainer = containerData;
+                
+                // Display container information
+                const sourceDisplay = document.getElementById('sourceDisplay');
+                sourceDisplay.textContent = `Container ${containerId} found!
+Total Samples: ${containerData.totalSamples}
+Strains: ${containerData.strains.join(', ')}
+Owner: ${containerData.owner}
+Stage: ${containerData.stage}
+Media: ${containerData.media}`;
+
+                // Show sample count highlighting
+                const sampleCountDisplay = document.getElementById('sampleCountDisplay');
+                const sampleCountNumber = document.getElementById('sampleCountNumber');
+                sampleCountNumber.textContent = containerData.totalSamples;
+                sampleCountDisplay.style.display = 'block';
+                
+                // Generate and display smart suggestions
+                generateSmartSuggestions(containerData);
+                
+            } else {
+                document.getElementById('sourceDisplay').textContent = `Container ${containerId} not found in inventory.`;
+                document.getElementById('sampleCountDisplay').style.display = 'none';
+                document.getElementById('smartSuggestions').style.display = 'none';
+            }
+        }
+        
+        // Generate smart suggestions
+        function generateSmartSuggestions(containerData) {
+            const totalSamples = containerData.totalSamples;
+            const suggestions = [];
+            
+            // Generate suggestions based on sample count
+            if (totalSamples >= 2) {
+                suggestions.push({ count: 2, label: '2-way split', description: `${Math.ceil(totalSamples/2)} samples each` });
+            }
+            if (totalSamples >= 3) {
+                suggestions.push({ count: 3, label: '3-way split', description: `${Math.ceil(totalSamples/3)} samples each` });
+            }
+            if (totalSamples >= 4) {
+                suggestions.push({ count: 4, label: '4-way split', description: `${Math.ceil(totalSamples/4)} samples each` });
+            }
+            
+            // One container per sample (if reasonable)
+            if (totalSamples > 1 && totalSamples <= 10) {
+                suggestions.push({ count: totalSamples, label: '1 sample per container', description: '1 sample each' });
+            }
+            
+            // Two samples per container
+            if (totalSamples >= 4 && totalSamples % 2 === 0) {
+                const halfSplit = totalSamples / 2;
+                if (halfSplit >= 2 && halfSplit <= 10) {
+                    suggestions.push({ count: halfSplit, label: '2 samples per container', description: '2 samples each' });
+                }
+            }
+            
+            // Display suggestions in UI
+            const suggestionsElement = document.getElementById('smartSuggestions');
+            if (suggestions.length > 0) {
+                const suggestionsHTML = suggestions.map(suggestion => `
+                    <button class="suggestion-btn" onclick="applySuggestion(${suggestion.count})">
+                        <div style="font-weight: bold;">${suggestion.label}</div>
+                        <div style="font-size: 0.8em; opacity: 0.9;">${suggestion.description}</div>
+                    </button>
+                `).join('');
+                
+                suggestionsElement.innerHTML = `
+                    <div class="suggestions-header">💡 Smart Suggestions for ${totalSamples} samples:</div>
+                    ${suggestionsHTML}
+                `;
+                suggestionsElement.style.display = 'block';
+                
+                // Auto-select optimal suggestion
+                const optimalCount = totalSamples >= 4 && totalSamples % 2 === 0 ? totalSamples / 2 : 
+                                   totalSamples >= 4 ? 3 : 2;
+                applySuggestion(Math.min(optimalCount, 10));
+            }
+        }
+        
+        // Apply a suggestion
+        function applySuggestion(count) {
+            currentSplitCount = count;
+            
+            if (!currentContainer) return;
+            
+            // Update split preview
+            const totalSamples = currentContainer.totalSamples;
+            const samplesPerContainer = Math.floor(totalSamples / count);
+            const remainderSamples = totalSamples % count;
+            
+            let previewText = `Split ${totalSamples} samples into ${count} containers:\n\n`;
+            const currentHighestId = window.StateManager.getState('highestContainerId') || 0;
+            
+            for (let i = 0; i < count; i++) {
+                const samplesInThisContainer = samplesPerContainer + (i < remainderSamples ? 1 : 0);
+                const newContainerId = currentHighestId + i + 1;
+                previewText += `Container ${newContainerId}: ${samplesInThisContainer} samples\n`;
+            }
+            
+            previewText += `\nNew containers will inherit metadata from source container.`;
+            
+            document.getElementById('splitPreview').textContent = previewText;
+            document.getElementById('processBtn').disabled = false;
+            
+            // Highlight the selected suggestion
+            const suggestionBtns = document.querySelectorAll('.suggestion-btn');
+            suggestionBtns.forEach(btn => btn.style.background = '#007bff');
+            event.target.style.background = '#28a745';
+        }
+        
+        // Process the split transfer
+        function processSplitTransfer() {
+            if (!currentContainer) {
+                alert('No container selected');
+                return;
+            }
+            
+            // Set up the transfer state
+            window.StateManager.setState('transferState.sourceContainer', {
+                id: currentContainer.containerId,
+                data: currentContainer
+            });
+            window.StateManager.setState('transferState.mode', 'split');
+            window.StateManager.setState('transferState.splitCount', currentSplitCount);
+            
+            // Process the transfer using the actual transfer processor
+            try {
+                const success = window.TransferProcessor.processTransfer();
+                
+                if (success) {
+                    // Show results
+                    const inventory = window.StateManager.getState('inventory');
+                    const newContainers = [...new Set(inventory.map(item => item.containerId))].filter(id => id > currentContainer.containerId);
+                    
+                    let resultsText = `✅ Split transfer completed successfully!\n\n`;
+                    resultsText += `Original container ${currentContainer.containerId} (${currentContainer.totalSamples} samples) split into:\n`;
+                    
+                    newContainers.forEach(containerId => {
+                        const samplesInContainer = inventory.filter(item => item.containerId === containerId).length;
+                        resultsText += `- Container ${containerId}: ${samplesInContainer} samples\n`;
+                    });
+                    
+                    resultsText += `\n📊 New highest container ID: ${window.StateManager.getState('highestContainerId')}`;
+                    resultsText += `\n🔬 Total containers created: ${newContainers.length}`;
+                    resultsText += `\n📋 All samples transferred with complete lineage tracking`;
+                    
+                    document.getElementById('transferResults').textContent = resultsText;
+                    document.getElementById('results').style.display = 'block';
+                    
+                    // Reset for next demo
+                    document.getElementById('processBtn').disabled = true;
+                    document.getElementById('processBtn').textContent = 'Transfer Completed ✅';
+                    
+                } else {
+                    alert('Transfer failed - check console for details');
+                }
+            } catch (error) {
+                alert('Transfer error: ' + error.message);
+                console.error('Transfer error:', error);
+            }
+        }
+        
+        // Auto-load test data when page loads
+        window.addEventListener('load', () => {
+            setTimeout(loadTestData, 1000);
+        });
+    </script>
+</body>
+</html>

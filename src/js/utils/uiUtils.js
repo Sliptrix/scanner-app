@@ -171,20 +171,9 @@ window.UIUtils = {
     
     // Setup focus management for the application
     setupFocusManagement: function() {
-        // Keep input focused based on current mode
-        setInterval(() => {
-            if (window.appState.mode === 'builder' && document.activeElement.id !== 'builderInput') {
-                const builderInput = document.getElementById('builderInput');
-                if (builderInput) builderInput.focus();
-            } else if (window.appState.mode === 'transfer') {
-                const transferState = window.appState.transferState;
-                if (!transferState.source && document.activeElement.id !== 'sourceContainerInput') {
-                    this.focusTransferInput('sourceContainerInput');
-                } else if (transferState.source && !transferState.destination && transferState.mode === 'single' && document.activeElement.id !== 'destContainerInput') {
-                    this.focusTransferInput('destContainerInput');
-                }
-            }
-        }, 2000);
+        // Remove aggressive focus management that causes cursor jumping
+        // Only focus on user-initiated actions, not automatic intervals
+        console.log('Focus management setup - using manual focus only');
     },
     
     // Rebuild inventory table (Phase 6 compatibility)

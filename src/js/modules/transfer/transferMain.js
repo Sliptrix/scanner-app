@@ -174,6 +174,12 @@ window.ContainerTransfer = (function() {
         if (window.TransferInputManager) {
             TransferInputManager.updateTransferButtonState();
         }
+        
+        // Move to step 4 when a mode is selected
+        const sourceContainer = StateManager.getState('transferState.sourceContainer');
+        if (sourceContainer && sourceContainer.data && window.TransferInputManager) {
+            TransferInputManager.updateWorkflowStep(4); // Move to step 4: Process Transfer
+        }
     }
 
     // Handle split count adjustment (called from main.js)

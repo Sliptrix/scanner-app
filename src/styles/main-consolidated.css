@@ -723,3 +723,165 @@ body {
     background: #fff3cd !important;
     border-left: 4px solid #ffc107;
 }
+
+/* Plant Data Update Interface */
+.plant-data-update {
+    background: #f8f9fa;
+    border: 2px solid #28a745;
+    border-radius: 12px;
+    padding: 20px;
+    margin: 20px 0;
+}
+
+.data-update-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 15px;
+    margin-bottom: 15px;
+}
+
+.update-field {
+    display: flex;
+    flex-direction: column;
+}
+
+.update-field label {
+    font-weight: 600;
+    color: #2c3e50;
+    margin-bottom: 5px;
+    font-size: 0.9rem;
+}
+
+.update-select, .update-input {
+    padding: 8px 12px;
+    border: 2px solid #dee2e6;
+    border-radius: 6px;
+    font-size: 0.9rem;
+    transition: border-color 0.3s ease;
+}
+
+.update-select:focus, .update-input:focus {
+    outline: none;
+    border-color: #28a745;
+    box-shadow: 0 0 0 2px rgba(40, 167, 69, 0.1);
+}
+
+.update-select {
+    background: white;
+    cursor: pointer;
+}
+
+/* Responsive grid for mobile */
+@media (max-width: 768px) {
+    .data-update-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* Workflow Progress Indicator */
+.workflow-progress {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin: 20px 0;
+    padding: 15px;
+    background: #f8f9fa;
+    border: 2px solid #e9ecef;
+    border-radius: 8px;
+    position: relative;
+}
+
+.workflow-progress::before {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 15%;
+    right: 15%;
+    height: 2px;
+    background: #e9ecef;
+    z-index: 0;
+}
+
+.workflow-step {
+    position: relative;
+    z-index: 1;
+    text-align: center;
+    flex: 1;
+    opacity: 0.5;
+    transition: all 0.3s ease;
+}
+
+.workflow-step.active {
+    opacity: 1;
+}
+
+.workflow-step.completed {
+    opacity: 1;
+}
+
+.step-number {
+    width: 35px;
+    height: 35px;
+    border-radius: 50%;
+    background: #e9ecef;
+    color: #6c757d;
+    border: 2px solid #e9ecef;
+    margin: 0 auto 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+    font-size: 0.9rem;
+    transition: all 0.3s ease;
+}
+
+.workflow-step.active .step-number {
+    background: #007bff;
+    border-color: #007bff;
+    color: white;
+    animation: pulse 2s infinite;
+}
+
+.workflow-step.completed .step-number {
+    background: #28a745;
+    border-color: #28a745;
+    color: white;
+}
+
+.step-label {
+    font-size: 0.75rem;
+    color: #6c757d;
+    font-weight: 500;
+}
+
+.workflow-step.active .step-label {
+    color: #007bff;
+    font-weight: 600;
+}
+
+.workflow-step.completed .step-label {
+    color: #28a745;
+    font-weight: 600;
+}
+
+/* Mobile responsive workflow */
+@media (max-width: 768px) {
+    .workflow-progress {
+        flex-direction: column;
+        gap: 10px;
+    }
+    
+    .workflow-progress::before {
+        display: none;
+    }
+    
+    .workflow-step {
+        flex-direction: row;
+        align-items: center;
+        gap: 10px;
+    }
+    
+    .step-number {
+        margin: 0;
+    }
+}

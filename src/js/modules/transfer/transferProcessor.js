@@ -19,19 +19,15 @@ window.TransferProcessor = (function() {
     function processTransfer() {
         const transferMode = StateManager.getState('transferState.mode');
         const sourceContainer = StateManager.getState('transferState.sourceContainer');
-        const destContainer = StateManager.getState('transferState.destContainer');
 
         if (!sourceContainer) {
             NotificationSystem.error('Source container must be specified');
             return false;
         }
         
-        if (transferMode === 'single' && !destContainer) {
-            NotificationSystem.error('Destination container must be specified for single transfer mode');
-            return false;
-        }
+        // NEW WORKFLOW: We always create new containers, so no destination check needed for single mode
         
-        // For split mode, we don't need a destination container as it's auto-generated
+        // For split mode, we need a split count
         if (transferMode === 'split' && !StateManager.getState('transferState.splitCount')) {
             NotificationSystem.error('Split count must be specified for split transfer mode');
             return false;
@@ -45,7 +41,7 @@ window.TransferProcessor = (function() {
         try {
             let result;
             if (transferMode === 'single') {
-                result = processSingleTransfer(sourceContainer, destContainer);
+                result = processSingleTransfer(sourceContainer); // No destination needed - always create new
             } else {
                 result = processSplitTransfer(sourceContainer);
             }
@@ -76,34 +72,55 @@ window.TransferProcessor = (function() {
         }
     }
 
-    // Process single container transfer
-    function processSingleTransfer(sourceContainer, destContainer) {
+    // Process single container transfer - NEW WORKFLOW: Always create new container
+    function processSingleTransfer(sourceContainer) {
         const samples = sourceContainer.data.samples;
-        const destContainerId = destContainer.id;
         
-        // Create new container ID if destination doesn't exist
-        let finalDestId = destContainerId;
-        if (!destContainer.exists) {
-            finalDestId = ensureContainerExists(destContainerId);
-        }
-
-        // Transfer all samples to destination
-        const transferredSamples = samples.map(sample => ({
-            ...sample,
-            containerId: finalDestId,
-            transferDate: new Date().toISOString(),
-            transferSource: sourceContainer.id,
-            transferType: 'single'
-        }));
+        // Generate new container ID for single transfer
+        const newContainerId = generateNewContainerIds(1)[0];
+        
+        // Get updated plant data from input manager
+        const updatedData = window.TransferInputManager ? 
+            window.TransferInputManager.getUpdatedPlantData() : {};
+        
+        // Transfer all samples to new destination with updated data
+        const transferredSamples = samples.map(sample => {
+            const newSample = {
+                ...sample,
+                containerId: newContainerId,
+                transferDate: new Date().toISOString(),
+                transferSource: sourceContainer.id,
+                transferType: 'single',
+                timestamp: new Date() // Update timestamp for new container
+            };
+            
+            // Apply updated plant data if provided
+            if (updatedData.stage) {
+                newSample.stage = updatedData.stage;
+                newSample.stageId = updatedData.stageId;
+            }
+            if (updatedData.mediaType) {
+                newSample.mediaType = updatedData.mediaType;
+                newSample.mediaId = updatedData.mediaId;
+            }
+            if (updatedData.date) {
+                newSample.date = updatedData.date;
+            }
+            if (updatedData.notes) {
+                newSample.transferNotes = updatedData.notes;
+            }
+            
+            return newSample;
+        });
 
         return {
             success: true,
             type: 'single',
             sourceContainerId: sourceContainer.id,
-            destinationContainers: [finalDestId],
+            destinationContainers: [newContainerId],
             transferredSamples: transferredSamples,
             samplesTransferred: samples.length,
-            message: `Successfully transferred ${samples.length} samples from container ${sourceContainer.id} to container ${finalDestId}`
+            message: `Successfully transferred ${samples.length} samples from container ${sourceContainer.id} to new container ${newContainerId}`
         };
     }
 
@@ -137,32 +154,87 @@ window.TransferProcessor = (function() {
     // Distribute samples evenly across containers
     function distributeSamplesEvenly(samples, containerIds, sourceId) {
         const distributedSamples = [];
-        const samplesPerContainer = Math.floor(samples.length / containerIds.length);
-        const remainderSamples = samples.length % containerIds.length;
-
-        let sampleIndex = 0;
+        
+        // Calculate total tissue count from all barcode entries
+        const totalTissueCount = samples.reduce((total, sample) => {
+            return total + (parseInt(sample.tissueCount) || 1);
+        }, 0);
+        
+        // Calculate tissues per container
+        const tissuesPerContainer = Math.floor(totalTissueCount / containerIds.length);
+        const remainderTissues = totalTissueCount % containerIds.length;
+        
+        // Track tissue distribution
+        let remainingTissueToDistribute = totalTissueCount;
+        let currentSampleIndex = 0;
+        let currentSampleTissueUsed = 0;
         
         containerIds.forEach((containerId, containerIndex) => {
-            // Calculate how many samples this container gets
-            const samplesForThisContainer = samplesPerContainer + (containerIndex < remainderSamples ? 1 : 0);
+            // Calculate how many tissues this container gets
+            const tissuesForThisContainer = tissuesPerContainer + (containerIndex < remainderTissues ? 1 : 0);
+            let tissuesAssignedToContainer = 0;
             
-            // Assign samples to this container
-            for (let i = 0; i < samplesForThisContainer; i++) {
-                if (sampleIndex < samples.length) {
-                    const sample = samples[sampleIndex];
-                    distributedSamples.push({
-                        ...sample,
+            // Distribute tissues to this container
+            while (tissuesAssignedToContainer < tissuesForThisContainer && currentSampleIndex < samples.length) {
+                const currentSample = samples[currentSampleIndex];
+                const currentSampleTotalTissues = parseInt(currentSample.tissueCount) || 1;
+                const remainingTissuesInCurrentSample = currentSampleTotalTissues - currentSampleTissueUsed;
+                
+                // How many tissues can we take from current sample for this container?
+                const tissuesNeeded = tissuesForThisContainer - tissuesAssignedToContainer;
+                const tissuesToTakeFromCurrentSample = Math.min(remainingTissuesInCurrentSample, tissuesNeeded);
+                
+                if (tissuesToTakeFromCurrentSample > 0) {
+                    // Get updated plant data from input manager
+                    const updatedData = window.TransferInputManager ? 
+                        window.TransferInputManager.getUpdatedPlantData() : {};
+                    
+                    // Create a new barcode entry for this portion with updated data
+                    const newSample = {
+                        ...currentSample,
                         containerId: containerId,
+                        tissueCount: tissuesToTakeFromCurrentSample,
                         transferDate: new Date().toISOString(),
                         transferSource: sourceId,
                         transferType: 'split',
-                        originalSampleIndex: sampleIndex
-                    });
-                    sampleIndex++;
+                        originalSampleIndex: currentSampleIndex,
+                        originalTissueCount: currentSampleTotalTissues,
+                        splitPortion: `${tissuesToTakeFromCurrentSample}/${currentSampleTotalTissues}`,
+                        timestamp: new Date() // Update timestamp for new container
+                    };
+                    
+                    // Apply updated plant data if provided
+                    if (updatedData.stage) {
+                        newSample.stage = updatedData.stage;
+                        newSample.stageId = updatedData.stageId;
+                    }
+                    if (updatedData.mediaType) {
+                        newSample.mediaType = updatedData.mediaType;
+                        newSample.mediaId = updatedData.mediaId;
+                    }
+                    if (updatedData.date) {
+                        newSample.date = updatedData.date;
+                    }
+                    if (updatedData.notes) {
+                        newSample.transferNotes = updatedData.notes;
+                    }
+                    
+                    distributedSamples.push(newSample);
+                    
+                    tissuesAssignedToContainer += tissuesToTakeFromCurrentSample;
+                    currentSampleTissueUsed += tissuesToTakeFromCurrentSample;
+                }
+                
+                // If we've used all tissues from current sample, move to next
+                if (currentSampleTissueUsed >= currentSampleTotalTissues) {
+                    currentSampleIndex++;
+                    currentSampleTissueUsed = 0;
                 }
             }
+            
+            remainingTissueToDistribute -= tissuesAssignedToContainer;
         });
-
+        
         return distributedSamples;
     }
 
@@ -356,21 +428,22 @@ window.TransferProcessor = (function() {
             return null;
         }
         
-        const samples = sourceContainer.data.samples;
-        const samplesPerContainer = Math.floor(samples.length / splitCount);
-        const remainderSamples = samples.length % splitCount;
+        // Calculate total tissue count from source container
+        const totalTissueCount = sourceContainer.data.totalSamples; // This is now the correct tissue count
+        const tissuesPerContainer = Math.floor(totalTissueCount / splitCount);
+        const remainderTissues = totalTissueCount % splitCount;
         
         const preview = [];
         for (let i = 0; i < splitCount; i++) {
-            const samplesInThisContainer = samplesPerContainer + (i < remainderSamples ? 1 : 0);
+            const tissuesInThisContainer = tissuesPerContainer + (i < remainderTissues ? 1 : 0);
             preview.push({
                 containerIndex: i + 1,
-                sampleCount: samplesInThisContainer
+                sampleCount: tissuesInThisContainer
             });
         }
         
         return {
-            totalSamples: samples.length,
+            totalSamples: totalTissueCount, // Now shows actual tissue count
             splitCount: splitCount,
             containers: preview
         };

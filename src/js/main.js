@@ -217,10 +217,44 @@ function adjustSplitCount(change) {
 }
 
 function processTransfer() {
-    if (window.ContainerTransfer) {
-        ContainerTransfer.processTransfer();
-    } else {
-        NotificationSystem.info('Transfer functionality not available');
+    console.log('processTransfer called');
+    
+    // Disable button during processing to prevent double-clicks
+    const transferBtn = document.getElementById('transferBtn');
+    if (transferBtn) {
+        transferBtn.disabled = true;
+        transferBtn.textContent = 'Processing...';
+    }
+    
+    try {
+        if (window.TransferProcessor) {
+            const success = TransferProcessor.processTransfer();
+            
+            if (success) {
+                NotificationSystem.success('Transfer completed successfully!');
+                
+                // Clear inputs after successful transfer
+                if (window.TransferInputManager) {
+                    TransferInputManager.clearInputs();
+                }
+            }
+        } else {
+            NotificationSystem.error('Transfer system not available');
+        }
+    } catch (error) {
+        console.error('Transfer error:', error);
+        NotificationSystem.error('Transfer failed: ' + error.message);
+    } finally {
+        // Re-enable button
+        if (transferBtn) {
+            transferBtn.disabled = false;
+            transferBtn.textContent = 'Process Transfer';
+        }
+        
+        // Update button state based on current inputs
+        if (window.TransferInputManager) {
+            TransferInputManager.updateTransferButtonState();
+        }
     }
 }
 
@@ -288,6 +322,7 @@ function clearInventory() {
     }
 }
 
+
 // Legacy compatibility for global function references
 window.switchMode = switchMode;
 window.nextBuilderStep = nextBuilderStep;
@@ -299,3 +334,4 @@ window.processTransfer = processTransfer;
 window.clearTransfer = clearTransfer;
 window.exportInventory = exportInventory;
 window.clearInventory = clearInventory;
+

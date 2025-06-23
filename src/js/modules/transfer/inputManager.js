@@ -70,12 +70,9 @@ window.TransferInputManager = (function() {
         
         NotificationSystem.success(`Source container ${containerId} loaded`);
         
-        // Focus destination input if empty
-        const destInput = document.getElementById('destContainerInput');
-        if (destInput && !destInput.value.trim()) {
-            destInput.focus();
-        }
-
+        // Don't auto-focus to prevent cursor jumping issues
+        // Let user manually move to next field
+        
         return true;
     }
 
@@ -155,17 +152,26 @@ window.TransferInputManager = (function() {
 
         // Group samples by strain for summary
         const strainGroups = {};
+        let totalTissueCount = 0;
+        
         containers.forEach(item => {
             const strain = item.strain || 'Unknown';
             if (!strainGroups[strain]) {
                 strainGroups[strain] = [];
             }
             strainGroups[strain].push(item);
+            
+            // Sum up actual tissue counts from each barcode entry
+            // IMPORTANT: tissueCount field in each barcode entry represents the number of tissue samples in that barcode
+            // This fixes the issue where we were counting barcode entries instead of actual tissue samples
+            const tissueCount = parseInt(item.tissueCount) || 1;
+            totalTissueCount += tissueCount;
         });
 
         return {
             containerId: containerId,
-            totalSamples: containers.length,
+            totalSamples: totalTissueCount, // This is now the actual tissue count, not entry count
+            barcodeEntries: containers.length, // Number of barcode entries
             strains: Object.keys(strainGroups),
             strainGroups: strainGroups,
             samples: containers,
@@ -194,15 +200,24 @@ window.TransferInputManager = (function() {
                 `;
             }
             
-            // Show prominent sample count
-            const sampleCountElement = document.getElementById('sourceSampleCount');
-            const sampleCountNumberElement = document.getElementById('sourceSampleCountNumber');
-            if (sampleCountElement && sampleCountNumberElement) {
-                sampleCountNumberElement.textContent = containerData.totalSamples;
-                sampleCountElement.style.display = 'block';
-            }
-            
-            UIUtils.addClass('sourceContainer', 'filled');
+        // Show prominent sample count
+        const sampleCountElement = document.getElementById('sourceSampleCount');
+        const sampleCountNumberElement = document.getElementById('sourceSampleCountNumber');
+        if (sampleCountElement && sampleCountNumberElement) {
+            sampleCountNumberElement.textContent = containerData.totalSamples;
+            sampleCountElement.style.display = 'block';
+        }
+        
+        // Show plant data update panel
+        showPlantDataUpdatePanel(containerData);
+        
+        // Show transfer options panel for technician to choose
+        showTransferOptionsPanel();
+        
+        // Update workflow progress - let technician proceed manually
+        updateWorkflowStep(2); // Show step 2: Update Plant Data available
+        
+        UIUtils.addClass('sourceContainer', 'filled');
         } else {
             if (summaryElement) {
                 summaryElement.textContent = 'Container not found in inventory';
@@ -259,23 +274,29 @@ window.TransferInputManager = (function() {
     function updateTransferButtonState() {
         const transferBtn = document.getElementById('transferBtn');
         const sourceContainer = StateManager.getState('transferState.sourceContainer');
-        const destContainer = StateManager.getState('transferState.destContainer');
         const transferMode = StateManager.getState('transferState.mode');
 
         if (transferBtn) {
             let canTransfer = false;
             
+            // NEW WORKFLOW: We always create new containers, so we only need source container
             if (sourceContainer && sourceContainer.data) {
-                if (transferMode === 'split') {
-                    // Split mode only requires source container
-                    canTransfer = true;
-                } else {
-                    // Single mode requires both source and destination
-                    canTransfer = destContainer && destContainer.id;
-                }
+                canTransfer = true; // Both single and split modes only need source container
             }
             
             transferBtn.disabled = !canTransfer;
+            
+            // Update button text to be more descriptive
+            if (canTransfer) {
+                if (transferMode === 'split') {
+                    const splitCount = StateManager.getState('transferState.splitCount');
+                    transferBtn.textContent = `Create ${splitCount} New Containers`;
+                } else {
+                    transferBtn.textContent = 'Create New Container';
+                }
+            } else {
+                transferBtn.textContent = 'Process Transfer';
+            }
         }
 
         // Update single transfer count
@@ -402,6 +423,188 @@ window.TransferInputManager = (function() {
         }
     }
 
+    // Show plant data update panel with current container data
+    function showPlantDataUpdatePanel(containerData) {
+        const updatePanel = document.getElementById('plantDataUpdate');
+        if (!updatePanel) return;
+        
+        // Get first sample to use as baseline for current values
+        const firstSample = containerData.samples[0];
+        
+        // Populate stage dropdown
+        populateStageOptions(firstSample.stage);
+        
+        // Populate media dropdown
+        populateMediaOptions(firstSample.mediaType || firstSample.media);
+        
+        // Set current date as default
+        const dateInput = document.getElementById('updateDate');
+        if (dateInput) {
+            const today = new Date().toISOString().split('T')[0];
+            dateInput.value = today;
+        }
+        
+        // Clear notes
+        const notesInput = document.getElementById('updateNotes');
+        if (notesInput) {
+            notesInput.value = '';
+        }
+        
+        // Show the panel
+        updatePanel.style.display = 'block';
+    }
+    
+    // Populate stage dropdown options from Excel data
+    function populateStageOptions(currentStage) {
+        const stageSelect = document.getElementById('updateStage');
+        if (!stageSelect) return;
+        
+        // Clear existing options except "keep same"
+        stageSelect.innerHTML = `<option value="keep-same">Keep Same (${currentStage})</option>`;
+        
+        // Get stage data from app state
+        const stagesData = StateManager.getState('stagesTable');
+        if (stagesData && typeof stagesData === 'object') {
+            Object.entries(stagesData).forEach(([key, value]) => {
+                if (value !== currentStage) { // Don't duplicate current stage
+                    stageSelect.innerHTML += `<option value="${key}">${value}</option>`;
+                }
+            });
+        }
+    }
+    
+    // Populate media dropdown options from Excel data
+    function populateMediaOptions(currentMedia) {
+        const mediaSelect = document.getElementById('updateMedia');
+        if (!mediaSelect) return;
+        
+        // Clear existing options except "keep same"
+        mediaSelect.innerHTML = `<option value="keep-same">Keep Same (${currentMedia})</option>`;
+        
+        // Get media data from app state
+        const mediaData = StateManager.getState('mediaTable');
+        if (mediaData && typeof mediaData === 'object') {
+            Object.entries(mediaData).forEach(([key, value]) => {
+                if (value !== currentMedia) { // Don't duplicate current media
+                    mediaSelect.innerHTML += `<option value="${key}">${value}</option>`;
+                }
+            });
+        }
+    }
+    
+    // Get updated plant data for new containers
+    function getUpdatedPlantData() {
+        const stageSelect = document.getElementById('updateStage');
+        const mediaSelect = document.getElementById('updateMedia');
+        const dateInput = document.getElementById('updateDate');
+        const notesInput = document.getElementById('updateNotes');
+        
+        const updates = {};
+        
+        // Check if stage was updated
+        if (stageSelect && stageSelect.value !== 'keep-same') {
+            const stagesData = StateManager.getState('stagesTable');
+            updates.stage = stagesData[stageSelect.value];
+            updates.stageId = stageSelect.value;
+        }
+        
+        // Check if media was updated
+        if (mediaSelect && mediaSelect.value !== 'keep-same') {
+            const mediaData = StateManager.getState('mediaTable');
+            updates.mediaType = mediaData[mediaSelect.value];
+            updates.mediaId = mediaSelect.value;
+        }
+        
+        // Always update date if provided
+        if (dateInput && dateInput.value) {
+            updates.date = dateInput.value;
+        }
+        
+        // Add notes if provided
+        if (notesInput && notesInput.value.trim()) {
+            updates.notes = notesInput.value.trim();
+        }
+        
+        return updates;
+    }
+    
+    // Hide plant data update panel
+    function hidePlantDataUpdatePanel() {
+        const updatePanel = document.getElementById('plantDataUpdate');
+        if (updatePanel) {
+            updatePanel.style.display = 'none';
+        }
+    }
+    
+    // Show transfer options panel for technician to choose transfer type
+    function showTransferOptionsPanel() {
+        const transferOptionsPanel = document.getElementById('transferOptions');
+        if (transferOptionsPanel) {
+            transferOptionsPanel.style.display = 'block';
+        }
+        
+        // Clear any existing mode selection to require manual choice
+        UIUtils.removeClass('singleTransferOption', 'selected');
+        UIUtils.removeClass('splitTransferOption', 'selected');
+        
+        // Update workflow to step 3 to indicate transfer type selection is available
+        updateWorkflowStep(3);
+    }
+    
+    // Hide transfer options panel
+    function hideTransferOptionsPanel() {
+        const transferOptionsPanel = document.getElementById('transferOptions');
+        if (transferOptionsPanel) {
+            transferOptionsPanel.style.display = 'none';
+        }
+    }
+    
+    // Update workflow step progress
+    function updateWorkflowStep(activeStep) {
+        // Clear all step states
+        for (let i = 1; i <= 4; i++) {
+            const stepElement = document.getElementById(`step${i}`);
+            if (stepElement) {
+                stepElement.classList.remove('active', 'completed');
+            }
+        }
+        
+        // Set completed steps
+        for (let i = 1; i < activeStep; i++) {
+            const stepElement = document.getElementById(`step${i}`);
+            if (stepElement) {
+                stepElement.classList.add('completed');
+            }
+        }
+        
+        // Set active step
+        const activeStepElement = document.getElementById(`step${activeStep}`);
+        if (activeStepElement) {
+            activeStepElement.classList.add('active');
+        }
+        
+        // Update feedback text based on step
+        const feedbackElement = document.getElementById('transferFeedback');
+        if (feedbackElement) {
+            switch (activeStep) {
+                case 1:
+                    feedbackElement.textContent = '👆 Start by scanning a source container';
+                    break;
+                case 2:
+                    feedbackElement.textContent = '🌱 Review and update plant data if needed, then choose transfer type';
+                    break;
+                case 3:
+                    feedbackElement.textContent = '⚙️ Choose your transfer type and proceed';
+                    break;
+                case 4:
+                    feedbackElement.textContent = '🚀 Ready to process transfer!';
+                    break;
+                default:
+                    feedbackElement.textContent = '👆 Start by scanning a source container';
+            }
+        }
+    }
+
     // Clear all transfer inputs
     function clearInputs() {
         UIUtils.clearInput('sourceContainerInput');
@@ -421,6 +624,15 @@ window.TransferInputManager = (function() {
             suggestionsElement.style.display = 'none';
         }
         
+        // Hide plant data update panel
+        hidePlantDataUpdatePanel();
+        
+        // Hide transfer options panel
+        hideTransferOptionsPanel();
+        
+        // Reset workflow to step 1
+        updateWorkflowStep(1);
+        
         updateTransferButtonState();
     }
 
@@ -432,7 +644,9 @@ window.TransferInputManager = (function() {
         validateContainerId,
         findContainerInInventory,
         clearInputs,
-        updateTransferButtonState
+        updateTransferButtonState,
+        getUpdatedPlantData,
+        updateWorkflowStep
     };
 
 })();
