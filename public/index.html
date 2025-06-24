@@ -76,16 +76,20 @@
                         <div class="progress-circle">4</div>
                         <div class="progress-label">Media</div>
                     </div>
-                    <div class="progress-step" id="step-stage">
+                    <div class="progress-step" id="step-recipe">
                         <div class="progress-circle">5</div>
+                        <div class="progress-label">Recipe</div>
+                    </div>
+                    <div class="progress-step" id="step-stage">
+                        <div class="progress-circle">6</div>
                         <div class="progress-label">Stage</div>
                     </div>
                     <div class="progress-step" id="step-tissue">
-                        <div class="progress-circle">6</div>
+                        <div class="progress-circle">7</div>
                         <div class="progress-label">Tissue</div>
                     </div>
                     <div class="progress-step" id="step-date">
-                        <div class="progress-circle">7</div>
+                        <div class="progress-circle">8</div>
                         <div class="progress-label">Date</div>
                     </div>
                 </div>
@@ -265,6 +269,37 @@
     <div id="notification" class="notification"></div>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-    <script src="assets/js/app.js"></script>
+    
+    <!-- Core modules -->
+    <script src="src/js/core/state.js"></script>
+    <script src="src/js/core/notifications.js"></script>
+    
+    <!-- Utility modules -->
+    <script src="src/js/utils/dataUtils.js"></script>
+    <script src="src/js/utils/uiUtils.js"></script>
+    
+    <!-- Recipe modules -->
+    <script type="module" src="src/js/modules/recipe/mediaData.js"></script>
+    <script type="module" src="src/js/modules/recipe/recipeCalculator.js"></script>
+    <script type="module" src="src/js/modules/recipe/recipeStorage.js"></script>
+    <script type="module" src="src/js/modules/recipe/recipeManager.js"></script>
+    
+    <!-- Builder modules -->
+    <script src="src/js/modules/builder/stepManager.js"></script>
+    <script src="src/js/modules/builder/barcodeGenerator.js"></script>
+    <script src="src/js/modules/builder/builderMain.js"></script>
+    
+    <!-- Transfer modules -->
+    <script src="src/js/modules/transfer/inputManager.js"></script>
+    <script src="src/js/modules/transfer/transferProcessor.js"></script>
+    <script src="src/js/modules/transfer/transferMain.js"></script>
+    
+    <!-- Inventory modules -->
+    <script src="src/js/modules/inventory/tableManager.js"></script>
+    <script src="src/js/modules/inventory/exportManager.js"></script>
+    <script src="src/js/modules/inventory/inventoryMain.js"></script>
+    
+    <!-- Main application -->
+    <script src="src/js/main.js"></script>
 </body>
 </html>

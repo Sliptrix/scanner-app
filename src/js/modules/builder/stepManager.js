@@ -33,6 +33,13 @@ window.BuilderStepManager = {
                 validation: /^[A-Z]+$/i,
                 options: 'media'
             },
+            recipe: {
+                prompt: 'Select or create a recipe for this media:',
+                hint: 'Recipe creation is mandatory for traceability',
+                placeholder: 'Recipe selection required',
+                validation: /^.+$/,
+                options: 'recipe'
+            },
             stage: {
                 prompt: 'Select the Propagation Stage:',
                 hint: 'Choose the current stage (1-9)',
@@ -66,6 +73,12 @@ window.BuilderStepManager = {
         const stepConfig = this.getStepConfig(stepName);
         
         if (!stepConfig) return;
+        
+        // Special handling for recipe step
+        if (stepName === 'recipe') {
+            this.handleRecipeStep();
+            return;
+        }
         
         // Update prompts and hints
         UIUtils.updateContent('builderPrompt', stepConfig.prompt);
@@ -309,10 +322,21 @@ window.BuilderStepManager = {
     
     // Handle "Next Step" button click
     handleNextButton: function() {
-        // If there's input that hasn't been processed, validate it first
-        const currentInput = document.getElementById('builderInput').value.trim();
         const currentStep = window.appState.builderState.currentStep;
         const stepName = window.appState.builderState.steps[currentStep];
+        
+        // Special handling for recipe step
+        if (stepName === 'recipe') {
+            if (!window.appState.builderState.values.recipe) {
+                NotificationSystem.showBuilderFeedback('Please select or create a recipe', 'error');
+                return;
+            }
+            this.nextStep();
+            return;
+        }
+        
+        // If there's input that hasn't been processed, validate it first
+        const currentInput = document.getElementById('builderInput').value.trim();
         
         if (currentInput && !window.appState.builderState.values[stepName]) {
             this.validateAndProceed();
@@ -327,5 +351,31 @@ window.BuilderStepManager = {
         
         // Move to next step
         this.nextStep();
+    },
+    
+    // Handle recipe step specially
+    handleRecipeStep: function() {
+        // Show recipe interface via RecipeManager
+        if (window.RecipeManager) {
+            RecipeManager.showRecipeStep();
+        } else {
+            console.error('RecipeManager not available');
+            NotificationSystem.showBuilderFeedback('Recipe system not available', 'error');
+        }
+    },
+    
+    // Continue from recipe step (called by RecipeManager)
+    continueFromRecipeStep: function(recipe) {
+        // Store recipe data
+        StateManager.setState('builderState.values.recipe', recipe.id);
+        StateManager.setState('builderState.metadata.recipeName', recipe.name);
+        
+        // Show success feedback
+        NotificationSystem.showBuilderFeedback(`✅ Recipe selected: ${recipe.name}`, 'success');
+        
+        // Move to next step
+        setTimeout(() => {
+            this.nextStep();
+        }, 500);
     }
 };

@@ -33,12 +33,13 @@ window.appState = {
     // Barcode Builder state
     builderState: {
         currentStep: 0,
-        steps: ['container', 'owner', 'strain', 'media', 'stage', 'tissue', 'date'],
+        steps: ['container', 'owner', 'strain', 'media', 'recipe', 'stage', 'tissue', 'date'],
         values: {
             container: null,
             owner: null,
             strain: null,
             media: null,
+            recipe: null,
             stage: null,
             tissue: null,
             date: null
@@ -47,7 +48,8 @@ window.appState = {
             ownerName: null,
             strainName: null,
             mediaName: null,
-            stageName: null
+            stageName: null,
+            recipeName: null
         }
     },
     
@@ -92,12 +94,13 @@ window.StateManager = {
     resetBuilderState: function() {
         window.appState.builderState = {
             currentStep: 0,
-            steps: ['container', 'owner', 'strain', 'media', 'stage', 'tissue', 'date'],
+            steps: ['container', 'owner', 'strain', 'media', 'recipe', 'stage', 'tissue', 'date'],
             values: {
                 container: null,
                 owner: null,
                 strain: null,
                 media: null,
+                recipe: null,
                 stage: null,
                 tissue: null,
                 date: null
@@ -106,7 +109,8 @@ window.StateManager = {
                 ownerName: null,
                 strainName: null,
                 mediaName: null,
-                stageName: null
+                stageName: null,
+                recipeName: null
             }
         };
         console.log('Builder state reset');

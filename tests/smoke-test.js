@@ -26,9 +26,14 @@ const requiredFiles = [
     'src/js/modules/inventory/tableManager.js',
     'src/js/modules/inventory/exportManager.js',
     'src/js/modules/inventory/inventoryMain.js',
+    'src/js/modules/recipe/mediaData.js',
+    'src/js/modules/recipe/recipeCalculator.js',
+    'src/js/modules/recipe/recipeStorage.js',
+    'src/js/modules/recipe/recipeManager.js',
     'tests/phase3-validation.html',
     'tests/phase4-validation.html',
-    'tests/phase5-validation.html'
+    'tests/phase5-validation.html',
+    'tests/recipe-integration.test.js'
 ];
 
 let filesExist = 0;

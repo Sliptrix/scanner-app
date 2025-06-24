@@ -41,6 +41,11 @@ function initializeApp() {
         InventoryManager.initialize();
     }
     
+    // Initialize recipe management module
+    if (window.RecipeManager) {
+        RecipeManager.initialize();
+    }
+    
     // Show initial status
     NotificationSystem.info('Lab system ready! Load Excel data to begin.');
     
