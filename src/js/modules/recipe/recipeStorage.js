@@ -4,7 +4,7 @@
  * Manages localStorage and recipe data persistence
  */
 
-import { RECIPE_TEMPLATE, DEFAULT_RECIPES } from './mediaData.js';
+// Note: mediaData.js is loaded separately via script tag
 
 window.RecipeStorage = (function() {
     'use strict';

@@ -1,24 +1,73 @@
 /**
  * Recipe Calculator Module
- * Handles all recipe calculations and amount updates
- * Preserves original recipe integrity while allowing customization
- * Extracted and adapted from Media Maker project
+ * Auto-populates recommended values based on media type (I, M, R)
+ * Allows technician customization while preserving workflow efficiency
  */
-
-import { 
-    BASE_AMOUNTS, 
-    POST_AUTOCLAVE_DEFAULTS, 
-    INGREDIENT_UNITS, 
-    VALIDATION_RANGES,
-    AUTOCLAVE_DEFAULTS,
-    PH_DEFAULTS
-} from './mediaData.js';
 
 window.RecipeCalculator = (function() {
     'use strict';
+    
+    // Recommended values for each media type (base amounts for 1L)
+    const MEDIA_TEMPLATES = {
+        'Initiation': {
+            basalSalt: { type: 'M&S', amount: 4.4 },
+            gellingAgent: { type: 'Phytogel', amount: 2.3 },
+            preAutoclave: {
+                gamborgVitamin: 1.0,
+                sucrose: 30.0,
+                ppm: 1.0
+            },
+            postAutoclave: [
+                { name: 'AgNO3', amount: 40, unit: 'µL' },
+                { name: 'Meta-Topolin', amount: 500, unit: 'µL/L' }
+            ],
+            pH: 5.8,
+            notes: 'Autoclave at 120°C with pressure for 20mins, cool to 55°C before adding post-autoclave ingredients'
+        },
+        'Multiplication': {
+            basalSalt: { type: 'M&S', amount: 4.4 },
+            gellingAgent: { type: 'Phytogel', amount: 2.3 },
+            preAutoclave: {
+                gamborgVitamin: 1.0,
+                sucrose: 30.0,
+                ppm: 1.0
+            },
+            postAutoclave: [
+                { name: 'AgNO3', amount: 40, unit: 'µL' },
+                { name: 'Meta-Topolin', amount: 500, unit: 'µL/L' },
+                { name: 'Gibberellic Acid', amount: 100, unit: 'µL' }
+            ],
+            pH: 5.8,
+            notes: 'Autoclave at 120°C with pressure for 20mins, cool to 55°C before adding post-autoclave ingredients'
+        },
+        'Rooting': {
+            basalSalt: { type: 'M&S', amount: 4.4 },
+            gellingAgent: { type: 'Phytogel', amount: 2.3 },
+            preAutoclave: {
+                gamborgVitamin: 1.0,
+                sucrose: 30.0,
+                ppm: 1.0
+            },
+            postAutoclave: [
+                { name: 'IBA', amount: 5, unit: 'µL', note: '2-5µL range' },
+                { name: 'NAA', amount: 2, unit: 'µL' },
+                { name: 'AgNO3', amount: 40, unit: 'µL' },
+                { name: 'Sodium Metacylitate', amount: 6, unit: 'mL' }
+            ],
+            pH: 5.8,
+            notes: 'Autoclave at 120°C with pressure for 20mins, cool to 55°C before adding post-autoclave ingredients'
+        }
+    };
+    
+    // Volume scaling factors
+    const VOLUME_SCALES = {
+        '500mL': 0.5,
+        '1L': 1.0,
+        '2L': 2.0
+    };
 
     // State management
-    let currentPostAutoclaveAdditions = [...POST_AUTOCLAVE_DEFAULTS['Initiation']];
+    let currentPostAutoclaveAdditions = [];
     let editedValues = new Map(); // Track which values have been edited
     let originalValues = new Map(); // Store original recommended values
 
@@ -35,16 +84,16 @@ window.RecipeCalculator = (function() {
      * Setup event listeners for recipe form elements
      */
     function setupEventListeners() {
+        // Media type change handler - auto-populate when media type changes
+        const mediaTypeSelect = document.getElementById('mediaType');
+        if (mediaTypeSelect) {
+            mediaTypeSelect.addEventListener('change', autoPopulateRecipe);
+        }
+
         // Volume change handler
         const volumeSelect = document.getElementById('volume');
         if (volumeSelect) {
-            volumeSelect.addEventListener('change', updateVolumeAmounts);
-        }
-
-        // Media type change handler
-        const mediaTypeSelect = document.getElementById('mediaType');
-        if (mediaTypeSelect) {
-            mediaTypeSelect.addEventListener('change', updatePostAutoclaveAdditions);
+            volumeSelect.addEventListener('change', autoPopulateRecipe);
         }
 
         // Basal salt change handler
@@ -59,127 +108,117 @@ window.RecipeCalculator = (function() {
             gellingAgentSelect.addEventListener('change', updateGellingAmount);
         }
 
-        // Input change handlers for edit tracking
-        const trackableInputs = [
-            'basalSaltAmount', 'gellingAgentAmount', 'gamborgVitamin', 
-            'sucrose', 'ppm', 'phValue'
-        ];
-        
-        trackableInputs.forEach(inputId => {
-            const input = document.getElementById(inputId);
-            if (input) {
-                input.addEventListener('change', (e) => {
-                    trackInputEdit(inputId, e.target.value);
-                });
-            }
-        });
+        // Auto-populate on initial load
+        setTimeout(() => {
+            autoPopulateRecipe();
+        }, 100);
     }
 
     /**
-     * Updates basal salt amount based on current volume selection
+     * Auto-populates entire recipe based on media type and volume
      */
-    function updateBasalSaltAmount() {
+    function autoPopulateRecipe() {
+        const mediaType = document.getElementById('mediaType')?.value;
         const volume = document.getElementById('volume')?.value;
-        const basalSalt = document.getElementById('basalSalt')?.value;
         
-        if (!volume || !basalSalt) return null;
+        if (!mediaType || !volume) return;
         
-        const amount = BASE_AMOUNTS[volume][basalSalt];
-        const input = document.getElementById('basalSaltAmount');
+        const template = MEDIA_TEMPLATES[mediaType];
+        if (!template) return;
         
-        if (input) {
-            input.value = amount;
-            // Store as original value for edit tracking
-            originalValues.set('basalSaltAmount', amount);
-            updateInputVisualState(input, true);
+        const scale = VOLUME_SCALES[volume];
+        
+        // Auto-populate basal salt
+        const basalSaltSelect = document.getElementById('basalSalt');
+        const basalSaltAmountInput = document.getElementById('basalSaltAmount');
+        if (basalSaltSelect && basalSaltAmountInput) {
+            basalSaltSelect.value = template.basalSalt.type;
+            basalSaltAmountInput.value = (template.basalSalt.amount * scale).toFixed(2);
         }
         
-        return amount;
-    }
-
-    /**
-     * Updates gelling agent amount based on current selections
-     */
-    function updateGellingAmount() {
-        const volume = document.getElementById('volume')?.value;
-        const gellingAgent = document.getElementById('gellingAgent')?.value?.toLowerCase();
-        
-        if (!volume || !gellingAgent) return null;
-        
-        const amount = BASE_AMOUNTS[volume][gellingAgent];
-        const input = document.getElementById('gellingAgentAmount');
-        
-        if (input) {
-            input.value = amount;
-            // Store as original value for edit tracking
-            originalValues.set('gellingAgentAmount', amount);
-            updateInputVisualState(input, true);
+        // Auto-populate gelling agent
+        const gellingAgentSelect = document.getElementById('gellingAgent');
+        const gellingAgentAmountInput = document.getElementById('gellingAgentAmount');
+        if (gellingAgentSelect && gellingAgentAmountInput) {
+            gellingAgentSelect.value = template.gellingAgent.type;
+            gellingAgentAmountInput.value = (template.gellingAgent.amount * scale).toFixed(2);
         }
         
-        return amount;
-    }
-
-    /**
-     * Updates all volume-dependent amounts when volume changes
-     */
-    function updateVolumeAmounts() {
-        const volume = document.getElementById('volume')?.value;
-        
-        if (!volume) return null;
-        
-        const amounts = BASE_AMOUNTS[volume];
-        
-        // Update pre-autoclave amounts
-        updateBasalSaltAmount();
-        
-        // Update other pre-autoclave ingredients
+        // Auto-populate pre-autoclave ingredients
         const gamborgInput = document.getElementById('gamborgVitamin');
         if (gamborgInput) {
-            gamborgInput.value = amounts.gamborgVitamin;
-            originalValues.set('gamborgVitamin', amounts.gamborgVitamin);
-            updateInputVisualState(gamborgInput, true);
+            gamborgInput.value = (template.preAutoclave.gamborgVitamin * scale).toFixed(2);
         }
         
         const sucroseInput = document.getElementById('sucrose');
         if (sucroseInput) {
-            sucroseInput.value = amounts.sucrose;
-            originalValues.set('sucrose', amounts.sucrose);
-            updateInputVisualState(sucroseInput, true);
+            sucroseInput.value = (template.preAutoclave.sucrose * scale).toFixed(1);
         }
         
         const ppmInput = document.getElementById('ppm');
         if (ppmInput) {
-            ppmInput.value = amounts.ppm;
-            originalValues.set('ppm', amounts.ppm);
-            updateInputVisualState(ppmInput, true);
+            ppmInput.value = (template.preAutoclave.ppm * scale).toFixed(2);
         }
         
-        updateGellingAmount();
+        // Auto-populate pH
+        const phInput = document.getElementById('phValue');
+        if (phInput) {
+            phInput.value = template.pH;
+        }
         
-        // Update post-autoclave amounts
-        updatePostAutoclaveAdditions();
-        
-        return amounts;
-    }
-
-    /**
-     * Updates post-autoclave additions based on media type and volume
-     */
-    function updatePostAutoclaveAdditions() {
-        const mediaType = document.getElementById('mediaType')?.value;
-        const volume = document.getElementById('volume')?.value;
-        
-        if (!mediaType || !volume) return [];
-        
-        const amounts = BASE_AMOUNTS[volume];
-        
-        currentPostAutoclaveAdditions = POST_AUTOCLAVE_DEFAULTS[mediaType].map(item => ({
+        // Auto-populate post-autoclave additions
+        currentPostAutoclaveAdditions = template.postAutoclave.map(item => ({
             ...item,
-            amount: amounts[item.key] || item.amount
+            amount: scale === 1 ? item.amount : (item.amount * scale).toFixed(item.unit === 'µL' ? 0 : 2)
         }));
         
         renderPostAutoclaveAdditions();
-        return currentPostAutoclaveAdditions;
+        
+        // Auto-populate notes if available
+        const notesInput = document.getElementById('recipeNotes');
+        if (notesInput && template.notes) {
+            notesInput.value = template.notes;
+        }
+        
+        console.log(`Auto-populated ${mediaType} recipe for ${volume}`);
+    }
+    
+    /**
+     * Updates basal salt amount when manually changed
+     */
+    function updateBasalSaltAmount() {
+        // This can be used for manual adjustments if needed
+        const input = document.getElementById('basalSaltAmount');
+        if (input) {
+            updateInputVisualState(input, false);
+        }
+    }
+
+    /**
+     * Updates gelling agent amount when manually changed
+     */
+    function updateGellingAmount() {
+        // This can be used for manual adjustments if needed
+        const input = document.getElementById('gellingAgentAmount');
+        if (input) {
+            updateInputVisualState(input, false);
+        }
+    }
+
+    /**
+     * This function is now replaced by autoPopulateRecipe
+     * Kept for compatibility but delegates to autoPopulateRecipe
+     */
+    function updateVolumeAmounts() {
+        autoPopulateRecipe();
+    }
+
+    /**
+     * This function is now replaced by autoPopulateRecipe
+     * Kept for compatibility but delegates to autoPopulateRecipe
+     */
+    function updatePostAutoclaveAdditions() {
+        autoPopulateRecipe();
     }
 
     /**
@@ -228,9 +267,11 @@ window.RecipeCalculator = (function() {
      * Validates if an amount is within recommended ranges
      */
     function validateAmount(ingredient, amount, volume) {
-        const baseAmount = BASE_AMOUNTS[volume]?.[ingredient];
+        const mediaType = document.getElementById('mediaType')?.value || 'Initiation';
+        const template = MEDIA_TEMPLATES[mediaType];
+        const scale = VOLUME_SCALES[volume] || 1;
         
-        if (!baseAmount) {
+        if (!template) {
             return {
                 isValid: true,
                 isRecommended: false,
@@ -239,11 +280,38 @@ window.RecipeCalculator = (function() {
             };
         }
         
+        let recommendedAmount = null;
+        
+        // Get recommended amount based on ingredient type
+        if (ingredient === 'basalSaltAmount') {
+            recommendedAmount = template.basalSalt.amount * scale;
+        } else if (ingredient === 'gellingAgentAmount') {
+            recommendedAmount = template.gellingAgent.amount * scale;
+        } else if (ingredient === 'gamborgVitamin') {
+            recommendedAmount = template.preAutoclave.gamborgVitamin * scale;
+        } else if (ingredient === 'sucrose') {
+            recommendedAmount = template.preAutoclave.sucrose * scale;
+        } else if (ingredient === 'ppm') {
+            recommendedAmount = template.preAutoclave.ppm * scale;
+        }
+        
+        if (recommendedAmount === null) {
+            return {
+                isValid: true,
+                isRecommended: false,
+                recommendation: null,
+                message: 'No recommendation available'
+            };
+        }
+        
+        const tolerance = 0.01; // Allow small floating point differences
+        const isRecommended = Math.abs(amount - recommendedAmount) <= tolerance;
+        
         return {
             isValid: true,
-            isRecommended: amount == baseAmount,
-            recommendation: baseAmount,
-            message: amount != baseAmount ? `Recommended: ${baseAmount}` : 'Using recommended amount'
+            isRecommended,
+            recommendation: recommendedAmount,
+            message: isRecommended ? 'Using recommended amount' : `Recommended: ${recommendedAmount}`
         };
     }
 
@@ -251,7 +319,25 @@ window.RecipeCalculator = (function() {
      * Gets the recommended amount for an ingredient at a specific volume
      */
     function getRecommendedAmount(ingredient, volume) {
-        return BASE_AMOUNTS[volume]?.[ingredient] || null;
+        const mediaType = document.getElementById('mediaType')?.value || 'Initiation';
+        const template = MEDIA_TEMPLATES[mediaType];
+        const scale = VOLUME_SCALES[volume] || 1;
+        
+        if (!template) return null;
+        
+        if (ingredient === 'basalSaltAmount') {
+            return template.basalSalt.amount * scale;
+        } else if (ingredient === 'gellingAgentAmount') {
+            return template.gellingAgent.amount * scale;
+        } else if (ingredient === 'gamborgVitamin') {
+            return template.preAutoclave.gamborgVitamin * scale;
+        } else if (ingredient === 'sucrose') {
+            return template.preAutoclave.sucrose * scale;
+        } else if (ingredient === 'ppm') {
+            return template.preAutoclave.ppm * scale;
+        }
+        
+        return null;
     }
 
     /**
@@ -380,11 +466,11 @@ window.RecipeCalculator = (function() {
                 ppm: parseFloat(document.getElementById('ppm')?.value) || 0
             },
             postAutoclave: getCurrentPostAutoclaveAdditions(),
-            pH: parseFloat(document.getElementById('phValue')?.value) || PH_DEFAULTS.value,
+            pH: parseFloat(document.getElementById('phValue')?.value) || 5.8,
             autoclaveConditions: {
-                temperature: AUTOCLAVE_DEFAULTS.temperature,
-                time: AUTOCLAVE_DEFAULTS.time,
-                coolTo: AUTOCLAVE_DEFAULTS.coolTo
+                temperature: 120,
+                time: 20,
+                coolTo: 55
             }
         };
     }
@@ -428,7 +514,7 @@ window.RecipeCalculator = (function() {
 
         // Set pH
         if (document.getElementById('phValue')) {
-            document.getElementById('phValue').value = recipe.pH || PH_DEFAULTS.value;
+            document.getElementById('phValue').value = recipe.pH || 5.8;
         }
 
         // Load post-autoclave additions
@@ -464,27 +550,23 @@ window.RecipeCalculator = (function() {
 
         // Validate amounts
         if (recipe.pH) {
-            const pHRange = VALIDATION_RANGES.pH;
-            if (recipe.pH < pHRange.min || recipe.pH > pHRange.max) {
-                errors.push(`pH must be between ${pHRange.min} and ${pHRange.max}`);
-            } else if (recipe.pH < pHRange.recommended.min || recipe.pH > pHRange.recommended.max) {
-                warnings.push(`pH outside recommended range (${pHRange.recommended.min}-${pHRange.recommended.max})`);
+            if (recipe.pH < 5.0 || recipe.pH > 7.0) {
+                errors.push('pH must be between 5.0 and 7.0');
+            } else if (recipe.pH < 5.6 || recipe.pH > 6.0) {
+                warnings.push('pH outside recommended range (5.6-6.0)');
             }
         }
 
         // Validate autoclave conditions
         if (recipe.autoclaveConditions) {
-            const tempRange = VALIDATION_RANGES.autoclaveTemp;
-            const timeRange = VALIDATION_RANGES.autoclaveTime;
-
-            if (recipe.autoclaveConditions.temperature < tempRange.min || 
-                recipe.autoclaveConditions.temperature > tempRange.max) {
-                errors.push(`Autoclave temperature must be between ${tempRange.min}°C and ${tempRange.max}°C`);
+            if (recipe.autoclaveConditions.temperature < 115 || 
+                recipe.autoclaveConditions.temperature > 125) {
+                errors.push('Autoclave temperature must be between 115°C and 125°C');
             }
 
-            if (recipe.autoclaveConditions.time < timeRange.min || 
-                recipe.autoclaveConditions.time > timeRange.max) {
-                errors.push(`Autoclave time must be between ${timeRange.min} and ${timeRange.max} minutes`);
+            if (recipe.autoclaveConditions.time < 15 || 
+                recipe.autoclaveConditions.time > 30) {
+                errors.push('Autoclave time must be between 15 and 30 minutes');
             }
         }
 
@@ -498,6 +580,7 @@ window.RecipeCalculator = (function() {
     // Public API
     return {
         initialize,
+        autoPopulateRecipe,
         updateBasalSaltAmount,
         updateGellingAmount,
         updateVolumeAmounts,

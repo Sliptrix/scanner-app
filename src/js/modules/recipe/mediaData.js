@@ -5,7 +5,7 @@
  */
 
 // Base amounts for different volumes and ingredients (numeric values only)
-export const BASE_AMOUNTS = {
+window.BASE_AMOUNTS = {
     '500mL': {
         'M&S': 2.24,
         'DKW': 2.66,
@@ -54,7 +54,7 @@ export const BASE_AMOUNTS = {
 };
 
 // Post-autoclave additions for each media type (numeric values with separate units)
-export const POST_AUTOCLAVE_DEFAULTS = {
+window.POST_AUTOCLAVE_DEFAULTS = {
     'Initiation': [
         { name: 'AgNO3', amount: 40, key: 'agno3', unit: 'μL' },
         { name: 'Meta-Topolin', amount: 500, key: 'metaTopolin', unit: 'μL' }
@@ -73,23 +73,23 @@ export const POST_AUTOCLAVE_DEFAULTS = {
 };
 
 // Default autoclave conditions
-export const AUTOCLAVE_DEFAULTS = {
+window.AUTOCLAVE_DEFAULTS = {
     temperature: 120,
     time: 20,
     coolTo: 55
 };
 
 // Default pH range
-export const PH_DEFAULTS = {
+window.PH_DEFAULTS = {
     value: 5.8,
     range: '(5.7-6.0)'
 };
 
 // PPM concentration range
-export const PPM_RANGE = '(500μL - 2mL)';
+window.PPM_RANGE = '(500μL - 2mL)';
 
 // Quick reference data for the reference card
-export const QUICK_REFERENCE = {
+window.QUICK_REFERENCE = {
     'Base': 'M&S (4.48g) or DKW (5.32g)',
     'Vitamins': 'Gamborg (1g)',
     'Gelling': 'Agar (8g) or Phytogel (3g)',
@@ -99,14 +99,14 @@ export const QUICK_REFERENCE = {
 };
 
 // Validation ranges for safety checks
-export const VALIDATION_RANGES = {
+window.VALIDATION_RANGES = {
     pH: { min: 5.0, max: 7.0, recommended: { min: 5.7, max: 6.0 } },
     autoclaveTemp: { min: 115, max: 125, recommended: 120 },
     autoclaveTime: { min: 15, max: 30, recommended: 20 }
 };
 
 // Unit mappings for ingredients
-export const INGREDIENT_UNITS = {
+window.INGREDIENT_UNITS = {
     'M&S': 'g',
     'DKW': 'g',
     'gamborgVitamin': 'g',
@@ -127,13 +127,13 @@ export const INGREDIENT_UNITS = {
 };
 
 // Media type configurations
-export const MEDIA_TYPES = ['Initiation', 'Multiplication', 'Rooting'];
-export const VOLUME_OPTIONS = ['500mL', '1L', '2L'];
-export const BASAL_SALT_OPTIONS = ['M&S', 'DKW'];
-export const GELLING_AGENT_OPTIONS = ['Phytogel', 'Agar'];
+window.MEDIA_TYPES = ['Initiation', 'Multiplication', 'Rooting'];
+window.VOLUME_OPTIONS = ['500mL', '1L', '2L'];
+window.BASAL_SALT_OPTIONS = ['M&S', 'DKW'];
+window.GELLING_AGENT_OPTIONS = ['Phytogel', 'Agar'];
 
 // Recipe data structure template
-export const RECIPE_TEMPLATE = {
+window.RECIPE_TEMPLATE = {
     id: '',
     name: '',
     mediaType: 'Initiation',
@@ -167,9 +167,8 @@ export const RECIPE_TEMPLATE = {
 };
 
 // Default recipe templates for common media types
-export const DEFAULT_RECIPES = {
+window.DEFAULT_RECIPES = {
     'Initiation_1L_MS': {
-        ...RECIPE_TEMPLATE,
         id: 'default_initiation_1l_ms',
         name: 'Standard Initiation (1L M&S)',
         mediaType: 'Initiation',
@@ -185,11 +184,20 @@ export const DEFAULT_RECIPES = {
             { name: 'AgNO3', amount: 40, key: 'agno3', unit: 'μL' },
             { name: 'Meta-Topolin', amount: 500, key: 'metaTopolin', unit: 'μL' }
         ],
-        isTemplate: true,
-        tags: ['default', 'initiation', 'standard']
+        pH: 5.8,
+        autoclaveConditions: {
+            temperature: 120,
+            time: 20,
+            coolTo: 55
+        },
+        notes: '',
+        createdDate: null,
+        lastUsed: null,
+        useCount: 0,
+        tags: ['default', 'initiation', 'standard'],
+        isTemplate: true
     },
     'Multiplication_1L_MS': {
-        ...RECIPE_TEMPLATE,
         id: 'default_multiplication_1l_ms',
         name: 'Standard Multiplication (1L M&S)',
         mediaType: 'Multiplication',
@@ -206,11 +214,20 @@ export const DEFAULT_RECIPES = {
             { name: 'Meta-Topolin', amount: 500, key: 'metaTopolin', unit: 'μL' },
             { name: 'Gibberellic Acid', amount: 100, key: 'gibberellic', unit: 'μL' }
         ],
-        isTemplate: true,
-        tags: ['default', 'multiplication', 'standard']
+        pH: 5.8,
+        autoclaveConditions: {
+            temperature: 120,
+            time: 20,
+            coolTo: 55
+        },
+        notes: '',
+        createdDate: null,
+        lastUsed: null,
+        useCount: 0,
+        tags: ['default', 'multiplication', 'standard'],
+        isTemplate: true
     },
     'Rooting_1L_MS': {
-        ...RECIPE_TEMPLATE,
         id: 'default_rooting_1l_ms',
         name: 'Standard Rooting (1L M&S)',
         mediaType: 'Rooting',
@@ -228,25 +245,19 @@ export const DEFAULT_RECIPES = {
             { name: 'AgNO3', amount: 40, key: 'agno3', unit: 'μL' },
             { name: 'Sodium Metacylitate', amount: 6, key: 'sodiumMetacylitate', unit: 'mL' }
         ],
-        isTemplate: true,
-        tags: ['default', 'rooting', 'standard']
+        pH: 5.8,
+        autoclaveConditions: {
+            temperature: 120,
+            time: 20,
+            coolTo: 55
+        },
+        notes: '',
+        createdDate: null,
+        lastUsed: null,
+        useCount: 0,
+        tags: ['default', 'rooting', 'standard'],
+        isTemplate: true
     }
 };
 
-// Export all constants for easy importing
-export default {
-    BASE_AMOUNTS,
-    POST_AUTOCLAVE_DEFAULTS,
-    AUTOCLAVE_DEFAULTS,
-    PH_DEFAULTS,
-    PPM_RANGE,
-    QUICK_REFERENCE,
-    VALIDATION_RANGES,
-    INGREDIENT_UNITS,
-    MEDIA_TYPES,
-    VOLUME_OPTIONS,
-    BASAL_SALT_OPTIONS,
-    GELLING_AGENT_OPTIONS,
-    RECIPE_TEMPLATE,
-    DEFAULT_RECIPES
-};
+// All constants are now available as global window properties

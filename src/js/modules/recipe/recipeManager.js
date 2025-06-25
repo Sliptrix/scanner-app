@@ -422,6 +422,16 @@ window.RecipeManager = (function() {
             loadRecipeList();
         }
         
+        // Auto-populate recommended values for new recipe mode
+        if (recipeMode === 'new' && window.RecipeCalculator) {
+            // Initialize the calculator to populate default values
+            setTimeout(() => {
+                if (window.RecipeCalculator.autoPopulateRecipe) {
+                    window.RecipeCalculator.autoPopulateRecipe();
+                }
+            }, 200);
+        }
+        
         // Update builder feedback
         updateBuilderFeedback('Select or create a recipe for this media');
     }
