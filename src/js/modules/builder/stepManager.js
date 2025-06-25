@@ -355,13 +355,25 @@ window.BuilderStepManager = {
     
     // Handle recipe step specially
     handleRecipeStep: function() {
-        // Show recipe interface via RecipeManager
-        if (window.RecipeManager) {
-            RecipeManager.showRecipeStep();
-        } else {
-            console.error('RecipeManager not available');
-            NotificationSystem.showBuilderFeedback('Recipe system not available', 'error');
+        // Update prompts and hints for recipe step
+        UIUtils.updateContent('builderPrompt', 'Select or create a recipe for this media:');
+        UIUtils.updateContent('builderHint', 'Choose a recipe or create a new one based on your media type');
+        
+        // Update input placeholder
+        const input = document.getElementById('builderInput');
+        if (input) {
+            input.placeholder = 'Recipe will be auto-selected';
+            input.value = '';
+            input.style.display = 'none'; // Hide input for recipe step
         }
+        
+        // Show recipe options in the builder options area
+        this.showRecipeOptions();
+        
+        // Update button text
+        UIUtils.updateContent('builderNextBtn', 'Continue with Recipe →');
+        
+        console.log('Recipe step initialized within builder');
     },
     
     // Continue from recipe step (called by RecipeManager)
@@ -373,9 +385,189 @@ window.BuilderStepManager = {
         // Show success feedback
         NotificationSystem.showBuilderFeedback(`✅ Recipe selected: ${recipe.name}`, 'success');
         
+        // Show input again for next step
+        const input = document.getElementById('builderInput');
+        if (input) {
+            input.style.display = 'block';
+        }
+        
         // Move to next step
         setTimeout(() => {
             this.nextStep();
         }, 500);
+    },
+    
+    // Show recipe options in the builder options area
+    showRecipeOptions: function() {
+        const optionsDiv = document.getElementById('builderOptions');
+        if (!optionsDiv) return;
+        
+        const mediaType = window.appState.builderState.values.media;
+        
+        // Create recipe selection UI
+        optionsDiv.innerHTML = `
+            <div class="recipe-selection" style="margin: 20px 0;">
+                <h4 style="margin-bottom: 15px; color: #2c3e50;">📝 Recipe Selection</h4>
+                
+                <div class="recipe-modes" style="display: flex; gap: 10px; margin-bottom: 20px;">
+                    <button class="recipe-mode-btn active" onclick="BuilderStepManager.selectRecipeMode('auto')">
+                        🎯 Auto-Select Recipe
+                    </button>
+                    <button class="recipe-mode-btn" onclick="BuilderStepManager.selectRecipeMode('create')">
+                        ➕ Create New Recipe
+                    </button>
+                    <button class="recipe-mode-btn" onclick="BuilderStepManager.selectRecipeMode('existing')">
+                        📋 Use Existing Recipe
+                    </button>
+                </div>
+                
+                <div id="recipeAutoMode" class="recipe-mode-content" style="display: block;">
+                    <p style="color: #495057; margin-bottom: 15px; font-size: 0.9rem;">
+                        🎯 A recommended recipe will be automatically selected based on your media type: <strong>${mediaType || 'Unknown'}</strong>
+                    </p>
+                    <button class="btn btn-primary" onclick="BuilderStepManager.autoSelectRecipe()">
+                        Auto-Select Recipe for ${mediaType || 'Media'}
+                    </button>
+                </div>
+                
+                <div id="recipeCreateMode" class="recipe-mode-content" style="display: none;">
+                    <p style="color: #495057; margin-bottom: 15px; font-size: 0.9rem;">
+                        ➕ Create a new custom recipe for this specific batch
+                    </p>
+                    <button class="btn btn-success" onclick="BuilderStepManager.createNewRecipe()">
+                        Create New Recipe
+                    </button>
+                </div>
+                
+                <div id="recipeExistingMode" class="recipe-mode-content" style="display: none;">
+                    <p style="color: #495057; margin-bottom: 15px; font-size: 0.9rem;">
+                        📋 Choose from previously saved recipes
+                    </p>
+                    <button class="btn btn-secondary" onclick="BuilderStepManager.selectExistingRecipe()">
+                        Browse Saved Recipes
+                    </button>
+                </div>
+            </div>
+        `;
+        
+        // Add CSS for recipe selection
+        this.addRecipeSelectionCSS();
+    },
+    
+    // Add CSS for recipe selection
+    addRecipeSelectionCSS: function() {
+        const cssId = 'recipe-selection-styles';
+        if (document.getElementById(cssId)) return;
+        
+        const style = document.createElement('style');
+        style.id = cssId;
+        style.textContent = `
+            .recipe-mode-btn {
+                padding: 8px 16px;
+                border: 2px solid #007bff;
+                background: white;
+                color: #007bff;
+                border-radius: 6px;
+                cursor: pointer;
+                font-size: 14px;
+                font-weight: 600;
+                transition: all 0.3s ease;
+            }
+            
+            .recipe-mode-btn.active,
+            .recipe-mode-btn:hover {
+                background: #007bff;
+                color: white;
+            }
+            
+            .recipe-mode-content {
+                padding: 15px;
+                background: #f8f9fa;
+                border-radius: 6px;
+                border: 1px solid #e9ecef;
+            }
+        `;
+        document.head.appendChild(style);
+    },
+    
+    // Select recipe mode
+    selectRecipeMode: function(mode) {
+        // Update button states
+        document.querySelectorAll('.recipe-mode-btn').forEach(btn => {
+            btn.classList.remove('active');
+        });
+        event.target.classList.add('active');
+        
+        // Show/hide content
+        document.querySelectorAll('.recipe-mode-content').forEach(content => {
+            content.style.display = 'none';
+        });
+        
+        const modeContent = document.getElementById(`recipe${mode.charAt(0).toUpperCase() + mode.slice(1)}Mode`);
+        if (modeContent) {
+            modeContent.style.display = 'block';
+        }
+    },
+    
+    // Auto-select recipe based on media type
+    autoSelectRecipe: function() {
+        const mediaType = window.appState.builderState.values.media;
+        
+        // Map media codes to recipe types
+        const mediaToRecipeMap = {
+            'IA': 'Initiation',
+            'MA': 'Multiplication', 
+            'RA': 'Rooting',
+            'I': 'Initiation',
+            'M': 'Multiplication',
+            'R': 'Rooting'
+        };
+        
+        const recipeType = mediaToRecipeMap[mediaType] || 'Initiation';
+        
+        // Create a basic recipe
+        const autoRecipe = {
+            id: `auto_${Date.now()}`,
+            name: `Auto-Selected ${recipeType} Recipe`,
+            mediaType: recipeType,
+            volume: '1L',
+            notes: `Auto-generated recipe for ${mediaType} media`,
+            isAutoGenerated: true
+        };
+        
+        // Continue with this recipe
+        this.continueFromRecipeStep(autoRecipe);
+    },
+    
+    // Create new recipe
+    createNewRecipe: function() {
+        const mediaType = window.appState.builderState.values.media;
+        
+        // For now, create a simple new recipe
+        const newRecipe = {
+            id: `custom_${Date.now()}`,
+            name: `Custom Recipe for ${mediaType}`,
+            mediaType: mediaType,
+            volume: '1L',
+            notes: 'Custom recipe created during barcode generation',
+            isCustom: true
+        };
+        
+        this.continueFromRecipeStep(newRecipe);
+    },
+    
+    // Select existing recipe
+    selectExistingRecipe: function() {
+        // For now, create a placeholder existing recipe
+        const existingRecipe = {
+            id: `existing_${Date.now()}`,
+            name: 'Standard Lab Recipe',
+            mediaType: 'Standard',
+            volume: '1L',
+            notes: 'Previously saved lab recipe',
+            isExisting: true
+        };
+        
+        this.continueFromRecipeStep(existingRecipe);
     }
 };
