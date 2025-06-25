@@ -91,7 +91,8 @@ window.TransferProcessor = (function() {
                 transferDate: new Date().toISOString(),
                 transferSource: parseInt(sourceContainer.id), // Convert to number for test compatibility
                 transferType: 'single',
-                timestamp: new Date() // Update timestamp for new container
+                timestamp: new Date(), // Update timestamp for new container
+                status: 'Complete' // Ensure transferred samples have correct status
             };
             
             // Apply updated plant data if provided
@@ -200,7 +201,8 @@ window.TransferProcessor = (function() {
                         originalSampleIndex: currentSampleIndex,
                         originalTissueCount: currentSampleTotalTissues,
                         splitPortion: `${tissuesToTakeFromCurrentSample}/${currentSampleTotalTissues}`,
-                        timestamp: new Date() // Update timestamp for new container
+                        timestamp: new Date(), // Update timestamp for new container
+                        status: 'Complete' // Ensure split samples have correct status
                     };
                     
                     // Apply updated plant data if provided
