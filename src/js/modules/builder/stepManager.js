@@ -378,9 +378,16 @@ window.BuilderStepManager = {
     
     // Continue from recipe step (called by RecipeManager)
     continueFromRecipeStep: function(recipe) {
+        // Debug logging
+        console.log('🔧 continueFromRecipeStep called with recipe:', recipe);
+        console.log('🔧 Current builder state before recipe update:', JSON.stringify(window.appState.builderState.values, null, 2));
+        
         // Store recipe data
         StateManager.setState('builderState.values.recipe', recipe.id);
         StateManager.setState('builderState.metadata.recipeName', recipe.name);
+        
+        // Debug logging after update
+        console.log('🔧 Builder state after recipe update:', JSON.stringify(window.appState.builderState.values, null, 2));
         
         // Show success feedback
         NotificationSystem.showBuilderFeedback(`✅ Recipe selected: ${recipe.name}`, 'success');
