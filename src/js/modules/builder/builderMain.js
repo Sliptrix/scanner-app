@@ -164,15 +164,4 @@ window.BarcodeBuilder = {
     }
 };
 
-// Legacy global functions for HTML onclick compatibility
-window.nextBuilderStep = function() {
-    BarcodeBuilder.nextStep();
-};
-
-window.resetBuilder = function() {
-    BarcodeBuilder.reset();
-};
-
-window.useGeneratedBarcode = function() {
-    BarcodeBuilder.saveBarcode();
-};
+// Note: Global functions for HTML onclick events are defined in main.js
