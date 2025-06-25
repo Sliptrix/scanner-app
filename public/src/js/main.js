@@ -29,6 +29,11 @@ function initializeApp() {
     // Initialize builder module if in builder mode
     if (window.appState.mode === 'builder') {
         BarcodeBuilder.initialize();
+        
+        // Initialize step manager
+        if (window.BuilderStepManager) {
+            BuilderStepManager.updateStep();
+        }
     }
     
     // Initialize transfer module
@@ -187,11 +192,19 @@ function switchMode(mode) {
 }
 
 function nextBuilderStep() {
-    BarcodeBuilder.nextStep();
+    if (window.BuilderStepManager) {
+        BuilderStepManager.handleNextButton();
+    } else {
+        BarcodeBuilder.nextStep();
+    }
 }
 
 function resetBuilder() {
-    BarcodeBuilder.reset();
+    if (window.BuilderStepManager) {
+        BuilderStepManager.reset();
+    } else {
+        BarcodeBuilder.reset();
+    }
 }
 
 function useGeneratedBarcode() {
