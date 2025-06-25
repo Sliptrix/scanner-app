@@ -187,11 +187,11 @@ function switchMode(mode) {
 }
 
 function nextBuilderStep() {
-    BarcodeBuilder.nextStep();
+    BuilderStepManager.handleNextButton();
 }
 
 function resetBuilder() {
-    BarcodeBuilder.reset();
+    BuilderStepManager.reset();
 }
 
 function useGeneratedBarcode() {
