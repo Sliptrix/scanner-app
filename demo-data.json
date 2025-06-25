@@ -1,0 +1,39 @@
+{
+  "strains": {
+    "1": "Purple Kush",
+    "2": "White Widow", 
+    "3": "Northern Lights",
+    "4": "Blue Dream",
+    "5": "Girl Scout Cookies",
+    "10": "OG Kush",
+    "15": "Sour Diesel",
+    "20": "Granddaddy Purple",
+    "25": "Jack Herer",
+    "30": "Pineapple Express"
+  },
+  "owners": {
+    "LW": "Lone Wolf Labs",
+    "J": "Johnson Research",
+    "TK": "Terra Kulture",
+    "BG": "BioGen Solutions",
+    "GS": "Green Science"
+  },
+  "mediaTypes": {
+    "IA": "Initiation Agar",
+    "MA": "Multiplication Agar", 
+    "RA": "Rooting Agar",
+    "IL": "Initiation Liquid",
+    "ML": "Multiplication Liquid"
+  },
+  "stages": {
+    "1": "Initial Culture",
+    "2": "Primary Multiplication", 
+    "3": "Secondary Multiplication",
+    "4": "Pre-Rooting",
+    "5": "Rooting Phase",
+    "6": "Maturation",
+    "7": "Hardening",
+    "8": "Quality Control",
+    "9": "Final Stage"
+  }
+}

@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Lab Barcode Builder & Transfer System</title>
-    <link rel="stylesheet" href="assets/css/main.css">
+    <link rel="stylesheet" href="src/styles/main-consolidated.css">
 </head>
 <body>
     <div class="container">
@@ -54,6 +54,8 @@
             </div>
         </div>
 
+        </div>
+
         <div class="main-content">
             <!-- Barcode Builder Section -->
             <div class="builder-section active" id="builderSection">
@@ -76,20 +78,16 @@
                         <div class="progress-circle">4</div>
                         <div class="progress-label">Media</div>
                     </div>
-                    <div class="progress-step" id="step-recipe">
-                        <div class="progress-circle">5</div>
-                        <div class="progress-label">Recipe</div>
-                    </div>
                     <div class="progress-step" id="step-stage">
-                        <div class="progress-circle">6</div>
+                        <div class="progress-circle">5</div>
                         <div class="progress-label">Stage</div>
                     </div>
                     <div class="progress-step" id="step-tissue">
-                        <div class="progress-circle">7</div>
+                        <div class="progress-circle">6</div>
                         <div class="progress-label">Tissue</div>
                     </div>
                     <div class="progress-step" id="step-date">
-                        <div class="progress-circle">8</div>
+                        <div class="progress-circle">7</div>
                         <div class="progress-label">Date</div>
                     </div>
                 </div>
@@ -146,42 +144,122 @@
                 
                 <div class="transfer-flow">
                     <div class="transfer-container" id="sourceContainer">
-                        <h3>📦 Source Container</h3>
+                        <h3>🏺 Source Container</h3>
                         <p style="margin: 10px 0; font-size: 1.5rem; font-weight: bold;" id="sourceContainerValue">-</p>
-                        <div style="font-size: 0.9rem; color: #6c757d;" id="sourceSummary">Scan to see contents</div>
+                        <div style="font-size: 0.9rem; color: #6c757d;" id="sourceSummary">Scan source container</div>
+                        
+                        <!-- Prominent sample count display -->
+                        <div id="sourceSampleCount" class="sample-count-highlight" style="display: none; margin: 10px 0;">
+                            <span id="sourceSampleCountNumber" class="sample-count-number">0</span>
+                            <span class="sample-count-label">tissue samples</span>
+                        </div>
+                        
                         <input type="text" id="sourceContainerInput" class="barcode-input" 
-                               placeholder="Scan source..." autocomplete="off" style="margin-top: 10px;">
+                               placeholder="Scan source container..." autocomplete="off" style="margin-top: 10px;">
                     </div>
                     
                     <div class="transfer-arrow">→</div>
                     
                     <div class="transfer-container" id="destContainer">
-                        <h3>📦 Destination</h3>
-                        <p style="margin: 10px 0; font-size: 1.5rem; font-weight: bold;" id="destContainerValue">-</p>
-                        <div style="font-size: 0.9rem; color: #6c757d;" id="destSummary">Single or multiple containers</div>
-                        <input type="text" id="destContainerInput" class="barcode-input" 
-                               placeholder="Scan destination..." autocomplete="off" style="margin-top: 10px;">
+                        <h3>🆕 New Container(s)</h3>
+                        <p style="margin: 10px 0; font-size: 1.5rem; font-weight: bold;" id="destContainerValue">Auto-Generated</p>
+                        <div style="font-size: 0.9rem; color: #6c757d;" id="destSummary">Will create new containers</div>
+                        <div style="margin-top: 10px; padding: 8px; background: #e3f2fd; border-radius: 4px; font-size: 0.85rem; color: #1976d2;">
+                            💡 New containers will be automatically created
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Workflow Progress Indicator -->
+                <div class="workflow-progress" id="workflowProgress">
+                    <div class="workflow-step active" id="step1">
+                        <div class="step-number">1</div>
+                        <div class="step-label">Scan Source Container</div>
+                    </div>
+                    <div class="workflow-step" id="step2">
+                        <div class="step-number">2</div>
+                        <div class="step-label">Update Plant Data</div>
+                    </div>
+                    <div class="workflow-step" id="step3">
+                        <div class="step-number">3</div>
+                        <div class="step-label">Choose Transfer Type</div>
+                    </div>
+                    <div class="workflow-step" id="step4">
+                        <div class="step-number">4</div>
+                        <div class="step-label">Process Transfer</div>
                     </div>
                 </div>
 
                 <div class="scan-feedback" id="transferFeedback">
-                    Transfer feedback will appear here
+                    👆 Start by scanning a source container
+                </div>
+                
+                <!-- Technician Control Notice -->
+                <div style="text-align: center; background: #e3f2fd; border: 2px solid #1976d2; border-radius: 8px; padding: 15px; margin: 20px 0;">
+                    <h4 style="margin: 0 0 8px 0; color: #1976d2;">👨‍🔬 Technician Control</h4>
+                    <p style="margin: 0; color: #495057; font-size: 0.9rem;">
+                        You have full control over how many containers to create and how to distribute samples.
+                        The system will guide you through each step but you make all the decisions.
+                    </p>
                 </div>
 
-                <div class="transfer-options" id="transferOptions">
-                    <h3 style="margin-bottom: 15px;">🌱 Transfer Options</h3>
+                <!-- Plant Data Update Panel -->
+                <div class="plant-data-update" id="plantDataUpdate" style="display: none;">
+                    <h3 style="margin-bottom: 15px; color: #2c3e50;">🌱 Update Plant Data for New Containers</h3>
+                    <p style="color: #6c757d; margin-bottom: 15px; font-size: 0.9rem;">
+                        Update any data that may have changed during the plant's growth cycle:
+                    </p>
+                    
+                    <div class="data-update-grid">
+                        <div class="update-field">
+                            <label>Growth Stage:</label>
+                            <select id="updateStage" class="update-select">
+                                <option value="keep-same">Keep Same (T1)</option>
+                                <!-- Options will be populated from Excel data -->
+                            </select>
+                        </div>
+                        
+                        <div class="update-field">
+                            <label>Media Type:</label>
+                            <select id="updateMedia" class="update-select">
+                                <option value="keep-same">Keep Same (MS)</option>
+                                <!-- Options will be populated from Excel data -->
+                            </select>
+                        </div>
+                        
+                        <div class="update-field">
+                            <label>New Date:</label>
+                            <input type="date" id="updateDate" class="update-input" />
+                        </div>
+                        
+                        <div class="update-field">
+                            <label>Notes (Optional):</label>
+                            <input type="text" id="updateNotes" class="update-input" placeholder="Growth notes, conditions, etc." />
+                        </div>
+                    </div>
+                    
+                    <div style="margin-top: 15px; padding: 10px; background: #f8f9fa; border-radius: 6px; font-size: 0.85rem; color: #495057;">
+                        💡 <strong>Tip:</strong> Only update fields that have changed. Other data (strain, owner) will be preserved from the source container.
+                    </div>
+                </div>
+
+                <div class="transfer-options" id="transferOptions" style="display: none;">
+                    <h3 style="margin-bottom: 15px;">🌱 Choose Transfer Type</h3>
+                    <p style="color: #6c757d; margin-bottom: 15px; font-size: 0.9rem;">
+                        Select how you want to distribute the tissue samples:
+                    </p>
                     
                     <div class="transfer-mode-toggle">
-                        <div class="mode-option selected" id="singleTransferOption" onclick="selectTransferMode('single')">
+                        <div class="mode-option" id="singleTransferOption" onclick="selectTransferMode('single')">
                             <h4>📦 Single Container</h4>
                             <p style="font-size: 0.9rem; color: #6c757d; margin-top: 5px;">
-                                Move all samples to one destination
+                                Move all samples to one new container
                             </p>
                         </div>
                         <div class="mode-option" id="splitTransferOption" onclick="selectTransferMode('split')">
                             <h4>🌱 Split Tissues</h4>
                             <p style="font-size: 0.9rem; color: #6c757d; margin-top: 5px;">
-                                Divide samples across new containers
+                                Divide samples across multiple new containers
                             </p>
                         </div>
                     </div>
@@ -193,15 +271,24 @@
                     </div>
 
                     <div id="splitTransferDetails" style="display: none;">
-                        <div style="text-align: center;">
-                            <label>Number of New Containers:</label>
+                        <!-- Smart suggestions panel -->
+                        <div id="smartSuggestions" class="smart-suggestions" style="display: none; margin-bottom: 20px;">
+                            <!-- Smart suggestions will be populated here -->
+                        </div>
+                        
+                        <div style="text-align: center; background: #f8f9fa; padding: 20px; border-radius: 8px; border: 2px solid #007bff;">
+                            <h4 style="margin-bottom: 15px; color: #007bff;">👨‍🔬 Technician Controls</h4>
+                            <label style="font-weight: 600; margin-bottom: 10px; display: block;">How many new containers do you want to create?</label>
                             <div class="tissue-counter">
                                 <button class="counter-btn" id="decreaseBtn" onclick="adjustSplitCount(-1)">-</button>
                                 <div class="tissue-count-display" id="splitCount">2</div>
                                 <button class="counter-btn" id="increaseBtn" onclick="adjustSplitCount(1)">+</button>
                             </div>
-                            <div style="font-size: 0.8rem; color: #6c757d; margin-top: 5px;" id="splitHint">
-                                Each container will get equal tissues
+                            <div style="font-size: 0.9rem; color: #495057; margin-top: 10px; font-weight: 500;" id="splitHint">
+                                Samples will be distributed equally across containers
+                            </div>
+                            <div style="font-size: 0.8rem; color: #6c757d; margin-top: 5px;">
+                                You can adjust this number based on your laboratory needs
                             </div>
                         </div>
 
@@ -269,37 +356,28 @@
     <div id="notification" class="notification"></div>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-    
-    <!-- Core modules -->
+    <!-- Core Infrastructure -->
     <script src="src/js/core/state.js"></script>
     <script src="src/js/core/notifications.js"></script>
-    
-    <!-- Utility modules -->
     <script src="src/js/utils/dataUtils.js"></script>
     <script src="src/js/utils/uiUtils.js"></script>
-    
-    <!-- Recipe modules -->
-    <script type="module" src="src/js/modules/recipe/mediaData.js"></script>
-    <script type="module" src="src/js/modules/recipe/recipeCalculator.js"></script>
-    <script type="module" src="src/js/modules/recipe/recipeStorage.js"></script>
-    <script type="module" src="src/js/modules/recipe/recipeManager.js"></script>
-    
-    <!-- Builder modules -->
+    <!-- Enhanced Barcode Modules -->
+    <script src="src/js/modules/barcode/code128Generator.js"></script>
+    <script src="src/js/modules/barcode/barcodeScanner.js"></script>
+    <script src="src/js/modules/barcode/eventLogger.js"></script>
+    <!-- Builder Module -->
     <script src="src/js/modules/builder/stepManager.js"></script>
     <script src="src/js/modules/builder/barcodeGenerator.js"></script>
     <script src="src/js/modules/builder/builderMain.js"></script>
-    
-    <!-- Transfer modules -->
+    <!-- Transfer Module -->
     <script src="src/js/modules/transfer/inputManager.js"></script>
     <script src="src/js/modules/transfer/transferProcessor.js"></script>
     <script src="src/js/modules/transfer/transferMain.js"></script>
-    
-    <!-- Inventory modules -->
+    <!-- Inventory Module -->
     <script src="src/js/modules/inventory/tableManager.js"></script>
     <script src="src/js/modules/inventory/exportManager.js"></script>
     <script src="src/js/modules/inventory/inventoryMain.js"></script>
-    
-    <!-- Main application -->
+    <!-- Main Application -->
     <script src="src/js/main.js"></script>
 </body>
 </html>

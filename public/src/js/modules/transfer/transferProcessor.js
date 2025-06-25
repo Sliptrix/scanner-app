@@ -89,7 +89,7 @@ window.TransferProcessor = (function() {
                 ...sample,
                 containerId: newContainerId,
                 transferDate: new Date().toISOString(),
-                transferSource: parseInt(sourceContainer.id), // Convert to number for test compatibility
+                transferSource: sourceContainer.id,
                 transferType: 'single',
                 timestamp: new Date() // Update timestamp for new container
             };
@@ -195,7 +195,7 @@ window.TransferProcessor = (function() {
                         containerId: containerId,
                         tissueCount: tissuesToTakeFromCurrentSample,
                         transferDate: new Date().toISOString(),
-                        transferSource: parseInt(sourceId), // Convert to number for test compatibility
+                        transferSource: sourceId,
                         transferType: 'split',
                         originalSampleIndex: currentSampleIndex,
                         originalTissueCount: currentSampleTotalTissues,
@@ -270,15 +270,10 @@ window.TransferProcessor = (function() {
     function updateInventoryAfterTransfer(transferResult) {
         const currentInventory = StateManager.getState('inventory');
         
-        // Convert source container ID to number for proper comparison
-        const sourceContainerIdNum = parseInt(transferResult.sourceContainerId);
-        
-        // Remove samples from source container - compare both string and number versions
-        const filteredInventory = currentInventory.filter(item => {
-            const itemContainerIdNum = parseInt(item.containerId);
-            return itemContainerIdNum !== sourceContainerIdNum && 
-                   item.containerId !== transferResult.sourceContainerId;
-        });
+        // Remove samples from source container
+        const filteredInventory = currentInventory.filter(item => 
+            item.containerId !== transferResult.sourceContainerId
+        );
         
         // Add transferred samples to inventory
         const newInventory = [...filteredInventory, ...transferResult.transferredSamples];
@@ -289,14 +284,8 @@ window.TransferProcessor = (function() {
         // Update lineage tracking
         updateContainerLineage(transferResult);
         
-        // Rebuild inventory table if available
-        if (window.InventoryTableManager) {
-            console.log('InventoryTableManager available, rebuilding table');
-            window.InventoryTableManager.rebuildTable();
-        } else {
-            console.log('InventoryTableManager not available, using fallback');
-            UIUtils.rebuildInventoryTable();
-        }
+        // Rebuild inventory table
+        UIUtils.rebuildInventoryTable();
         
         console.log(`Inventory updated: removed ${transferResult.samplesTransferred} from container ${transferResult.sourceContainerId}, added to containers ${transferResult.destinationContainers.join(', ')}`);
     }

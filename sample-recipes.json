@@ -1,0 +1,161 @@
+{
+  "version": "1.0",
+  "exportDate": "2024-06-24T21:00:00.000Z",
+  "recipeCount": 3,
+  "recipes": [
+    {
+      "id": "demo_recipe_001",
+      "name": "Premium Initiation Media (1L)",
+      "mediaType": "Initiation",
+      "volume": "1L",
+      "basalSalt": {
+        "type": "M&S",
+        "amount": 4.48
+      },
+      "gellingAgent": {
+        "type": "Phytogel",
+        "amount": 3
+      },
+      "preAutoclave": {
+        "gamborgVitamin": 1,
+        "sucrose": 30,
+        "ppm": 1
+      },
+      "postAutoclave": [
+        {
+          "name": "AgNO3",
+          "amount": 40,
+          "key": "agno3",
+          "unit": "μL"
+        },
+        {
+          "name": "Meta-Topolin",
+          "amount": 500,
+          "key": "metaTopolin",
+          "unit": "μL"
+        }
+      ],
+      "pH": 5.8,
+      "autoclaveConditions": {
+        "temperature": 120,
+        "time": 20,
+        "coolTo": 55
+      },
+      "notes": "Premium initiation media optimized for difficult strains",
+      "createdDate": "2024-06-24T10:00:00.000Z",
+      "lastUsed": null,
+      "useCount": 0,
+      "tags": ["premium", "initiation", "difficult-strains"],
+      "isTemplate": false
+    },
+    {
+      "id": "demo_recipe_002", 
+      "name": "High-Yield Multiplication (2L)",
+      "mediaType": "Multiplication",
+      "volume": "2L",
+      "basalSalt": {
+        "type": "DKW",
+        "amount": 10.64
+      },
+      "gellingAgent": {
+        "type": "Agar",
+        "amount": 16
+      },
+      "preAutoclave": {
+        "gamborgVitamin": 2,
+        "sucrose": 60,
+        "ppm": 2
+      },
+      "postAutoclave": [
+        {
+          "name": "AgNO3",
+          "amount": 80,
+          "key": "agno3",
+          "unit": "μL"
+        },
+        {
+          "name": "Meta-Topolin",
+          "amount": 1000,
+          "key": "metaTopolin",
+          "unit": "μL"
+        },
+        {
+          "name": "Gibberellic Acid",
+          "amount": 200,
+          "key": "gibberellic",
+          "unit": "μL"
+        }
+      ],
+      "pH": 5.7,
+      "autoclaveConditions": {
+        "temperature": 120,
+        "time": 20,
+        "coolTo": 55
+      },
+      "notes": "High-yield multiplication formula for maximum tissue production",
+      "createdDate": "2024-06-24T11:00:00.000Z",
+      "lastUsed": "2024-06-24T20:00:00.000Z",
+      "useCount": 15,
+      "tags": ["high-yield", "multiplication", "production"],
+      "isTemplate": false
+    },
+    {
+      "id": "demo_recipe_003",
+      "name": "Fast-Root Formula (500mL)",
+      "mediaType": "Rooting",
+      "volume": "500mL",
+      "basalSalt": {
+        "type": "M&S",
+        "amount": 2.24
+      },
+      "gellingAgent": {
+        "type": "Phytogel",
+        "amount": 1.5
+      },
+      "preAutoclave": {
+        "gamborgVitamin": 0.5,
+        "sucrose": 15,
+        "ppm": 0.5
+      },
+      "postAutoclave": [
+        {
+          "name": "IBA",
+          "amount": 1.5,
+          "key": "iba",
+          "unit": "μL",
+          "range": "(2-5μL)"
+        },
+        {
+          "name": "NAA",
+          "amount": 1,
+          "key": "naa",
+          "unit": "μL"
+        },
+        {
+          "name": "AgNO3",
+          "amount": 20,
+          "key": "agno3",
+          "unit": "μL"
+        },
+        {
+          "name": "Sodium Metacylitate",
+          "amount": 3,
+          "key": "sodiumMetacylitate",
+          "unit": "mL"
+        }
+      ],
+      "pH": 5.9,
+      "autoclaveConditions": {
+        "temperature": 120,
+        "time": 20,
+        "coolTo": 55
+      },
+      "notes": "Accelerated rooting formula for quick turnaround",
+      "createdDate": "2024-06-24T12:00:00.000Z",
+      "lastUsed": "2024-06-24T19:30:00.000Z",
+      "useCount": 8,
+      "tags": ["fast-rooting", "quick-turnaround", "efficient"],
+      "isTemplate": false
+    }
+  ]
+}
