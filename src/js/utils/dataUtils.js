@@ -85,8 +85,104 @@ window.DataUtils = {
         return rule.test(value);
     },
     
+    // Excel data persistence keys
+    STORAGE_KEYS: {
+        EXCEL_DATA: 'labScanner_excelData',
+        EXCEL_METADATA: 'labScanner_excelMetadata'
+    },
+    
+    // Load Excel data from localStorage if available
+    loadSavedExcelData: function() {
+        try {
+            const savedData = localStorage.getItem(this.STORAGE_KEYS.EXCEL_DATA);
+            const savedMetadata = localStorage.getItem(this.STORAGE_KEYS.EXCEL_METADATA);
+            
+            if (savedData && savedMetadata) {
+                const data = JSON.parse(savedData);
+                const metadata = JSON.parse(savedMetadata);
+                
+                // Restore data to appState
+                window.appState.strainsTable = data.strainsTable || {};
+                window.appState.ownersTable = data.ownersTable || {};
+                window.appState.stagesTable = data.stagesTable || {};
+                window.appState.locationsTable = data.locationsTable || [];
+                window.appState.mediaTypesTable = data.mediaTypesTable || {};
+                window.appState.isDataLoaded = true;
+                
+                console.log('=== EXCEL DATA LOADED FROM CACHE ===');
+                console.log(`File: ${metadata.fileName}`);
+                console.log(`Loaded: ${new Date(metadata.loadDate).toLocaleString()}`);
+                console.log(`Strains: ${Object.keys(window.appState.strainsTable).length}`);
+                console.log(`Owners: ${Object.keys(window.appState.ownersTable).length}`);
+                console.log(`Stages: ${Object.keys(window.appState.stagesTable).length}`);
+                
+                return {
+                    success: true,
+                    metadata: metadata
+                };
+            }
+            
+            return { success: false, reason: 'No saved data found' };
+        } catch (error) {
+            console.error('Error loading saved Excel data:', error);
+            return { success: false, reason: error.message };
+        }
+    },
+    
+    // Save Excel data to localStorage
+    saveExcelData: function(fileName) {
+        try {
+            const dataToSave = {
+                strainsTable: window.appState.strainsTable,
+                ownersTable: window.appState.ownersTable,
+                stagesTable: window.appState.stagesTable,
+                locationsTable: window.appState.locationsTable,
+                mediaTypesTable: window.appState.mediaTypesTable
+            };
+            
+            const metadata = {
+                fileName: fileName,
+                loadDate: new Date().toISOString(),
+                recordCounts: {
+                    strains: Object.keys(window.appState.strainsTable).length,
+                    owners: Object.keys(window.appState.ownersTable).length,
+                    stages: Object.keys(window.appState.stagesTable).length,
+                    locations: window.appState.locationsTable.length,
+                    mediaTypes: Object.keys(window.appState.mediaTypesTable).length
+                }
+            };
+            
+            localStorage.setItem(this.STORAGE_KEYS.EXCEL_DATA, JSON.stringify(dataToSave));
+            localStorage.setItem(this.STORAGE_KEYS.EXCEL_METADATA, JSON.stringify(metadata));
+            
+            console.log('Excel data saved to localStorage');
+            return true;
+        } catch (error) {
+            console.error('Error saving Excel data:', error);
+            return false;
+        }
+    },
+    
+    // Clear saved Excel data
+    clearSavedExcelData: function() {
+        localStorage.removeItem(this.STORAGE_KEYS.EXCEL_DATA);
+        localStorage.removeItem(this.STORAGE_KEYS.EXCEL_METADATA);
+        console.log('Saved Excel data cleared');
+    },
+    
+    // Get saved Excel metadata
+    getSavedExcelMetadata: function() {
+        try {
+            const savedMetadata = localStorage.getItem(this.STORAGE_KEYS.EXCEL_METADATA);
+            return savedMetadata ? JSON.parse(savedMetadata) : null;
+        } catch (error) {
+            console.error('Error getting saved Excel metadata:', error);
+            return null;
+        }
+    },
+    
     // Excel data processing utilities
-    processExcelData: function(workbook) {
+    processExcelData: function(workbook, fileName = 'Unknown File') {
         try {
             this.loadStrains(workbook.Sheets['Strains']);
             this.loadOwners(workbook.Sheets['Owners']);
@@ -95,6 +191,9 @@ window.DataUtils = {
             this.loadMediaTypes(workbook.Sheets['Media_Types']);
             
             window.appState.isDataLoaded = true;
+            
+            // Save to localStorage for future use
+            this.saveExcelData(fileName);
             
             console.log('=== EXCEL DATA LOADED ===');
             console.log(`Strains: ${Object.keys(window.appState.strainsTable).length}`);

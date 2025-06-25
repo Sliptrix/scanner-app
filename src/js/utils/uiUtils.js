@@ -60,15 +60,25 @@ window.UIUtils = {
     },
     
     // File upload UI management
-    updateDataStatus: function(loaded = false, filename = null) {
+    updateDataStatus: function(loaded = false, filename = null, fromCache = false) {
         const dataStatus = document.getElementById('dataStatus');
         if (!dataStatus) return;
         
         if (loaded) {
             dataStatus.classList.add('loaded');
+            
+            const cacheIndicator = fromCache ? '📁 ' : '📊 ';
+            const cacheText = fromCache ? ' (cached)' : '';
+            
             dataStatus.innerHTML = `
-                <span>✅ Excel data loaded: ${Object.keys(window.appState.strainsTable).length} strains, ${Object.keys(window.appState.ownersTable).length} owners</span>
+                <span>${cacheIndicator}Excel data loaded: ${Object.keys(window.appState.strainsTable).length} strains, ${Object.keys(window.appState.ownersTable).length} owners${cacheText}</span>
                 ${filename ? `<span style="font-size: 0.8rem;">File: ${filename}</span>` : ''}
+                <div style="margin-top: 8px; display: flex; gap: 10px;">
+                    <button class="btn btn-secondary btn-sm" onclick="document.getElementById('fileInput').click()">
+                        🔄 Load New File
+                    </button>
+                    ${fromCache ? '<button class="btn btn-secondary btn-sm" onclick="DataUtils.clearSavedExcelData(); location.reload();">🗑️ Clear Cache</button>' : ''}
+                </div>
             `;
         } else {
             dataStatus.classList.remove('loaded');

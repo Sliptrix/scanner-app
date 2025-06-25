@@ -14,6 +14,9 @@ function initializeApp() {
     // Initialize state from any existing inventory
     StateManager.initializeFromInventory();
     
+    // Try to load saved Excel data first
+    loadSavedExcelDataOnStartup();
+    
     // Set initial mode
     UIUtils.switchMode('builder');
     
@@ -122,6 +125,30 @@ function handleFileDrop(event) {
     }
 }
 
+// Load saved Excel data on startup
+function loadSavedExcelDataOnStartup() {
+    const savedData = DataUtils.loadSavedExcelData();
+    
+    if (savedData.success) {
+        // Update UI to show cached data is loaded
+        UIUtils.updateDataStatus(true, savedData.metadata.fileName, true);
+        
+        NotificationSystem.success(
+            `📁 Cached Excel data loaded: ${savedData.metadata.fileName} ` +
+            `(${new Date(savedData.metadata.loadDate).toLocaleDateString()})`
+        );
+        
+        // Update builder if active
+        if (window.appState.mode === 'builder') {
+            UIUtils.focusBuilderInput();
+        }
+        
+        console.log('Startup: Using cached Excel data');
+    } else {
+        console.log('Startup: No cached Excel data found, user will need to load file');
+    }
+}
+
 function loadExcelFile(file) {
     if (!file.name.match(/\.(xlsx|xls)$/)) {
         NotificationSystem.error('Please select an Excel file (.xlsx or .xls)');
@@ -136,13 +163,13 @@ function loadExcelFile(file) {
             const data = new Uint8Array(e.target.result);
             const workbook = XLSX.read(data, {type: 'array'});
             
-            // Process the workbook using DataUtils
-            const success = DataUtils.processExcelData(workbook);
+            // Process the workbook using DataUtils (now includes saving to localStorage)
+            const success = DataUtils.processExcelData(workbook, file.name);
             
             if (success) {
                 // Update UI
-                UIUtils.updateDataStatus(true, file.name);
-                NotificationSystem.success(`Excel data loaded! Ready for barcode building.`);
+                UIUtils.updateDataStatus(true, file.name, false);
+                NotificationSystem.success(`📊 Excel data loaded and cached: ${file.name}`);
                 
                 // Update builder if active
                 if (window.appState.mode === 'builder') {
