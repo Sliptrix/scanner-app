@@ -242,7 +242,7 @@ window.BarcodeEventLogger = {
     addBarcodeToInventory: function(event) {
         const inventoryEntry = {
             timestamp: new Date(event.timestamp),
-            containerId: event.metadata?.container_id || 'auto_' + Date.now(),
+containerId: event.metadata?.container_id || DataUtils.getNextContainerId(),
             sampleBarcode: event.composite_string,
             strain: event.fields.strain,
             strainId: event.fields.strain,
