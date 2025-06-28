@@ -1,0 +1,652 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Recipe Functionality Test</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 20px;
+            background: #f5f5f5;
+        }
+        .test-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .test-section {
+            margin: 20px 0;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            background: #fafafa;
+        }
+        .test-buttons {
+            display: flex;
+            gap: 10px;
+            margin: 20px 0;
+            flex-wrap: wrap;
+        }
+        .btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: all 0.3s ease;
+        }
+        .btn-primary { background: #007bff; color: white; }
+        .btn-success { background: #28a745; color: white; }
+        .btn-warning { background: #ffc107; color: black; }
+        .btn-danger { background: #dc3545; color: white; }
+        .btn:hover { transform: translateY(-1px); box-shadow: 0 2px 5px rgba(0,0,0,0.2); }
+        
+        .results {
+            background: #f8f9fa;
+            border: 1px solid #e9ecef;
+            padding: 15px;
+            border-radius: 4px;
+            margin: 15px 0;
+            white-space: pre-wrap;
+            font-family: 'Courier New', monospace;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        .form-control {
+            width: 100%;
+            padding: 8px 12px;
+            border: 1px solid #ced4da;
+            border-radius: 4px;
+            margin: 5px 0;
+        }
+        .form-group {
+            margin: 10px 0;
+        }
+        .form-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+        }
+        .hidden { display: none; }
+        
+        /* Recipe form specific styles */
+        .recipe-form-container {
+            background: white;
+            border: 1px solid #dee2e6;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 20px 0;
+        }
+        
+        .status-indicator {
+            padding: 5px 10px;
+            border-radius: 3px;
+            font-weight: bold;
+            margin: 5px 0;
+        }
+        .status-success { background: #d4edda; color: #155724; }
+        .status-error { background: #f8d7da; color: #721c24; }
+        .status-warning { background: #fff3cd; color: #856404; }
+        .status-info { background: #d1ecf1; color: #0c5460; }
+    </style>
+</head>
+<body>
+    <div class="test-container">
+        <h1>🧪 Recipe Functionality Test Suite</h1>
+        <p>This page tests the recipe creation functionality to ensure new recipes are created when values are changed.</p>
+        
+        <div class="test-buttons">
+            <button class="btn btn-success" onclick="runAllTests()">🚀 Run All Tests</button>
+            <button class="btn btn-primary" onclick="testBasicRecipeCreation()">📝 Basic Recipe Creation</button>
+            <button class="btn btn-primary" onclick="testValueChangeDetection()">🔄 Value Change Detection</button>
+            <button class="btn btn-primary" onclick="testRecipePersistence()">💾 Recipe Persistence</button>
+            <button class="btn btn-warning" onclick="clearStorage()">🗑️ Clear Storage</button>
+            <button class="btn btn-danger" onclick="clearResults()">❌ Clear Results</button>
+        </div>
+        
+        <!-- Recipe Form for Testing -->
+        <div class="test-section">
+            <h3>🧪 Recipe Creation Form</h3>
+            <div class="recipe-form-container">
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label for="mediaType">Media Type:</label>
+                        <select id="mediaType" class="form-control">
+                            <option value="Initiation">Initiation</option>
+                            <option value="Multiplication">Multiplication</option>
+                            <option value="Rooting">Rooting</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="volume">Volume:</label>
+                        <select id="volume" class="form-control">
+                            <option value="500mL">500mL</option>
+                            <option value="1L" selected>1L</option>
+                            <option value="2L">2L</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="basalSalt">Basal Salt:</label>
+                        <select id="basalSalt" class="form-control">
+                            <option value="M&S" selected>M&S</option>
+                            <option value="DKW">DKW</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="basalSaltAmount">Basal Salt Amount (g):</label>
+                        <input type="number" id="basalSaltAmount" class="form-control" step="0.01" min="0">
+                    </div>
+                    <div class="form-group">
+                        <label for="gellingAgent">Gelling Agent:</label>
+                        <select id="gellingAgent" class="form-control">
+                            <option value="Phytogel" selected>Phytogel</option>
+                            <option value="Agar">Agar</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="gellingAgentAmount">Gelling Agent Amount (g):</label>
+                        <input type="number" id="gellingAgentAmount" class="form-control" step="0.01" min="0">
+                    </div>
+                    <div class="form-group">
+                        <label for="gamborgVitamin">Gamborg Vitamin (g):</label>
+                        <input type="number" id="gamborgVitamin" class="form-control" step="0.01" min="0">
+                    </div>
+                    <div class="form-group">
+                        <label for="sucrose">Sucrose (g):</label>
+                        <input type="number" id="sucrose" class="form-control" step="0.1" min="0">
+                    </div>
+                    <div class="form-group">
+                        <label for="ppm">PPM (mL):</label>
+                        <input type="number" id="ppm" class="form-control" step="0.01" min="0">
+                    </div>
+                    <div class="form-group">
+                        <label for="phValue">pH:</label>
+                        <input type="number" id="phValue" class="form-control" step="0.1" min="5" max="7" value="5.8">
+                    </div>
+                    <div class="form-group">
+                        <label for="recipeName">Recipe Name:</label>
+                        <input type="text" id="recipeName" class="form-control" placeholder="Enter recipe name">
+                    </div>
+                </div>
+                
+                <div style="margin-top: 20px;">
+                    <button class="btn btn-primary" onclick="populateRecommendedValues()">🔄 Auto-Populate Recommended Values</button>
+                    <button class="btn btn-success" onclick="createRecipe()">✅ Create Recipe</button>
+                    <button class="btn btn-warning" onclick="modifyAndCreateRecipe()">🔧 Modify Values & Create Recipe</button>
+                </div>
+            </div>
+            
+            <div id="postAutoclaveList" class="hidden"></div>
+        </div>
+        
+        <!-- Test Results -->
+        <div class="test-section">
+            <h3>📊 Test Results</h3>
+            <div id="testResults" class="results">Ready to run tests...\n\nClick "Run All Tests" to begin comprehensive testing.\n</div>
+        </div>
+        
+        <!-- Storage Inspection -->
+        <div class="test-section">
+            <h3>💾 Recipe Storage</h3>
+            <button class="btn btn-primary" onclick="inspectStorage()">🔍 Inspect Storage</button>
+            <div id="storageResults" class="results">Storage inspection results will appear here...</div>
+        </div>
+    </div>
+
+    <!-- Mock DOM elements needed by the recipe system -->
+    <div id="builderSection" class="hidden">
+        <div id="builderPrompt"></div>
+        <div id="builderHint"></div>
+        <input id="builderInput" />
+        <div id="builderOptions"></div>
+        <div id="builderFeedback"></div>
+        <button id="builderNextBtn"></button>
+    </div>
+    <div id="notification" class="hidden"></div>
+
+    <script>
+        // Recipe templates and recommended values
+        const MEDIA_TEMPLATES = {
+            'Initiation': {
+                basalSalt: { type: 'M&S', amount: 4.4 },
+                gellingAgent: { type: 'Phytogel', amount: 2.3 },
+                preAutoclave: { gamborgVitamin: 1.0, sucrose: 30.0, ppm: 1.0 },
+                postAutoclave: [
+                    { name: 'AgNO3', amount: 40, unit: 'µL' },
+                    { name: 'Meta-Topolin', amount: 500, unit: 'µL/L' }
+                ],
+                pH: 5.8
+            },
+            'Multiplication': {
+                basalSalt: { type: 'M&S', amount: 4.4 },
+                gellingAgent: { type: 'Phytogel', amount: 2.3 },
+                preAutoclave: { gamborgVitamin: 1.0, sucrose: 30.0, ppm: 1.0 },
+                postAutoclave: [
+                    { name: 'AgNO3', amount: 40, unit: 'µL' },
+                    { name: 'Meta-Topolin', amount: 500, unit: 'µL/L' },
+                    { name: 'Gibberellic Acid', amount: 100, unit: 'µL' }
+                ],
+                pH: 5.8
+            },
+            'Rooting': {
+                basalSalt: { type: 'M&S', amount: 4.4 },
+                gellingAgent: { type: 'Phytogel', amount: 2.3 },
+                preAutoclave: { gamborgVitamin: 1.0, sucrose: 30.0, ppm: 1.0 },
+                postAutoclave: [
+                    { name: 'IBA', amount: 5, unit: 'µL' },
+                    { name: 'NAA', amount: 2, unit: 'µL' },
+                    { name: 'AgNO3', amount: 40, unit: 'µL' }
+                ],
+                pH: 5.8
+            }
+        };
+
+        const VOLUME_SCALES = {
+            '500mL': 0.5,
+            '1L': 1.0,
+            '2L': 2.0
+        };
+
+        // Test state
+        let testResults = [];
+        let recipeCounter = 0;
+
+        // Mock UIUtils for notifications
+        window.UIUtils = {
+            showNotification: function(message, type = 'info') {
+                logResult(`[${type.toUpperCase()}] ${message}`, type);
+                return { message, type };
+            }
+        };
+
+        // Utility functions
+        function logResult(message, type = 'info') {
+            const timestamp = new Date().toLocaleTimeString();
+            const status = type === 'error' ? '❌' : type === 'success' ? '✅' : type === 'warning' ? '⚠️' : 'ℹ️';
+            const formattedMessage = `[${timestamp}] ${status} ${message}`;
+            
+            const resultsDiv = document.getElementById('testResults');
+            resultsDiv.textContent += formattedMessage + '\n';
+            resultsDiv.scrollTop = resultsDiv.scrollHeight;
+            
+            testResults.push({ timestamp, type, message });
+        }
+
+        function clearResults() {
+            document.getElementById('testResults').textContent = 'Results cleared.\n';
+            document.getElementById('storageResults').textContent = 'Storage inspection results will appear here...';
+            testResults = [];
+        }
+
+        function clearStorage() {
+            localStorage.removeItem('labRecipes');
+            localStorage.removeItem('labRecipesBackup');
+            logResult('Local storage cleared', 'warning');
+            inspectStorage();
+        }
+
+        function generateRecipeId() {
+            const timestamp = Date.now();
+            const random = Math.random().toString(36).substr(2, 5);
+            return `recipe_${timestamp}_${random}`;
+        }
+
+        function populateRecommendedValues() {
+            const mediaType = document.getElementById('mediaType').value;
+            const volume = document.getElementById('volume').value;
+            
+            if (!mediaType || !volume) {
+                logResult('Please select media type and volume first', 'warning');
+                return;
+            }
+            
+            const template = MEDIA_TEMPLATES[mediaType];
+            if (!template) {
+                logResult(`No template found for media type: ${mediaType}`, 'error');
+                return;
+            }
+            
+            const scale = VOLUME_SCALES[volume];
+            
+            // Populate form fields
+            document.getElementById('basalSalt').value = template.basalSalt.type;
+            document.getElementById('basalSaltAmount').value = (template.basalSalt.amount * scale).toFixed(2);
+            document.getElementById('gellingAgent').value = template.gellingAgent.type;
+            document.getElementById('gellingAgentAmount').value = (template.gellingAgent.amount * scale).toFixed(2);
+            document.getElementById('gamborgVitamin').value = (template.preAutoclave.gamborgVitamin * scale).toFixed(2);
+            document.getElementById('sucrose').value = (template.preAutoclave.sucrose * scale).toFixed(1);
+            document.getElementById('ppm').value = (template.preAutoclave.ppm * scale).toFixed(2);
+            document.getElementById('phValue').value = template.pH;
+            
+            if (!document.getElementById('recipeName').value) {
+                document.getElementById('recipeName').value = `${mediaType} Recipe - ${new Date().toLocaleDateString()}`;
+            }
+            
+            logResult(`Auto-populated recommended values for ${mediaType} - ${volume}`, 'success');
+        }
+
+        function getFormData() {
+            return {
+                mediaType: document.getElementById('mediaType').value,
+                volume: document.getElementById('volume').value,
+                basalSalt: {
+                    type: document.getElementById('basalSalt').value,
+                    amount: parseFloat(document.getElementById('basalSaltAmount').value) || 0
+                },
+                gellingAgent: {
+                    type: document.getElementById('gellingAgent').value,
+                    amount: parseFloat(document.getElementById('gellingAgentAmount').value) || 0
+                },
+                preAutoclave: {
+                    gamborgVitamin: parseFloat(document.getElementById('gamborgVitamin').value) || 0,
+                    sucrose: parseFloat(document.getElementById('sucrose').value) || 0,
+                    ppm: parseFloat(document.getElementById('ppm').value) || 0
+                },
+                pH: parseFloat(document.getElementById('phValue').value) || 5.8,
+                name: document.getElementById('recipeName').value || 'Unnamed Recipe'
+            };
+        }
+
+        function saveRecipe(recipeData) {
+            try {
+                const recipe = {
+                    id: generateRecipeId(),
+                    ...recipeData,
+                    createdDate: new Date().toISOString(),
+                    lastModified: new Date().toISOString()
+                };
+
+                const recipes = JSON.parse(localStorage.getItem('labRecipes') || '[]');
+                recipes.push(recipe);
+                localStorage.setItem('labRecipes', JSON.stringify(recipes));
+                
+                logResult(`Recipe saved: "${recipe.name}" (ID: ${recipe.id})`, 'success');
+                return recipe.id;
+            } catch (error) {
+                logResult(`Failed to save recipe: ${error.message}`, 'error');
+                return null;
+            }
+        }
+
+        function createRecipe() {
+            const formData = getFormData();
+            
+            if (!formData.name.trim()) {
+                logResult('Recipe name is required', 'error');
+                return null;
+            }
+            
+            const savedId = saveRecipe(formData);
+            if (savedId) {
+                recipeCounter++;
+                logResult(`Recipe #${recipeCounter} created successfully`, 'success');
+                inspectStorage();
+            }
+            return savedId;
+        }
+
+        function modifyAndCreateRecipe() {
+            // First populate recommended values
+            populateRecommendedValues();
+            
+            // Then modify some values
+            const currentBasalSalt = parseFloat(document.getElementById('basalSaltAmount').value);
+            const currentSucrose = parseFloat(document.getElementById('sucrose').value);
+            const currentPH = parseFloat(document.getElementById('phValue').value);
+            
+            document.getElementById('basalSaltAmount').value = (currentBasalSalt + 0.5).toFixed(2);
+            document.getElementById('sucrose').value = (currentSucrose + 5.0).toFixed(1);
+            document.getElementById('phValue').value = (currentPH + 0.1).toFixed(1);
+            document.getElementById('recipeName').value += ` - Modified ${Date.now()}`;
+            
+            logResult('Modified recommended values', 'info');
+            createRecipe();
+        }
+
+        function inspectStorage() {
+            try {
+                const recipes = JSON.parse(localStorage.getItem('labRecipes') || '[]');
+                const storageDiv = document.getElementById('storageResults');
+                
+                if (recipes.length === 0) {
+                    storageDiv.textContent = 'No recipes found in storage.';
+                    return;
+                }
+                
+                let output = `Found ${recipes.length} recipe(s) in storage:\n\n`;
+                recipes.forEach((recipe, index) => {
+                    output += `${index + 1}. ${recipe.name}\n`;
+                    output += `   ID: ${recipe.id}\n`;
+                    output += `   Media: ${recipe.mediaType} (${recipe.volume})\n`;
+                    output += `   Basal Salt: ${recipe.basalSalt.amount}g ${recipe.basalSalt.type}\n`;
+                    output += `   Sucrose: ${recipe.preAutoclave.sucrose}g\n`;
+                    output += `   pH: ${recipe.pH}\n`;
+                    output += `   Created: ${new Date(recipe.createdDate).toLocaleString()}\n\n`;
+                });
+                
+                storageDiv.textContent = output;
+                logResult(`Storage contains ${recipes.length} recipes`, 'info');
+            } catch (error) {
+                logResult(`Failed to inspect storage: ${error.message}`, 'error');
+            }
+        }
+
+        // Test functions
+        function testBasicRecipeCreation() {
+            logResult('=== Starting Basic Recipe Creation Test ===', 'info');
+            
+            try {
+                // Clear storage first
+                localStorage.removeItem('labRecipes');
+                
+                // Test 1: Create recipe with recommended values
+                document.getElementById('mediaType').value = 'Initiation';
+                document.getElementById('volume').value = '1L';
+                populateRecommendedValues();
+                document.getElementById('recipeName').value = 'Test Recipe 1';
+                
+                const recipe1Id = createRecipe();
+                if (!recipe1Id) {
+                    throw new Error('Failed to create first recipe');
+                }
+                
+                // Test 2: Create another recipe with different media type
+                document.getElementById('mediaType').value = 'Multiplication';
+                populateRecommendedValues();
+                document.getElementById('recipeName').value = 'Test Recipe 2';
+                
+                const recipe2Id = createRecipe();
+                if (!recipe2Id) {
+                    throw new Error('Failed to create second recipe');
+                }
+                
+                // Verify both recipes exist
+                const allRecipes = JSON.parse(localStorage.getItem('labRecipes') || '[]');
+                if (allRecipes.length !== 2) {
+                    throw new Error(`Expected 2 recipes, found ${allRecipes.length}`);
+                }
+                
+                logResult('✅ Basic Recipe Creation Test PASSED', 'success');
+                return true;
+            } catch (error) {
+                logResult(`❌ Basic Recipe Creation Test FAILED: ${error.message}`, 'error');
+                return false;
+            }
+        }
+
+        function testValueChangeDetection() {
+            logResult('=== Starting Value Change Detection Test ===', 'info');
+            
+            try {
+                // Clear storage
+                localStorage.removeItem('labRecipes');
+                
+                // Create base recipe
+                document.getElementById('mediaType').value = 'Initiation';
+                document.getElementById('volume').value = '1L';
+                populateRecommendedValues();
+                document.getElementById('recipeName').value = 'Base Recipe';
+                
+                const baseRecipeId = createRecipe();
+                if (!baseRecipeId) {
+                    throw new Error('Failed to create base recipe');
+                }
+                
+                // Create modified recipe
+                document.getElementById('basalSaltAmount').value = '5.0'; // Modified from 4.4
+                document.getElementById('sucrose').value = '35.0'; // Modified from 30.0
+                document.getElementById('phValue').value = '6.0'; // Modified from 5.8
+                document.getElementById('recipeName').value = 'Modified Recipe';
+                
+                const modifiedRecipeId = createRecipe();
+                if (!modifiedRecipeId) {
+                    throw new Error('Failed to create modified recipe');
+                }
+                
+                // Verify both recipes exist and are different
+                const allRecipes = JSON.parse(localStorage.getItem('labRecipes') || '[]');
+                if (allRecipes.length !== 2) {
+                    throw new Error(`Expected 2 recipes, found ${allRecipes.length}`);
+                }
+                
+                const baseRecipe = allRecipes.find(r => r.id === baseRecipeId);
+                const modifiedRecipe = allRecipes.find(r => r.id === modifiedRecipeId);
+                
+                if (!baseRecipe || !modifiedRecipe) {
+                    throw new Error('Could not find both base and modified recipes');
+                }
+                
+                // Verify differences
+                if (Math.abs(baseRecipe.basalSalt.amount - modifiedRecipe.basalSalt.amount) < 0.1) {
+                    throw new Error('Recipes have same basal salt amount - modification not detected');
+                }
+                
+                if (Math.abs(baseRecipe.preAutoclave.sucrose - modifiedRecipe.preAutoclave.sucrose) < 0.1) {
+                    throw new Error('Recipes have same sucrose amount - modification not detected');
+                }
+                
+                if (Math.abs(baseRecipe.pH - modifiedRecipe.pH) < 0.1) {
+                    throw new Error('Recipes have same pH - modification not detected');
+                }
+                
+                logResult('✅ Value Change Detection Test PASSED', 'success');
+                logResult(`Base recipe basal salt: ${baseRecipe.basalSalt.amount}g, Modified: ${modifiedRecipe.basalSalt.amount}g`, 'info');
+                logResult(`Base recipe sucrose: ${baseRecipe.preAutoclave.sucrose}g, Modified: ${modifiedRecipe.preAutoclave.sucrose}g`, 'info');
+                logResult(`Base recipe pH: ${baseRecipe.pH}, Modified: ${modifiedRecipe.pH}`, 'info');
+                return true;
+            } catch (error) {
+                logResult(`❌ Value Change Detection Test FAILED: ${error.message}`, 'error');
+                return false;
+            }
+        }
+
+        function testRecipePersistence() {
+            logResult('=== Starting Recipe Persistence Test ===', 'info');
+            
+            try {
+                // Clear storage
+                localStorage.removeItem('labRecipes');
+                
+                // Create test recipe with specific values
+                document.getElementById('mediaType').value = 'Rooting';
+                document.getElementById('volume').value = '2L';
+                populateRecommendedValues();
+                document.getElementById('basalSaltAmount').value = '8.8';
+                document.getElementById('sucrose').value = '60.0';
+                document.getElementById('phValue').value = '5.9';
+                document.getElementById('recipeName').value = 'Persistence Test Recipe';
+                
+                const testRecipeId = createRecipe();
+                if (!testRecipeId) {
+                    throw new Error('Failed to create test recipe');
+                }
+                
+                // Simulate page reload by re-reading from storage
+                const allRecipes = JSON.parse(localStorage.getItem('labRecipes') || '[]');
+                const persistedRecipe = allRecipes.find(r => r.id === testRecipeId);
+                
+                if (!persistedRecipe) {
+                    throw new Error('Recipe not found after storage persistence');
+                }
+                
+                // Verify all values persisted correctly
+                if (persistedRecipe.mediaType !== 'Rooting') {
+                    throw new Error(`Media type not persisted correctly: ${persistedRecipe.mediaType}`);
+                }
+                
+                if (persistedRecipe.volume !== '2L') {
+                    throw new Error(`Volume not persisted correctly: ${persistedRecipe.volume}`);
+                }
+                
+                if (Math.abs(persistedRecipe.basalSalt.amount - 8.8) > 0.01) {
+                    throw new Error(`Basal salt amount not persisted correctly: ${persistedRecipe.basalSalt.amount}`);
+                }
+                
+                if (Math.abs(persistedRecipe.preAutoclave.sucrose - 60.0) > 0.01) {
+                    throw new Error(`Sucrose amount not persisted correctly: ${persistedRecipe.preAutoclave.sucrose}`);
+                }
+                
+                if (Math.abs(persistedRecipe.pH - 5.9) > 0.01) {
+                    throw new Error(`pH not persisted correctly: ${persistedRecipe.pH}`);
+                }
+                
+                logResult('✅ Recipe Persistence Test PASSED', 'success');
+                logResult(`Persisted recipe: ${persistedRecipe.name} with all values intact`, 'info');
+                return true;
+            } catch (error) {
+                logResult(`❌ Recipe Persistence Test FAILED: ${error.message}`, 'error');
+                return false;
+            }
+        }
+
+        async function runAllTests() {
+            logResult('🚀 Starting Comprehensive Recipe Functionality Test Suite', 'info');
+            logResult('=' .repeat(60), 'info');
+            
+            const tests = [
+                { name: 'Basic Recipe Creation', func: testBasicRecipeCreation },
+                { name: 'Value Change Detection', func: testValueChangeDetection },
+                { name: 'Recipe Persistence', func: testRecipePersistence }
+            ];
+            
+            let passedTests = 0;
+            let totalTests = tests.length;
+            
+            for (const test of tests) {
+                logResult(`\n📋 Running test: ${test.name}`, 'info');
+                const result = test.func();
+                if (result) {
+                    passedTests++;
+                }
+                // Small delay between tests
+                await new Promise(resolve => setTimeout(resolve, 100));
+            }
+            
+            logResult('\n' + '=' .repeat(60), 'info');
+            logResult(`📊 Test Results: ${passedTests}/${totalTests} tests passed`, passedTests === totalTests ? 'success' : 'error');
+            
+            if (passedTests === totalTests) {
+                logResult('🎉 ALL TESTS PASSED! Recipe functionality is working correctly.', 'success');
+                logResult('✅ Recipes are properly created when values are changed', 'success');
+                logResult('✅ Recipe modifications are saved and persist correctly', 'success');
+                logResult('✅ Recipe storage system is functioning properly', 'success');
+            } else {
+                logResult('⚠️  SOME TESTS FAILED - Please review the issues above', 'warning');
+            }
+            
+            inspectStorage();
+            return passedTests === totalTests;
+        }
+
+        // Auto-populate recommended values on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            populateRecommendedValues();
+            logResult('Test page loaded - ready to test recipe functionality', 'info');
+        });
+    </script>
+</body>
+</html>

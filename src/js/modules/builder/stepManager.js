@@ -455,7 +455,7 @@ window.BuilderStepManager = {
                         <div class="form-group">
                             <label for="recipeBasalSalt">Basal Salt:</label>
                             <div style="display: flex; gap: 10px; align-items: center;">
-                                <select id="recipeBasalSalt" class="form-control" style="flex: 1;" onchange="BuilderStepManager.updateRecipeAmounts()">
+                                <select id="recipeBasalSalt" class="form-control" style="flex: 1;" onchange="BuilderStepManager.updateBasalSaltAmount()">
                                     <option value="M&S" selected>M&S</option>
                                     <option value="DKW">DKW</option>
                                 </select>
@@ -465,7 +465,7 @@ window.BuilderStepManager = {
                         <div class="form-group">
                             <label for="recipeGellingAgent">Gelling Agent:</label>
                             <div style="display: flex; gap: 10px; align-items: center;">
-                                <select id="recipeGellingAgent" class="form-control" style="flex: 1;" onchange="BuilderStepManager.updateRecipeAmounts()">
+                                <select id="recipeGellingAgent" class="form-control" style="flex: 1;" onchange="BuilderStepManager.updateGellingAgentAmount()">
                                     <option value="Phytogel" selected>Phytogel</option>
                                     <option value="Agar">Agar</option>
                                 </select>
@@ -759,6 +759,82 @@ window.BuilderStepManager = {
         this.continueFromRecipeStep(recipeData);
     },
     
+    // Update basal salt amount when type is changed
+    updateBasalSaltAmount: function() {
+        const basalSaltSelect = document.getElementById('recipeBasalSalt');
+        const basalSaltAmountInput = document.getElementById('recipeBasalSaltAmount');
+        const volumeSelect = document.getElementById('recipeVolume');
+        
+        if (basalSaltSelect && basalSaltAmountInput && volumeSelect) {
+            const selectedType = basalSaltSelect.value;
+            const volume = volumeSelect.value;
+            
+            // Define recommended amounts for different basal salts (per 1L)
+            const basalSaltAmounts = {
+                'M&S': 4.4,
+                'DKW': 3.9
+            };
+            
+            // Define volume scales
+            const volumeScales = {
+                '500mL': 0.5,
+                '1L': 1.0,
+                '2L': 2.0
+            };
+            
+            const scale = volumeScales[volume] || 1;
+            const baseAmount = basalSaltAmounts[selectedType] || 4.4;
+            
+            // Update the amount based on the selected type
+            basalSaltAmountInput.value = (baseAmount * scale).toFixed(2);
+            
+            // Visual feedback
+            basalSaltAmountInput.style.borderColor = '#28a745';
+            basalSaltAmountInput.style.backgroundColor = '#f8fff9';
+            
+            console.log(`Updated basal salt amount for ${selectedType}: ${basalSaltAmountInput.value}g`);
+            NotificationSystem.showBuilderFeedback(`✅ Updated ${selectedType} amount to ${basalSaltAmountInput.value}g`, 'success');
+        }
+    },
+
+    // Update gelling agent amount when type is changed
+    updateGellingAgentAmount: function() {
+        const gellingAgentSelect = document.getElementById('recipeGellingAgent');
+        const gellingAgentAmountInput = document.getElementById('recipeGellingAgentAmount');
+        const volumeSelect = document.getElementById('recipeVolume');
+        
+        if (gellingAgentSelect && gellingAgentAmountInput && volumeSelect) {
+            const selectedType = gellingAgentSelect.value;
+            const volume = volumeSelect.value;
+            
+            // Define recommended amounts for different gelling agents (per 1L)
+            const gellingAgentAmounts = {
+                'Phytogel': 2.3,
+                'Agar': 8.0
+            };
+            
+            // Define volume scales
+            const volumeScales = {
+                '500mL': 0.5,
+                '1L': 1.0,
+                '2L': 2.0
+            };
+            
+            const scale = volumeScales[volume] || 1;
+            const baseAmount = gellingAgentAmounts[selectedType] || 2.3;
+            
+            // Update the amount based on the selected type
+            gellingAgentAmountInput.value = (baseAmount * scale).toFixed(2);
+            
+            // Visual feedback
+            gellingAgentAmountInput.style.borderColor = '#28a745';
+            gellingAgentAmountInput.style.backgroundColor = '#f8fff9';
+            
+            console.log(`Updated gelling agent amount for ${selectedType}: ${gellingAgentAmountInput.value}g`);
+            NotificationSystem.showBuilderFeedback(`✅ Updated ${selectedType} amount to ${gellingAgentAmountInput.value}g`, 'success');
+        }
+    },
+    
     // Add CSS for recipe form
     addRecipeFormCSS: function() {
         const cssId = 'recipe-form-styles';
@@ -792,6 +868,12 @@ window.BuilderStepManager = {
                 border-radius: 4px;
                 font-size: 14px;
                 transition: border-color 0.15s ease-in-out;
+            }
+            
+            .form-control:focus {
+                border-color: #80bdff;
+                outline: 0;
+                box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25);
             }
             
             .form-control:focus {
