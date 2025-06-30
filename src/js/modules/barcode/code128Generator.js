@@ -405,7 +405,7 @@ window.Code128BarcodeGenerator = {
     },
     
     /**
-     * Log barcode generation event
+     * Log barcode generation event (prevent duplicates)
      * @param {Object} fields - Original fields
      * @param {String} compositeString - Generated composite string
      * @param {Object} barcodeResult - Barcode generation result
@@ -413,6 +413,22 @@ window.Code128BarcodeGenerator = {
     logBarcodeGenerationEvent: function(fields, compositeString, barcodeResult) {
         try {
             if (window.BarcodeEventLogger) {
+                // Check if we've already logged this exact barcode in the last 10 seconds
+                const recentEvents = window.BarcodeEventLogger.getEventHistory({
+                    type: 'barcode_generated',
+                    limit: 10
+                });
+                
+                const isDuplicate = recentEvents.some(event => {
+                    const timeDiff = Date.now() - new Date(event.timestamp).getTime();
+                    return event.composite_string === compositeString && timeDiff < 10000; // 10 seconds
+                });
+                
+                if (isDuplicate) {
+                    console.log('Skipping duplicate barcode generation event for:', compositeString);
+                    return;
+                }
+                
                 const event = {
                     type: 'barcode_generated',
                     timestamp: new Date().toISOString(),

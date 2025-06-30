@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ML System Diagnostic Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; background: #f8f9fa; }
+        .container { max-width: 800px; margin: 0 auto; background: white; padding: 30px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        .test-section { margin: 20px 0; padding: 15px; border: 1px solid #dee2e6; border-radius: 6px; }
+        .success { background: #d4edda; border-color: #c3e6cb; color: #155724; }
+        .error { background: #f8d7da; border-color: #f5c6cb; color: #721c24; }
+        .warning { background: #fff3cd; border-color: #ffeaa7; color: #856404; }
+        button { background: #007bff; color: white; border: none; padding: 10px 20px; border-radius: 4px; cursor: pointer; margin: 5px; }
+        button.danger { background: #dc3545; }
+        button.success { background: #28a745; }
+        .log { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 0.9rem; max-height: 300px; overflow-y: auto; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🧪 ML System Diagnostic Test</h1>
+        <p>This page will help diagnose and fix the localStorage issue preventing container creation.</p>
+
+        <div class="test-section">
+            <h3>🔍 System Diagnostics</h3>
+            <button onclick="checkLocalStorage()">Check localStorage</button>
+            <button onclick="testMLEngine()">Test ML Engine</button>
+            <button onclick="clearSystemData()" class="danger">Clear All Data</button>
+            <button onclick="runFullTest()" class="success">Run Full Test</button>
+        </div>
+
+        <div class="test-section">
+            <h3>📊 Test Results</h3>
+            <div id="testResults" class="log">Test results will appear here...</div>
+        </div>
+
+        <div class="test-section">
+            <h3>💾 localStorage Contents</h3>
+            <div id="storageContents" class="log">Storage contents will appear here...</div>
+        </div>
+    </div>
+
+    <!-- Load our ML modules -->
+    <script src="src/js/modules/ml/basicMLEngine.js"></script>
+    <script src="src/js/modules/ml/mlIntegration.js"></script>
+    <script src="src/js/utils/systemReset.js"></script>
+    <script src="tests/ml-engine-tests.js"></script>
+
+    <script>
+        let logArea = null;
+        let storageArea = null;
+
+        function log(message, type = 'info') {
+            if (!logArea) logArea = document.getElementById('testResults');
+            const timestamp = new Date().toLocaleTimeString();
+            const logMessage = `[${timestamp}] ${message}`;
+            logArea.innerHTML += logMessage + '\n';
+            logArea.scrollTop = logArea.scrollHeight;
+            console.log(logMessage);
+        }
+
+        function updateStorageDisplay() {
+            if (!storageArea) storageArea = document.getElementById('storageContents');
+            
+            const keys = [
+                'labInventoryData', 'labInventory', 'labRecipes', 'labRecipesBackup',
+                'labTransferHistory', 'labContainerLineage', 'labExcelData'
+            ];
+            
+            let display = '';
+            keys.forEach(key => {
+                const data = localStorage.getItem(key);
+                if (data) {
+                    try {
+                        const parsed = JSON.parse(data);
+                        display += `${key}: ${JSON.stringify(parsed, null, 2)}\n\n`;
+                    } catch (e) {
+                        display += `${key}: ${data}\n\n`;
+                    }
+                } else {
+                    display += `${key}: (not set)\n\n`;
+                }
+            });
+            
+            storageArea.textContent = display;
+        }
+
+        function checkLocalStorage() {
+            log('🔍 Checking localStorage...');
+            updateStorageDisplay();
+            
+            const keys = Object.keys(localStorage);
+            log(`Found ${keys.length} localStorage keys`);
+            
+            // Check for problematic data
+            const problematicKeys = keys.filter(key => key.startsWith('lab'));
+            if (problematicKeys.length > 0) {
+                log(`⚠️ Found ${problematicKeys.length} lab-related keys: ${problematicKeys.join(', ')}`);
+            } else {
+                log('✅ No lab-related localStorage keys found');
+            }
+        }
+
+        function testMLEngine() {
+            log('🧪 Testing ML Engine...');
+            
+            try {
+                if (window.LabMLEngine) {
+                    log('✅ ML Engine loaded successfully');
+                    log(`✅ ML Engine initialized: ${window.LabMLEngine.initialized}`);
+                    
+                    // Test recipe recommendations
+                    const testRec = window.LabMLEngine.getRecipeRecommendations({ stage: 'vegetative' });
+                    if (testRec) {
+                        log('✅ Recipe recommendations working');
+                        log(`   Vegetative recommendations: ${JSON.stringify(testRec)}`);
+                    } else {
+                        log('❌ Recipe recommendations not working');
+                    }
+                    
+                    // Test transfer prediction
+                    const testPred = window.LabMLEngine.predictTransferSuccess({ stage: 'vegetative' });
+                    log(`✅ Transfer prediction: ${(testPred * 100).toFixed(1)}%`);
+                    
+                } else {
+                    log('❌ ML Engine not loaded');
+                }
+                
+                if (window.MLIntegration) {
+                    log('✅ ML Integration loaded successfully');
+                } else {
+                    log('❌ ML Integration not loaded');
+                }
+                
+            } catch (error) {
+                log(`❌ ML Engine test failed: ${error.message}`);
+            }
+        }
+
+        function clearSystemData() {
+            log('🧹 Clearing all system data...');
+            
+            if (window.SystemReset) {
+                window.SystemReset.clearAllData();
+                log('✅ System data cleared using SystemReset utility');
+            } else {
+                // Manual clear
+                const keys = Object.keys(localStorage);
+                const labKeys = keys.filter(key => key.startsWith('lab'));
+                labKeys.forEach(key => {
+                    localStorage.removeItem(key);
+                    log(`   Cleared: ${key}`);
+                });
+                log('✅ Manual localStorage clear completed');
+            }
+            
+            updateStorageDisplay();
+        }
+
+        function runFullTest() {
+            log('🚀 Running full diagnostic test...');
+            log('================================');
+            
+            // Run all tests
+            checkLocalStorage();
+            testMLEngine();
+            
+            // Run ML test suite if available
+            if (window.MLEngineTestSuite) {
+                log('🧪 Running ML Engine test suite...');
+                const testSuite = new MLEngineTestSuite();
+                const results = testSuite.runAllTests();
+                log(`✅ Test suite completed: ${results.passed}/${results.total} passed`);
+            }
+            
+            log('================================');
+            log('🎉 Full diagnostic test completed');
+        }
+
+        // Auto-run diagnostics on page load
+        window.addEventListener('load', () => {
+            setTimeout(() => {
+                log('🚀 Page loaded - running initial diagnostics...');
+                checkLocalStorage();
+                testMLEngine();
+            }, 500);
+        });
+    </script>
+</body>
+</html>

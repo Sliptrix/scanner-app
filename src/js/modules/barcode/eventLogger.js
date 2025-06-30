@@ -218,7 +218,9 @@ window.BarcodeEventLogger = {
             
             switch (event.type) {
                 case 'barcode_generated':
-                    this.addBarcodeToInventory(event);
+                    // DO NOT auto-add to inventory - this should be handled by explicit save action
+                    // Only log the event for history/tracking purposes
+                    console.log('Barcode generation event logged (inventory update skipped - handled by save action)');
                     break;
                     
                 case 'barcode_transferred':
@@ -348,6 +350,13 @@ containerId: event.metadata?.container_id || DataUtils.getNextContainerId(),
                     likely_duplicate_of: recentEvent.event_id,
                     time_difference_ms: new Date(event.timestamp) - new Date(recentEvent.timestamp)
                 };
+                
+                // For barcode_generated events, this likely indicates a double-click or race condition
+                if (event.type === 'barcode_generated') {
+                    console.error('DUPLICATE BARCODE GENERATION DETECTED - This may cause inventory duplication!');
+                    // Optional: Prevent the duplicate from being logged
+                    // throw new Error('Duplicate barcode generation prevented');
+                }
                 break;
             }
         }
