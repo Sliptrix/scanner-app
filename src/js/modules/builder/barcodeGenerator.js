@@ -13,11 +13,21 @@ window.BuilderBarcodeGenerator = {
             return false;
         }
         
+        // Reset save state for new barcode generation
+        window.appState.currentBarcodeIsSaved = false;
+        
         // Generate enhanced Code128 barcode
         const barcodeResult = this.generateEnhancedBarcode(values, metadata);
         
         if (!barcodeResult.success) {
             NotificationSystem.error(`Barcode generation failed: ${barcodeResult.error}`);
+            return false;
+        }
+        
+        // Ensure barcode result has actual data
+        if (!barcodeResult.data) {
+            NotificationSystem.error('Barcode generation failed: No barcode data produced');
+            console.error('Barcode generation produced no data:', barcodeResult);
             return false;
         }
         
@@ -35,7 +45,8 @@ window.BuilderBarcodeGenerator = {
             container: values.container,
             barcode: barcodeResult.data,
             type: barcodeResult.type,
-            metadata: window.appState.currentMetadata
+            metadata: window.appState.currentMetadata,
+            saveState: window.appState.currentBarcodeIsSaved
         });
         
         return true;
@@ -288,8 +299,71 @@ window.BuilderBarcodeGenerator = {
     
     // Process and save the generated barcode to inventory
     saveToInventory: function() {
-        if (!window.appState.currentContainer || !window.appState.currentSample) {
-            NotificationSystem.error('No barcode to save. Please generate a barcode first.');
+        console.log('🔍 BARCODE BUILDER: saveToInventory() called');
+        console.log('🔍 Call stack:', new Error().stack);
+        
+        // CRITICAL: Prevent double-saves immediately
+        if (window.appState.currentBarcodeIsSaved) {
+            NotificationSystem.warning('This barcode has already been saved to inventory.');
+            console.log('Double-save prevented - barcode already saved');
+            return false;
+        }
+        
+        // CRITICAL: Ensure we're in builder mode - no transfer operations allowed
+        if (window.appState.mode !== 'builder') {
+            NotificationSystem.error('Cannot save barcode while in transfer mode. Switch to Barcode Builder mode first.');
+            return false;
+        }
+        
+        // Validate required data exists
+        if (!window.appState.currentContainer) {
+            NotificationSystem.error('No container ID available. Please generate a barcode first.');
+            return false;
+        }
+        
+        if (!window.appState.currentSample) {
+            NotificationSystem.error('No barcode data available. Please generate a barcode first.');
+            return false;
+        }
+        
+        // Validate that we have complete barcode data with actual barcode string
+        if (!window.appState.currentBarcodeResult || 
+            !window.appState.currentBarcodeResult.success || 
+            !window.appState.currentBarcodeResult.data) {
+            NotificationSystem.error('Invalid or incomplete barcode data. Please regenerate the barcode.');
+            console.error('Barcode validation failed:', {
+                hasResult: !!window.appState.currentBarcodeResult,
+                success: window.appState.currentBarcodeResult?.success,
+                hasData: !!window.appState.currentBarcodeResult?.data
+            });
+            return false;
+        }
+        
+        // Enhanced duplicate prevention - check for ANY entry with same container ID
+        const containerExists = window.appState.inventory.find(entry => 
+            entry.containerId === window.appState.currentContainer
+        );
+        
+        if (containerExists) {
+            NotificationSystem.warning(`Container ${window.appState.currentContainer} already exists in inventory. Cannot create duplicate container.`);
+            console.log('Duplicate container prevented:', {
+                attempted: window.appState.currentContainer,
+                existing: containerExists
+            });
+            return false;
+        }
+        
+        // Additional check for exact barcode match
+        const exactBarcodeMatch = window.appState.inventory.find(entry => 
+            entry.sampleBarcode === window.appState.currentSample
+        );
+        
+        if (exactBarcodeMatch) {
+            NotificationSystem.warning('This exact barcode already exists in inventory.');
+            console.log('Duplicate barcode prevented:', {
+                attempted: window.appState.currentSample,
+                existing: exactBarcodeMatch
+            });
             return false;
         }
         
@@ -302,24 +376,49 @@ window.BuilderBarcodeGenerator = {
         // Get container lineage
         const lineage = DataUtils.getContainerLineage(window.appState.currentContainer);
         
-        // Create inventory entry
+        // CRITICAL: Mark as saved BEFORE creating entry to prevent race conditions
+        window.appState.currentBarcodeIsSaved = true;
+        
+        // Ensure we have metadata (fallback to builder state if needed)
+        const metadata = window.appState.currentMetadata || this.buildMetadata(
+            window.appState.builderState.values, 
+            window.appState.builderState.metadata
+        );
+        
+        // Create inventory entry with complete barcode information - MUST include actual barcode
         const inventoryEntry = {
             timestamp: new Date(),
             containerId: window.appState.currentContainer,
             containerLineage: lineage.length > 0 ? lineage.join(' ← ') : null,
             sampleBarcode: window.appState.currentSample,
-            strain: window.appState.currentMetadata.strain,
-            strainId: window.appState.currentMetadata.strainId,
-            owner: window.appState.currentMetadata.owner,
-            ownerId: window.appState.currentMetadata.ownerId,
-            stage: window.appState.currentMetadata.stage,
-            stageId: window.appState.currentMetadata.stageId,
-            mediaType: window.appState.currentMetadata.mediaType,
-            mediaId: window.appState.currentMetadata.mediaId,
-            tissueCount: window.appState.currentMetadata.tissueCount,
-            date: window.appState.currentMetadata.formattedDate,
+            barcode: window.appState.currentBarcodeResult.data, // CRITICAL: Include actual barcode data
+            barcodeType: window.appState.currentBarcodeResult.type || 'CODE128',
+            barcodeMetadata: window.appState.currentBarcodeResult.metadata || null,
+            strain: metadata.strain || 'Unknown',
+            strainId: metadata.strainId || '',
+            owner: metadata.owner || 'Unknown',
+            ownerId: metadata.ownerId || '',
+            stage: metadata.stage || 'Unknown',
+            stageId: metadata.stageId || '',
+            media: metadata.mediaType || metadata.mediaId || 'Unknown',
+            mediaType: metadata.mediaType || 'Unknown',
+            mediaId: metadata.mediaId || '',
+            tissueCount: metadata.tissueCount || 1,
+            date: metadata.formattedDate || new Date().toISOString().split('T')[0],
             status: 'Complete'
         };
+        
+        // Final validation before adding to inventory
+        if (!inventoryEntry.barcode || !inventoryEntry.containerId) {
+            window.appState.currentBarcodeIsSaved = false; // Reset save state on error
+            NotificationSystem.error('Cannot save entry - missing critical barcode or container data');
+            console.error('Save validation failed:', {
+                hasBarcode: !!inventoryEntry.barcode,
+                hasContainer: !!inventoryEntry.containerId,
+                entry: inventoryEntry
+            });
+            return false;
+        }
         
         // Add to inventory
         window.appState.inventory.unshift(inventoryEntry);
@@ -330,12 +429,17 @@ window.BuilderBarcodeGenerator = {
         this.updateInventoryTable();
         
         console.log('✅ Entry saved to inventory:', inventoryEntry);
-        NotificationSystem.success(`Barcode saved to inventory: ${inventoryEntry.strain}`);
+        NotificationSystem.success(`Barcode saved to inventory: ${inventoryEntry.strain} (Container: ${inventoryEntry.containerId})`);
         
-        // Auto-reset for next entry
+        // Persist to localStorage immediately to prevent data loss
+        if (window.InventoryManager && typeof window.InventoryManager.saveToLocalStorage === 'function') {
+            window.InventoryManager.saveToLocalStorage();
+        }
+        
+        // Auto-reset for next entry after a delay
         setTimeout(() => {
             this.resetForNext();
-        }, 2000);
+        }, 2500);
         
         return true;
     },
@@ -393,6 +497,8 @@ window.BuilderBarcodeGenerator = {
         window.appState.currentContainer = null;
         window.appState.currentSample = null;
         window.appState.currentMetadata = null;
+        window.appState.currentBarcodeResult = null;
+        window.appState.currentBarcodeIsSaved = false;
         
         // Reset builder
         BuilderStepManager.reset();
@@ -406,6 +512,8 @@ window.BuilderBarcodeGenerator = {
         window.appState.currentContainer = null;
         window.appState.currentSample = null;
         window.appState.currentMetadata = null;
+        window.appState.currentBarcodeResult = null;
+        window.appState.currentBarcodeIsSaved = false;
         
         // Hide barcode display
         UIUtils.showElement('generatedBarcode', false);

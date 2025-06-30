@@ -107,6 +107,7 @@ window.DataUtils = {
                 window.appState.stagesTable = data.stagesTable || {};
                 window.appState.locationsTable = data.locationsTable || [];
                 window.appState.mediaTypesTable = data.mediaTypesTable || {};
+                window.appState.strainOwnerMapping = data.strainOwnerMapping || {};
                 window.appState.isDataLoaded = true;
                 
                 console.log('=== EXCEL DATA LOADED FROM CACHE ===');
@@ -137,7 +138,8 @@ window.DataUtils = {
                 ownersTable: window.appState.ownersTable,
                 stagesTable: window.appState.stagesTable,
                 locationsTable: window.appState.locationsTable,
-                mediaTypesTable: window.appState.mediaTypesTable
+                mediaTypesTable: window.appState.mediaTypesTable,
+                strainOwnerMapping: window.appState.strainOwnerMapping || {}
             };
             
             const metadata = {
@@ -148,7 +150,8 @@ window.DataUtils = {
                     owners: Object.keys(window.appState.ownersTable).length,
                     stages: Object.keys(window.appState.stagesTable).length,
                     locations: window.appState.locationsTable.length,
-                    mediaTypes: Object.keys(window.appState.mediaTypesTable).length
+                    mediaTypes: Object.keys(window.appState.mediaTypesTable).length,
+                    strainOwnerMappings: Object.keys(window.appState.strainOwnerMapping || {}).length
                 }
             };
             
@@ -189,6 +192,7 @@ window.DataUtils = {
             this.loadStages(workbook.Sheets['Stages']);
             this.loadLocations(workbook.Sheets['Locations']);
             this.loadMediaTypes(workbook.Sheets['Media_Types']);
+            this.loadStrainOwnerMapping(workbook.Sheets['Strain_Owner_Mapping'] || workbook.Sheets['Strain-Owner']);
             
             window.appState.isDataLoaded = true;
             
@@ -199,6 +203,7 @@ window.DataUtils = {
             console.log(`Strains: ${Object.keys(window.appState.strainsTable).length}`);
             console.log(`Owners: ${Object.keys(window.appState.ownersTable).length}`);
             console.log(`Stages: ${Object.keys(window.appState.stagesTable).length}`);
+            console.log(`Strain-Owner Mappings: ${Object.keys(window.appState.strainOwnerMapping || {}).length}`);
             
             return true;
         } catch (error) {
@@ -251,5 +256,52 @@ window.DataUtils = {
                 window.appState.mediaTypesTable[row['Media ID']] = row['Media Type'];
             }
         });
+    },
+    
+    // Load strain-to-owner mapping data
+    loadStrainOwnerMapping: function(sheet) {
+        if (!sheet) {
+            console.log('No strain-owner mapping sheet found, using demo data');
+            this.loadDemoStrainOwnerMapping();
+            return;
+        }
+        
+        console.log('Loading strain-to-owner mapping from Excel sheet');
+        const data = XLSX.utils.sheet_to_json(sheet);
+        
+        window.appState.strainOwnerMapping = {};
+        data.forEach(row => {
+            // Try different possible column names
+            const strainId = row['Strain ID'] || row['StrainID'] || row['Strain_ID'] || row['strain_id'];
+            const ownerId = row['Owner ID'] || row['OwnerID'] || row['Owner_ID'] || row['owner_id'] || row['Owner'];
+            
+            if (strainId && ownerId) {
+                const normalizedStrainId = parseInt(strainId).toString();
+                window.appState.strainOwnerMapping[normalizedStrainId] = ownerId.toUpperCase();
+            }
+        });
+        
+        console.log('Strain-Owner mapping loaded:', window.appState.strainOwnerMapping);
+    },
+    
+    // Load demo strain-to-owner mapping for testing
+    loadDemoStrainOwnerMapping: function() {
+        console.log('Loading demo strain-to-owner mapping data');
+        
+        // Demo data matching our test scenarios
+        window.appState.strainOwnerMapping = {
+            "1": "vibe",
+            "2": "vibe",
+            "3": "vibe",
+            "4": "vibe",
+            "5": "vibe",
+            "10": "vibe",
+            "22": "LWB",
+            "23": "LWB",
+            "68": "beau",
+            "71": "jay"
+        };
+        
+        console.log('Demo strain-owner mapping loaded:', window.appState.strainOwnerMapping);
     }
 };

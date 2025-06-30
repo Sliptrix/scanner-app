@@ -32,6 +32,10 @@ window.NotificationSystem = {
         this.showNotification(message, 'info', duration);
     },
     
+    warning: function(message, duration = 4500) {
+        this.showNotification(message, 'warning', duration);
+    },
+    
     // Builder feedback system
     showBuilderFeedback: function(message, type, duration = 2000) {
         const feedback = document.getElementById('builderFeedback');

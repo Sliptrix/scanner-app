@@ -239,6 +239,9 @@ window.BuilderStepManager = {
                 StateManager.setState('builderState.values.strain', strainId);
                 StateManager.setState('builderState.metadata.strainName', 
                     window.appState.strainsTable[parseInt(strainId)] || 'Unknown Strain');
+                
+                // Auto-populate owner from strain-to-owner mapping
+                this.autoPopulateOwnerFromStrain(strainId);
                 break;
                 
             case 'media':
@@ -896,5 +899,94 @@ window.BuilderStepManager = {
             }
         `;
         document.head.appendChild(style);
+    },
+    
+    // Auto-populate owner field when strain is selected (strain-to-owner mapping)
+    autoPopulateOwnerFromStrain: function(strainId) {
+        // Check if we have strain-to-owner mapping data
+        if (!window.appState.strainOwnerMapping) {
+            console.log('No strain-to-owner mapping data available');
+            return;
+        }
+        
+        const normalizedStrainId = parseInt(strainId).toString();
+        const ownerCode = window.appState.strainOwnerMapping[normalizedStrainId];
+        
+        if (ownerCode) {
+            const ownerName = window.appState.ownersTable[ownerCode] || ownerCode;
+            
+            // Check if we're currently on the owner step or have already passed it
+            const currentStep = window.appState.builderState.currentStep;
+            const ownerStepIndex = window.appState.builderState.steps.indexOf('owner');
+            
+            if (currentStep > ownerStepIndex) {
+                // We've already passed the owner step, auto-populate it
+                StateManager.setState('builderState.values.owner', ownerCode);
+                StateManager.setState('builderState.metadata.ownerName', ownerName);
+                
+                NotificationSystem.showBuilderFeedback(
+                    `🧬 Owner auto-populated: ${ownerName} (${ownerCode}) from strain ${normalizedStrainId}`,
+                    'success'
+                );
+                
+                console.log(`Auto-populated owner ${ownerCode} (${ownerName}) for strain ${normalizedStrainId}`);
+            } else if (currentStep === ownerStepIndex) {
+                // We're currently on the owner step, show suggestion
+                const builderHint = document.getElementById('builderHint');
+                if (builderHint) {
+                    builderHint.innerHTML = `
+                        <div style="background: #e8f4f8; border-left: 4px solid #0066cc; padding: 10px; margin: 10px 0; border-radius: 4px;">
+                            <strong>🧬 Strain-Owner Mapping Found:</strong><br>
+                            Strain ${normalizedStrainId} is typically owned by <strong>${ownerName} (${ownerCode})</strong><br>
+                            <button class="btn btn-sm btn-primary" onclick="BuilderStepManager.applyOwnerSuggestion('${ownerCode}')" style="margin-top: 8px;">
+                                Use ${ownerCode} →
+                            </button>
+                        </div>
+                        ${this.getStepConfig('owner').hint}
+                    `;
+                }
+                
+                // Pre-fill the input field
+                const input = document.getElementById('builderInput');
+                if (input && !input.value) {
+                    input.value = ownerCode;
+                    input.style.background = '#e8f4f8';
+                    input.style.borderColor = '#0066cc';
+                }
+                
+                console.log(`Suggested owner ${ownerCode} for strain ${normalizedStrainId}`);
+            }
+        } else {
+            console.log(`No owner mapping found for strain ${normalizedStrainId}`);
+            
+            // Show warning if no mapping exists
+            if (window.appState.builderState.currentStep === window.appState.builderState.steps.indexOf('owner')) {
+                const builderHint = document.getElementById('builderHint');
+                if (builderHint) {
+                    builderHint.innerHTML = `
+                        <div style="background: #fff3cd; border-left: 4px solid #ffc107; padding: 10px; margin: 10px 0; border-radius: 4px;">
+                            <strong>⚠️ No Owner Mapping:</strong><br>
+                            No automatic owner mapping found for strain ${normalizedStrainId}. Please select the owner manually.
+                        </div>
+                        ${this.getStepConfig('owner').hint}
+                    `;
+                }
+            }
+        }
+    },
+    
+    // Apply suggested owner from strain-to-owner mapping
+    applyOwnerSuggestion: function(ownerCode) {
+        const input = document.getElementById('builderInput');
+        if (input) {
+            input.value = ownerCode;
+            input.style.background = '#e8f4f8';
+            input.style.borderColor = '#0066cc';
+            
+            // Immediately validate and proceed
+            setTimeout(() => {
+                this.validateAndProceed();
+            }, 100);
+        }
     }
 };

@@ -17,6 +17,15 @@ window.TransferProcessor = (function() {
 
     // Process the transfer based on current state
     function processTransfer() {
+        console.log('🔍 TRANSFER PROCESSOR: processTransfer() called');
+        console.log('🔍 Call stack:', new Error().stack);
+        
+        // CRITICAL: Ensure we're in transfer mode - no barcode operations allowed
+        if (window.appState.mode !== 'transfer') {
+            NotificationSystem.error('Cannot process transfer while in builder mode. Switch to Container Transfer mode first.');
+            return false;
+        }
+        
         const transferMode = StateManager.getState('transferState.mode');
         const sourceContainer = StateManager.getState('transferState.sourceContainer');
 
@@ -244,15 +253,31 @@ window.TransferProcessor = (function() {
     function generateNewContainerIds(count) {
         const newIds = [];
         let highestId = StateManager.getState('highestContainerId') || 0;
+        const currentInventory = StateManager.getState('inventory') || [];
         
         for (let i = 0; i < count; i++) {
-            highestId++;
-            newIds.push(highestId);
+            let candidateId;
+            let attempts = 0;
+            
+            // Keep trying to find an unused container ID
+            do {
+                highestId++;
+                candidateId = highestId;
+                attempts++;
+                
+                // Safety check to prevent infinite loops
+                if (attempts > 1000) {
+                    throw new Error('Unable to generate unique container ID after 1000 attempts');
+                }
+            } while (currentInventory.some(entry => parseInt(entry.containerId) === candidateId));
+            
+            newIds.push(candidateId);
         }
         
         // Update highest container ID in state
         StateManager.setState('highestContainerId', highestId);
         
+        console.log('Generated new container IDs:', newIds);
         return newIds;
     }
 

@@ -222,7 +222,82 @@ function resetBuilder() {
 }
 
 function useGeneratedBarcode() {
-    BarcodeBuilder.saveBarcode();
+    // Early validation - check if we have the necessary components
+    if (!window.appState.currentContainer || !window.appState.currentSample) {
+        NotificationSystem.error('No barcode to save. Please generate a barcode first.');
+        return;
+    }
+    
+    // Check if barcode has already been saved (primary duplicate prevention)
+    if (window.appState.currentBarcodeIsSaved) {
+        NotificationSystem.warning('This barcode has already been saved to inventory.');
+        console.log('Save blocked - barcode already saved:', window.appState.currentContainer);
+        return;
+    }
+    
+    // Validate barcode data integrity
+    if (!window.appState.currentBarcodeResult || 
+        !window.appState.currentBarcodeResult.success || 
+        !window.appState.currentBarcodeResult.data) {
+        NotificationSystem.error('Invalid barcode data. Please regenerate the barcode.');
+        console.error('Save blocked - invalid barcode data:', window.appState.currentBarcodeResult);
+        return;
+    }
+    
+    // Additional check for container already existing in inventory
+    if (window.appState.currentContainer) {
+        const existingContainer = window.appState.inventory.find(entry => 
+            parseInt(entry.containerId) === parseInt(window.appState.currentContainer)
+        );
+        
+        if (existingContainer) {
+            NotificationSystem.warning(`Container ${window.appState.currentContainer} already exists in inventory. Cannot save duplicate container.`);
+            console.log('Duplicate container save prevented:', {
+                attempted: window.appState.currentContainer,
+                existing: existingContainer
+            });
+            return;
+        }
+    }
+    
+    // Disable the save button to prevent double-clicks
+    const saveButton = document.querySelector('button[onclick="useGeneratedBarcode()"]');
+    if (saveButton) {
+        saveButton.disabled = true;
+        saveButton.textContent = 'Saving...';
+    }
+    
+    try {
+        const success = BarcodeBuilder.saveBarcode();
+        
+        if (success && saveButton) {
+            saveButton.textContent = 'Saved ✓';
+            saveButton.style.background = '#28a745';
+            
+            // Reset button after delay - button will be re-enabled when new barcode is generated
+            setTimeout(() => {
+                if (saveButton && !window.appState.currentBarcodeIsSaved) {
+                    saveButton.disabled = false;
+                    saveButton.textContent = 'Save to Inventory';
+                    saveButton.style.background = '';
+                }
+            }, 3000);
+        } else if (saveButton) {
+            // Re-enable button if save failed
+            saveButton.disabled = false;
+            saveButton.textContent = 'Save to Inventory';
+            saveButton.style.background = '';
+        }
+    } catch (error) {
+        console.error('Save barcode error:', error);
+        NotificationSystem.error('Failed to save barcode: ' + error.message);
+        
+        if (saveButton) {
+            saveButton.disabled = false;
+            saveButton.textContent = 'Save to Inventory';
+            saveButton.style.background = '';
+        }
+    }
 }
 
 function selectTransferMode(mode) {
@@ -249,7 +324,8 @@ function adjustSplitCount(change) {
 }
 
 function processTransfer() {
-    console.log('processTransfer called');
+    console.log('🔍 MAIN.JS: processTransfer() called');
+    console.log('🔍 Call stack:', new Error().stack);
     
     // Disable button during processing to prevent double-clicks
     const transferBtn = document.getElementById('transferBtn');

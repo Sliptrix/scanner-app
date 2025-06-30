@@ -4,6 +4,26 @@
 window.UIUtils = {
     // Mode switching functionality
     switchMode: function(mode) {
+        console.log('🔄 SWITCHING MODE:', window.appState.mode, '→', mode);
+        
+        // Clear any cross-contamination before switching
+        if (mode === 'builder') {
+            console.log('🏗️ Entering BUILDER mode - Transfer functions disabled');
+            // Clear any transfer state that might cause conflicts
+            StateManager.resetTransferState();
+        } else if (mode === 'transfer') {
+            console.log('🔄 Entering TRANSFER mode - Builder functions disabled');
+            // Clear any builder state that might cause conflicts
+            if (window.appState.currentContainer) {
+                console.log('⚠️ Clearing builder state before entering transfer mode');
+                window.appState.currentContainer = null;
+                window.appState.currentSample = null;
+                window.appState.currentMetadata = null;
+                window.appState.currentBarcodeResult = null;
+                window.appState.currentBarcodeIsSaved = false;
+            }
+        }
+        
         window.appState.mode = mode;
         
         // Update mode buttons
