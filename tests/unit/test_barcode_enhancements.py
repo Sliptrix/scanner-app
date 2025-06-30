@@ -16,14 +16,23 @@ class TestCode128BarcodeGeneration(unittest.TestCase):
     def setUp(self):
         """Set up test fixtures."""
         self.sample_composite_fields = {
-            'owner': 'LW',
-            'strain': '00123',
+            'owner': 'vibe',
+            'strain': '00001',
             'media': 'MS',
             'stage': '2',
             'tissue': '15',
             'date': '20240623'
         }
-        self.expected_composite_string = 'LW00123MS21520240623'
+        self.expected_composite_string = 'vibe00001MS21520240623'
+        
+        # Sample strain-to-owner mapping for testing
+        self.sample_strain_owner_mapping = {
+            '1': 'vibe',
+            '2': 'vibe', 
+            '22': 'LWB',
+            '68': 'beau',
+            '71': 'jay'
+        }
     
     def test_generates_composite_string_from_fields(self):
         """Composite string is correctly built from seven fields."""
@@ -104,6 +113,73 @@ class TestCode128BarcodeGeneration(unittest.TestCase):
         
         self.assertIn('Barcode generation failed', str(context.exception))
     
+    def test_auto_populates_owner_from_strain(self):
+        """Auto-populates owner field when strain has known mapping."""
+        # Test with strain that has known owner mapping
+        fields_without_owner = {
+            'strain': '1',  # Maps to 'vibe'
+            'media': 'MS',
+            'stage': '2',
+            'tissue': '15',
+            'date': '20240623'
+        }
+        
+        result = self._auto_populate_owner(fields_without_owner)
+        
+        self.assertEqual(result['owner'], 'vibe')
+        self.assertEqual(result['strain'], '1')
+    
+    def test_does_not_override_existing_owner(self):
+        """Does not override owner field if already provided."""
+        fields_with_owner = {
+            'owner': 'LWB',  # Explicitly set
+            'strain': '1',   # Maps to 'vibe' but should not override
+            'media': 'MS',
+            'stage': '2',
+            'tissue': '15',
+            'date': '20240623'
+        }
+        
+        result = self._auto_populate_owner(fields_with_owner)
+        
+        self.assertEqual(result['owner'], 'LWB')  # Should remain unchanged
+    
+    def test_handles_unknown_strain_gracefully(self):
+        """Gracefully handles strains with no known owner mapping."""
+        fields_unknown_strain = {
+            'strain': '999',  # No mapping for this strain
+            'media': 'MS',
+            'stage': '2',
+            'tissue': '15',
+            'date': '20240623'
+        }
+        
+        result = self._auto_populate_owner(fields_unknown_strain)
+        
+        self.assertNotIn('owner', result)  # Should not add owner field
+        self.assertEqual(result['strain'], '999')
+    
+    def test_auto_population_with_different_strains(self):
+        """Auto-population works with different strain-owner mappings."""
+        test_cases = [
+            ('22', 'LWB'),
+            ('68', 'beau'),
+            ('71', 'jay')
+        ]
+        
+        for strain_id, expected_owner in test_cases:
+            fields = {
+                'strain': strain_id,
+                'media': 'MS',
+                'stage': '2',
+                'tissue': '15',
+                'date': '20240623'
+            }
+            
+            result = self._auto_populate_owner(fields)
+            self.assertEqual(result['owner'], expected_owner, 
+                           f"Strain {strain_id} should map to owner {expected_owner}")
+    
     # Helper methods simulating the actual JavaScript implementation
     def _generate_composite_string(self, fields):
         """Simulate composite string generation."""
@@ -139,6 +215,21 @@ class TestCode128BarcodeGeneration(unittest.TestCase):
     def _generate_code128_barcode_with_error(self, fields):
         """Simulate barcode generation with error."""
         raise Exception('Barcode generation failed: Library error')
+    
+    def _auto_populate_owner(self, fields):
+        """Simulate auto-population of owner field from strain."""
+        # If owner is already provided, don't override
+        if 'owner' in fields and fields['owner']:
+            return fields
+        
+        # Look up owner from strain using test mapping
+        strain_id = fields.get('strain')
+        if strain_id and strain_id in self.sample_strain_owner_mapping:
+            fields_copy = fields.copy()
+            fields_copy['owner'] = self.sample_strain_owner_mapping[strain_id]
+            return fields_copy
+        
+        return fields
 
 
 class TestBarcodeScanning(unittest.TestCase):

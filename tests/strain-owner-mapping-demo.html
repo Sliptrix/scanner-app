@@ -1,0 +1,454 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Strain-Owner Mapping Demo</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f8f9fa;
+        }
+        
+        .demo-section {
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 20px 0;
+            border: 1px solid #ddd;
+        }
+        
+        .demo-title {
+            color: #0066cc;
+            border-bottom: 2px solid #0066cc;
+            padding-bottom: 10px;
+            margin-bottom: 20px;
+        }
+        
+        .demo-input {
+            margin: 10px 0;
+        }
+        
+        .demo-input label {
+            display: inline-block;
+            width: 150px;
+            font-weight: bold;
+        }
+        
+        .demo-input input, .demo-input select {
+            width: 200px;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        
+        .demo-button {
+            background: #0066cc;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 10px 5px;
+        }
+        
+        .demo-button:hover {
+            background: #0052a3;
+        }
+        
+        .result-panel {
+            background: #e8f4f8;
+            border-left: 4px solid #0066cc;
+            padding: 15px;
+            margin: 15px 0;
+            border-radius: 4px;
+        }
+        
+        .error-panel {
+            background: #ffe6e6;
+            border-left: 4px solid #cc0000;
+            padding: 15px;
+            margin: 15px 0;
+            border-radius: 4px;
+        }
+        
+        .mapping-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 15px 0;
+        }
+        
+        .mapping-table th, .mapping-table td {
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: left;
+        }
+        
+        .mapping-table th {
+            background: #f5f5f5;
+        }
+        
+        .container-summary {
+            font-size: 14px;
+            line-height: 1.4;
+        }
+        
+        .container-summary .summary-main {
+            font-weight: 500;
+            margin-bottom: 8px;
+            color: #333;
+        }
+        
+        .container-summary .strain-owner-details {
+            background: #e8f4f8;
+            border-left: 3px solid #0066cc;
+            padding: 6px 8px;
+            margin-top: 6px;
+            font-size: 13px;
+            border-radius: 3px;
+            color: #555;
+        }
+        
+        .container-summary .strain-owner-details strong {
+            color: #0066cc;
+            font-weight: 600;
+        }
+    </style>
+</head>
+<body>
+    <h1>🧬 Strain-to-Owner Mapping Demo</h1>
+    <p>This demo showcases the new strain-to-owner auto-population feature that reduces scanning/input requirements.</p>
+
+    <!-- Demo Data Display -->
+    <div class="demo-section">
+        <h2 class="demo-title">📋 Available Strain-Owner Mappings</h2>
+        <table class="mapping-table" id="mappingTable">
+            <thead>
+                <tr>
+                    <th>Strain ID</th>
+                    <th>Strain Name</th>
+                    <th>Owner Code</th>
+                    <th>Owner Name</th>
+                </tr>
+            </thead>
+            <tbody id="mappingTableBody">
+                <!-- Populated by JavaScript -->
+            </tbody>
+        </table>
+    </div>
+
+    <!-- Barcode Generation Test -->
+    <div class="demo-section">
+        <h2 class="demo-title">🏷️ Barcode Generation with Auto-Population</h2>
+        <p>Enter strain information and see owner auto-population in action:</p>
+        
+        <div class="demo-input">
+            <label>Strain ID:</label>
+            <select id="strainSelect">
+                <option value="">Select a strain...</option>
+            </select>
+        </div>
+        
+        <div class="demo-input">
+            <label>Owner (auto-filled):</label>
+            <input type="text" id="ownerField" placeholder="Will be auto-populated" readonly style="background: #f5f5f5;">
+        </div>
+        
+        <div class="demo-input">
+            <label>Media:</label>
+            <input type="text" id="mediaField" value="MS" placeholder="e.g., MS, IA, ML">
+        </div>
+        
+        <div class="demo-input">
+            <label>Stage:</label>
+            <input type="text" id="stageField" value="2" placeholder="1-9">
+        </div>
+        
+        <div class="demo-input">
+            <label>Tissue Count:</label>
+            <input type="text" id="tissueField" value="15" placeholder="1-99">
+        </div>
+        
+        <div class="demo-input">
+            <label>Date (YYYYMMDD):</label>
+            <input type="text" id="dateField" value="20240630" placeholder="YYYYMMDD">
+        </div>
+        
+        <button class="demo-button" onclick="testBarcodeGeneration()">Generate Barcode with Auto-Population</button>
+        <button class="demo-button" onclick="testWithoutStrain()">Test Without Strain (should fail)</button>
+        
+        <div id="barcodeResult"></div>
+    </div>
+
+    <!-- Container Transfer Demo -->
+    <div class="demo-section">
+        <h2 class="demo-title">📦 Container Transfer with Strain-Owner Display</h2>
+        <p>Simulate container transfer showing enhanced strain-owner information:</p>
+        
+        <div class="demo-input">
+            <label>Container ID:</label>
+            <input type="text" id="containerIdField" value="5" placeholder="Enter container ID">
+        </div>
+        
+        <button class="demo-button" onclick="simulateContainerLoad()">Load Container (Enhanced Display)</button>
+        <button class="demo-button" onclick="simulateMultiStrainContainer()">Load Multi-Strain Container</button>
+        
+        <div id="containerResult"></div>
+    </div>
+
+    <!-- JavaScript Implementation -->
+    <script>
+        // Demo data matching our updated demo-data.json
+        const demoData = {
+            strains: {
+                "1": "Animal Cookies",
+                "2": "Baker's Dozen",
+                "3": "Chem Reserve",
+                "4": "Cake Mix",
+                "5": "Cinderella 99",
+                "10": "Tropical Runts",
+                "22": "StarDawg",
+                "23": "A187.2",
+                "68": "Cherry OG",
+                "71": "Blue Dream"
+            },
+            strainOwnerMapping: {
+                "1": "vibe",
+                "2": "vibe",
+                "3": "vibe",
+                "4": "vibe",
+                "5": "vibe",
+                "10": "vibe",
+                "22": "LWB",
+                "23": "LWB",
+                "68": "beau",
+                "71": "jay"
+            },
+            owners: {
+                "vibe": "Vibe Genetics",
+                "LWB": "Lone Wolf Botanicals", 
+                "beau": "Beau Labs",
+                "jay": "Jay Genetics",
+                "ted": "Ted's Research"
+            }
+        };
+        
+        // Initialize demo
+        function initializeDemo() {
+            populateMappingTable();
+            populateStrainSelect();
+            setupStrainChangeHandler();
+        }
+        
+        function populateMappingTable() {
+            const tbody = document.getElementById('mappingTableBody');
+            tbody.innerHTML = '';
+            
+            Object.keys(demoData.strainOwnerMapping).forEach(strainId => {
+                const ownerCode = demoData.strainOwnerMapping[strainId];
+                const strainName = demoData.strains[strainId] || 'Unknown';
+                const ownerName = demoData.owners[ownerCode] || 'Unknown';
+                
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td>${strainId}</td>
+                    <td>${strainName}</td>
+                    <td><strong>${ownerCode}</strong></td>
+                    <td>${ownerName}</td>
+                `;
+                tbody.appendChild(row);
+            });
+        }
+        
+        function populateStrainSelect() {
+            const select = document.getElementById('strainSelect');
+            
+            Object.keys(demoData.strains).forEach(strainId => {
+                const option = document.createElement('option');
+                option.value = strainId;
+                option.textContent = `${strainId} - ${demoData.strains[strainId]}`;
+                select.appendChild(option);
+            });
+        }
+        
+        function setupStrainChangeHandler() {
+            const strainSelect = document.getElementById('strainSelect');
+            const ownerField = document.getElementById('ownerField');
+            
+            strainSelect.addEventListener('change', function() {
+                const strainId = this.value;
+                
+                if (strainId && demoData.strainOwnerMapping[strainId]) {
+                    const ownerCode = demoData.strainOwnerMapping[strainId];
+                    const ownerName = demoData.owners[ownerCode];
+                    ownerField.value = `${ownerCode} (${ownerName})`;
+                    ownerField.style.background = '#e8f4f8';
+                } else {
+                    ownerField.value = '';
+                    ownerField.style.background = '#f5f5f5';
+                }
+            });
+        }
+        
+        function testBarcodeGeneration() {
+            const resultDiv = document.getElementById('barcodeResult');
+            
+            try {
+                const strain = document.getElementById('strainSelect').value;
+                const media = document.getElementById('mediaField').value;
+                const stage = document.getElementById('stageField').value;
+                const tissue = document.getElementById('tissueField').value;
+                const date = document.getElementById('dateField').value;
+                
+                if (!strain) {
+                    throw new Error('Please select a strain');
+                }
+                
+                // Simulate auto-population
+                const ownerCode = demoData.strainOwnerMapping[strain];
+                if (!ownerCode) {
+                    throw new Error(`No owner mapping found for strain ${strain}`);
+                }
+                
+                const fields = {
+                    strain: strain.padStart(5, '0'),
+                    owner: ownerCode,
+                    media: media.toUpperCase(),
+                    stage: stage,
+                    tissue: tissue.padStart(2, '0'),
+                    date: date
+                };
+                
+                const compositeString = `${fields.owner}${fields.strain}${fields.media}${fields.stage}${fields.tissue}${fields.date}`;
+                const ownerName = demoData.owners[ownerCode];
+                const strainName = demoData.strains[strain];
+                
+                resultDiv.innerHTML = `
+                    <div class="result-panel">
+                        <h4>✅ Barcode Generated Successfully!</h4>
+                        <p><strong>Composite String:</strong> <code>${compositeString}</code></p>
+                        <p><strong>Auto-populated Owner:</strong> ${ownerCode} (${ownerName})</p>
+                        <p><strong>Strain:</strong> ${strain} (${strainName})</p>
+                        <p><strong>Fields:</strong></p>
+                        <ul>
+                            <li>Owner: ${fields.owner}</li>
+                            <li>Strain: ${fields.strain}</li>
+                            <li>Media: ${fields.media}</li>
+                            <li>Stage: ${fields.stage}</li>
+                            <li>Tissue: ${fields.tissue}</li>
+                            <li>Date: ${fields.date}</li>
+                        </ul>
+                    </div>
+                `;
+            } catch (error) {
+                resultDiv.innerHTML = `
+                    <div class="error-panel">
+                        <h4>❌ Error</h4>
+                        <p>${error.message}</p>
+                    </div>
+                `;
+            }
+        }
+        
+        function testWithoutStrain() {
+            const resultDiv = document.getElementById('barcodeResult');
+            
+            resultDiv.innerHTML = `
+                <div class="error-panel">
+                    <h4>❌ Validation Failed</h4>
+                    <p>Cannot generate barcode without strain information. Owner auto-population requires a valid strain ID.</p>
+                </div>
+            `;
+        }
+        
+        function simulateContainerLoad() {
+            const resultDiv = document.getElementById('containerResult');
+            const containerId = document.getElementById('containerIdField').value;
+            
+            // Simulate container with single strain
+            const containerData = {
+                containerId: containerId,
+                totalSamples: 12,
+                strains: ["1"],
+                strainGroups: {
+                    "1": [
+                        { strain: "1", tissueCount: 3 },
+                        { strain: "1", tissueCount: 5 },
+                        { strain: "1", tissueCount: 4 }
+                    ]
+                }
+            };
+            
+            const strain = "1";
+            const ownerCode = demoData.strainOwnerMapping[strain];
+            const ownerName = demoData.owners[ownerCode];
+            const strainName = demoData.strains[strain];
+            
+            resultDiv.innerHTML = `
+                <div class="result-panel">
+                    <h4>📦 Container ${containerId} Loaded</h4>
+                    <div class="container-summary">
+                        <div class="summary-main">
+                            <strong>${containerData.totalSamples}</strong> tissue samples | 
+                            <strong>${containerData.strains.length}</strong> strain(s)
+                        </div>
+                        <div class="strain-owner-details">
+                            Strain ${strain} (${ownerName}): 3 entries<br>
+                            <strong>Strain:</strong> ${strainName}<br>
+                            <strong>Owner:</strong> ${ownerCode} - ${ownerName}
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+        
+        function simulateMultiStrainContainer() {
+            const resultDiv = document.getElementById('containerResult');
+            
+            // Simulate container with multiple strains from different owners
+            const containerData = {
+                containerId: "Mixed-Container",
+                totalSamples: 18,
+                strains: ["1", "22", "68"],
+                strainGroups: {
+                    "1": [{ strain: "1", tissueCount: 6 }],
+                    "22": [{ strain: "22", tissueCount: 8 }],
+                    "68": [{ strain: "68", tissueCount: 4 }]
+                }
+            };
+            
+            let strainOwnerInfo = '';
+            containerData.strains.forEach(strain => {
+                const ownerCode = demoData.strainOwnerMapping[strain];
+                const ownerName = demoData.owners[ownerCode];
+                const strainName = demoData.strains[strain];
+                const sampleCount = containerData.strainGroups[strain].length;
+                
+                strainOwnerInfo += `Strain ${strain} (${ownerName}): ${sampleCount} entries<br>`;
+            });
+            
+            resultDiv.innerHTML = `
+                <div class="result-panel">
+                    <h4>📦 Multi-Strain Container Loaded</h4>
+                    <div class="container-summary">
+                        <div class="summary-main">
+                            <strong>${containerData.totalSamples}</strong> tissue samples | 
+                            <strong>${containerData.strains.length}</strong> strain(s)
+                        </div>
+                        <div class="strain-owner-details">
+                            ${strainOwnerInfo}
+                            <strong>Multiple owners detected:</strong> vibe, LWB, beau
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+        
+        // Initialize on page load
+        document.addEventListener('DOMContentLoaded', initializeDemo);
+    </script>
+</body>
+</html>

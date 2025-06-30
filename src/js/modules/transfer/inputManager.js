@@ -150,14 +150,24 @@ window.TransferInputManager = (function() {
             return null;
         }
 
-        // Group samples by strain for summary
+        // Group samples by strain for summary with enhanced owner information
         const strainGroups = {};
         let totalTissueCount = 0;
+        const ownerInfo = {}; // Track owner information for each strain
         
         containers.forEach(item => {
             const strain = item.strain || 'Unknown';
             if (!strainGroups[strain]) {
                 strainGroups[strain] = [];
+                
+                // Get owner info for this strain using strain-to-owner mapping
+                const ownerCode = getOwnerForStrain(strain);
+                const ownerName = getOwnerName(ownerCode);
+                
+                ownerInfo[strain] = {
+                    code: ownerCode,
+                    name: ownerName
+                };
             }
             strainGroups[strain].push(item);
             
@@ -193,10 +203,32 @@ window.TransferInputManager = (function() {
 
         if (containerData) {
             if (summaryElement) {
+                // Create enhanced summary with strain-owner relationships
+                let strainOwnerInfo = '';
+                if (containerData.strainGroups && Object.keys(containerData.strainGroups).length > 0) {
+                    const strainSummaries = Object.keys(containerData.strainGroups).map(strain => {
+                        const ownerCode = getOwnerForStrain(strain);
+                        const ownerName = getOwnerName(ownerCode);
+                        const sampleCount = containerData.strainGroups[strain].length;
+                        
+                        if (ownerCode) {
+                            return `Strain ${strain} (${ownerName}): ${sampleCount} entries`;
+                        } else {
+                            return `Strain ${strain}: ${sampleCount} entries`;
+                        }
+                    });
+                    
+                    strainOwnerInfo = strainSummaries.join('<br>');
+                }
+                
                 summaryElement.innerHTML = `
-                    <strong>${containerData.totalSamples}</strong> samples | 
-                    <strong>${containerData.strains.length}</strong> strain(s) | 
-                    Owner: <strong>${containerData.owner}</strong>
+                    <div class="container-summary">
+                        <div class="summary-main">
+                            <strong>${containerData.totalSamples}</strong> tissue samples | 
+                            <strong>${containerData.strains.length}</strong> strain(s)
+                        </div>
+                        ${strainOwnerInfo ? `<div class="strain-owner-details">${strainOwnerInfo}</div>` : ''}
+                    </div>
                 `;
             }
             
@@ -605,6 +637,62 @@ window.TransferInputManager = (function() {
         }
     }
 
+    // Get owner code for a given strain using strain-to-owner mapping
+    function getOwnerForStrain(strainId) {
+        try {
+            // Get demo data with strain-owner mapping
+            const demoData = getDemoData();
+            if (demoData && demoData.strainOwnerMapping && demoData.strainOwnerMapping[strainId]) {
+                return demoData.strainOwnerMapping[strainId];
+            }
+            
+            return null;
+        } catch (error) {
+            console.warn('Could not get owner for strain:', error);
+            return null;
+        }
+    }
+    
+    // Get owner name from owner code
+    function getOwnerName(ownerCode) {
+        if (!ownerCode) return 'Unknown';
+        
+        try {
+            const demoData = getDemoData();
+            if (demoData && demoData.owners && demoData.owners[ownerCode]) {
+                return demoData.owners[ownerCode];
+            }
+            
+            return ownerCode; // Fallback to code if name not found
+        } catch (error) {
+            console.warn('Could not get owner name:', error);
+            return ownerCode;
+        }
+    }
+    
+    // Get demo data with strain-owner mapping
+    function getDemoData() {
+        try {
+            // Try to get from StateManager first
+            if (window.StateManager) {
+                const demoData = StateManager.getState('demoData');
+                if (demoData) {
+                    return demoData;
+                }
+            }
+            
+            // Fallback to global demoData if available
+            if (typeof demoData !== 'undefined') {
+                return demoData;
+            }
+            
+            return null;
+        } catch (error) {
+            console.warn('Could not access demo data:', error);
+            return null;
+        }
+    }
+    
     // Clear all transfer inputs
     function clearInputs() {
         UIUtils.clearInput('sourceContainerInput');

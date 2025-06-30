@@ -13,12 +13,82 @@
 window.Code128BarcodeGenerator = {
     
     /**
+     * Auto-populate owner field based on strain-to-owner mapping
+     * @param {Object} fields - Fields object, will be modified in place
+     * @returns {Object} Updated fields with owner auto-populated if applicable
+     */
+    autoPopulateOwner: function(fields) {
+        try {
+            // If owner is already provided, don't override
+            if (fields.owner && fields.owner.toString().trim()) {
+                return fields;
+            }
+            
+            // Look up owner from strain
+            const strainId = fields.strain ? fields.strain.toString() : null;
+            if (!strainId) {
+                return fields;
+            }
+            
+            // Get strain-owner mapping from demo data
+            const demoData = this.getDemoData();
+            if (demoData && demoData.strainOwnerMapping && demoData.strainOwnerMapping[strainId]) {
+                const ownerCode = demoData.strainOwnerMapping[strainId];
+                fields.owner = ownerCode;
+                
+                console.log(`Auto-populated owner '${ownerCode}' for strain '${strainId}'`);
+                
+                // Log this auto-population for user awareness
+                if (window.NotificationSystem) {
+                    const ownerName = demoData.owners && demoData.owners[ownerCode] ? 
+                        demoData.owners[ownerCode] : ownerCode;
+                    NotificationSystem.info(`Auto-populated owner: ${ownerName} (${ownerCode})`);
+                }
+            }
+            
+            return fields;
+        } catch (error) {
+            console.warn('Failed to auto-populate owner:', error);
+            return fields;
+        }
+    },
+    
+    /**
+     * Get demo data with strain-owner mapping
+     * @returns {Object|null} Demo data object or null if not available
+     */
+    getDemoData: function() {
+        try {
+            // Try to get from StateManager first
+            if (window.StateManager) {
+                const demoData = StateManager.getState('demoData');
+                if (demoData) {
+                    return demoData;
+                }
+            }
+            
+            // Fallback to global demoData if available
+            if (typeof demoData !== 'undefined') {
+                return demoData;
+            }
+            
+            return null;
+        } catch (error) {
+            console.warn('Could not access demo data:', error);
+            return null;
+        }
+    },
+    
+    /**
      * Generate a Code128 barcode from the seven-field composite string
      * @param {Object} fields - Object containing all seven barcode fields
      * @returns {Object} Barcode generation result with SVG, base64, and metadata
      */
     generateCode128Barcode: function(fields) {
         try {
+            // Auto-populate owner based on strain if owner is missing
+            fields = this.autoPopulateOwner(fields);
+            
             // Validate all required fields
             this.validateBarcodeFields(fields);
             
