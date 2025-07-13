@@ -101,6 +101,12 @@ window.BuilderStepManager = {
         // Focus input
         UIUtils.focusBuilderInput();
         
+        // Update live preview
+        this.updateFieldPreview();
+        
+        // Set up real-time input monitoring for live preview
+        this.setupRealTimePreview();
+        
         console.log(`Builder step updated: ${stepName} (${currentStep + 1}/${window.appState.builderState.steps.length})`);
     },
     
@@ -254,6 +260,9 @@ window.BuilderStepManager = {
                     window.appState.stagesTable[parseInt(input)] || `Stage ${input}`);
                 break;
         }
+        
+        // Update the live preview after storing the value
+        this.updateFieldPreview();
     },
     
     // Move to next step
@@ -312,6 +321,9 @@ window.BuilderStepManager = {
         // Update to first step
         this.updateStep();
         
+        // Reset the field preview
+        this.resetFieldPreview();
+        
         NotificationSystem.info('Builder reset to first step');
     },
     
@@ -358,25 +370,54 @@ window.BuilderStepManager = {
     
     // Handle recipe step specially
     handleRecipeStep: function() {
-        // Update prompts and hints for recipe step
-        UIUtils.updateContent('builderPrompt', 'Select or create a recipe for this media:');
-        UIUtils.updateContent('builderHint', 'Choose a recipe or create a new one based on your media type');
+        console.log('🧪 Starting recipe step...');
+        console.log('RecipeManager available:', !!window.RecipeManager);
         
-        // Update input placeholder
-        const input = document.getElementById('builderInput');
-        if (input) {
-            input.placeholder = 'Recipe will be auto-selected';
-            input.value = '';
-            input.style.display = 'none'; // Hide input for recipe step
+        if (!window.RecipeManager) {
+            console.error('RecipeManager not available - waiting for initialization');
+            setTimeout(() => this.handleRecipeStep(), 100);
+            return;
         }
         
-        // Show recipe options in the builder options area
-        this.showRecipeOptions();
+        console.log('RecipeManager methods:', Object.keys(window.RecipeManager));
+        
+        // Always use the new Recipe Manager wizard
+        this.setupRecipeWizard();
+        
+        // Show the recipe step
+        window.RecipeManager.showRecipeStep();
+        
+        // Hide the builder input since we're using the recipe wizard
+        const input = document.getElementById('builderInput');
+        if (input) {
+            input.style.display = 'none';
+        }
+        
+        // Hide the options area since we're using the recipe wizard
+        const optionsDiv = document.getElementById('builderOptions');
+        if (optionsDiv) {
+            optionsDiv.style.display = 'none';
+        }
         
         // Update button text
         UIUtils.updateContent('builderNextBtn', 'Continue with Recipe →');
         
-        console.log('Recipe step initialized within builder');
+        console.log('✅ Recipe step initialized with new Recipe Manager wizard');
+    },
+    
+    // Setup the recipe wizard UI
+    setupRecipeWizard: function() {
+        // Check if RecipeManager needs to initialize its UI
+        if (!document.getElementById('recipeSection')) {
+            console.log('Setting up Recipe Manager UI...');
+            
+            // Call the setupRecipeUI function from RecipeManager
+            if (window.RecipeManager && typeof window.RecipeManager.setupRecipeUI === 'function') {
+                window.RecipeManager.setupRecipeUI();
+            } else {
+                console.warn('RecipeManager.setupRecipeUI not available');
+            }
+        }
     },
     
     // Continue from recipe step (called by RecipeManager)
@@ -426,103 +467,121 @@ window.BuilderStepManager = {
         
         const recipeType = mediaToRecipeMap[mediaType] || 'Initiation';
         
-        // Create recipe form with recommended values
+        // Create modern recipe wizard
         optionsDiv.innerHTML = `
-            <div class="recipe-form-container" style="margin: 20px 0;">
-                <h4 style="margin-bottom: 15px; color: #2c3e50;">📝 Recipe for ${recipeType} Media (${mediaType})</h4>
-                
-                <div class="recommended-notice" style="background: #e3f2fd; border: 2px solid #2196f3; border-radius: 6px; padding: 12px; margin-bottom: 20px;">
-                    <h5 style="margin: 0 0 8px 0; color: #1976d2;">👨‍🔬 Recommended Values Auto-Populated</h5>
-                    <p style="margin: 0; color: #1976d2; font-size: 0.9rem;">
-                        These are the recommended values for <strong>${recipeType}</strong> media. You can adjust any values as needed for your specific requirements.
-                    </p>
+            <div class="recipe-wizard" style="max-width: 100%; margin: 10px 0;">
+                <!-- Header -->
+                <div class="wizard-header">
+                    <h3 style="margin: 0; color: #2c3e50; display: flex; align-items: center; gap: 10px;">
+                        <span>🧪</span> ${recipeType} Recipe Setup
+                        <span style="font-size: 0.8rem; background: #e3f2fd; color: #1976d2; padding: 4px 8px; border-radius: 12px;">${mediaType}</span>
+                    </h3>
+                    <p style="margin: 5px 0 0 0; color: #6c757d; font-size: 0.9rem;">Quick setup with recommended values</p>
                 </div>
-                
-                <div class="recipe-form" style="background: #f8f9fa; border-radius: 8px; padding: 20px; border: 1px solid #dee2e6;">
-                    <div class="form-row" style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px;">
-                        <div class="form-group">
-                            <label for="recipeVolume">Volume:</label>
-                            <select id="recipeVolume" class="form-control" onchange="BuilderStepManager.updateRecipeAmounts()">
+
+                <!-- Quick Setup Panel -->
+                <div class="quick-setup-panel">
+                    <div class="setup-row">
+                        <div class="setup-item">
+                            <label>Volume</label>
+                            <select id="recipeVolume" class="setup-select" onchange="BuilderStepManager.updateRecipeAmounts()">
                                 <option value="500mL">500mL</option>
                                 <option value="1L" selected>1L</option>
                                 <option value="2L">2L</option>
                             </select>
                         </div>
-                        <div class="form-group">
-                            <label for="recipeName">Recipe Name:</label>
-                            <input type="text" id="recipeName" class="form-control" value="${recipeType} Recipe - ${new Date().toLocaleDateString()}" />
+                        <div class="setup-item">
+                            <label>Base Type</label>
+                            <select id="recipeBasalSalt" class="setup-select" onchange="BuilderStepManager.updateBasalSaltAmount()">
+                                <option value="M&S" selected>M&S Media</option>
+                                <option value="DKW">DKW Media</option>
+                            </select>
+                        </div>
+                        <div class="setup-item">
+                            <label>Gelling Agent</label>
+                            <select id="recipeGellingAgent" class="setup-select" onchange="BuilderStepManager.updateGellingAgentAmount()">
+                                <option value="Phytogel" selected>Phytogel</option>
+                                <option value="Agar">Agar</option>
+                            </select>
                         </div>
                     </div>
-                    
-                    <div class="form-row" style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px;">
-                        <div class="form-group">
-                            <label for="recipeBasalSalt">Basal Salt:</label>
-                            <div style="display: flex; gap: 10px; align-items: center;">
-                                <select id="recipeBasalSalt" class="form-control" style="flex: 1;" onchange="BuilderStepManager.updateBasalSaltAmount()">
-                                    <option value="M&S" selected>M&S</option>
-                                    <option value="DKW">DKW</option>
-                                </select>
-                                <input type="number" id="recipeBasalSaltAmount" class="form-control" style="width: 80px;" step="0.01" /> g
+                </div>
+
+                <!-- Ingredient Summary -->
+                <div class="ingredients-summary">
+                    <h4 style="margin: 0 0 10px 0; color: #495057; font-size: 1rem;">📋 Ingredient List</h4>
+                    <div class="ingredient-grid">
+                        <div class="ingredient-card base">
+                            <div class="ingredient-name">Base Media</div>
+                            <div class="ingredient-amount" id="basalSaltDisplay">M&S: 4.48g</div>
+                        </div>
+                        <div class="ingredient-card gelling">
+                            <div class="ingredient-name">Gelling Agent</div>
+                            <div class="ingredient-amount" id="gellingAgentDisplay">Phytogel: 2.3g</div>
+                        </div>
+                        <div class="ingredient-card vitamin">
+                            <div class="ingredient-name">Gamborg Vitamin</div>
+                            <div class="ingredient-amount" id="gamborgDisplay">1.0g</div>
+                        </div>
+                        <div class="ingredient-card sugar">
+                            <div class="ingredient-name">Sucrose</div>
+                            <div class="ingredient-amount" id="sucroseDisplay">30.0g</div>
+                        </div>
+                        <div class="ingredient-card additive">
+                            <div class="ingredient-name">PPM</div>
+                            <div class="ingredient-amount" id="ppmDisplay">1.0mL</div>
+                        </div>
+                        <div class="ingredient-card ph">
+                            <div class="ingredient-name">Target pH</div>
+                            <div class="ingredient-amount" id="phDisplay">5.8</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Advanced Options (Collapsible) -->
+                <div class="advanced-options" style="margin-top: 15px;">
+                    <div class="advanced-toggle" onclick="BuilderStepManager.toggleAdvancedOptions()" style="cursor: pointer; padding: 10px; background: #f8f9fa; border-radius: 6px; border: 1px solid #dee2e6; display: flex; justify-content: space-between; align-items: center;">
+                        <span style="font-weight: 600; color: #495057;">🔧 Advanced Options</span>
+                        <span id="advancedToggleIcon" style="color: #6c757d;">▼</span>
+                    </div>
+                    <div id="advancedContent" style="display: none; padding: 15px; background: #f8f9fa; border: 1px solid #dee2e6; border-top: none; border-radius: 0 0 6px 6px;">
+                        <div class="advanced-grid">
+                            <div class="advanced-item">
+                                <label>Recipe Name</label>
+                                <input type="text" id="recipeName" class="advanced-input" value="${recipeType} Recipe - ${new Date().toLocaleDateString()}" />
+                            </div>
+                            <div class="advanced-item">
+                                <label>Custom Notes</label>
+                                <input type="text" id="recipeNotes" class="advanced-input" placeholder="Special instructions..." />
                             </div>
                         </div>
-                        <div class="form-group">
-                            <label for="recipeGellingAgent">Gelling Agent:</label>
-                            <div style="display: flex; gap: 10px; align-items: center;">
-                                <select id="recipeGellingAgent" class="form-control" style="flex: 1;" onchange="BuilderStepManager.updateGellingAgentAmount()">
-                                    <option value="Phytogel" selected>Phytogel</option>
-                                    <option value="Agar">Agar</option>
-                                </select>
-                                <input type="number" id="recipeGellingAgentAmount" class="form-control" style="width: 80px;" step="0.01" /> g
+                        <div id="postAutoclaveSection" style="margin-top: 15px;">
+                            <h5 style="margin: 0 0 10px 0; color: #495057; font-size: 0.9rem;">Post-Autoclave Additions</h5>
+                            <div id="postAutoclaveAdditions" class="post-autoclave-list">
+                                <!-- Will be populated -->
                             </div>
                         </div>
                     </div>
-                    
-                    <h5 style="margin: 20px 0 10px 0; color: #2c3e50;">Pre-Autoclave Ingredients</h5>
-                    <div class="form-row" style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 15px; margin-bottom: 15px;">
-                        <div class="form-group">
-                            <label for="recipeGamborgVitamin">Gamborg Vitamin:</label>
-                            <div style="display: flex; gap: 5px; align-items: center;">
-                                <input type="number" id="recipeGamborgVitamin" class="form-control" step="0.01" /> g
-                            </div>
-                        </div>
-                        <div class="form-group">
-                            <label for="recipeSucrose">Sucrose:</label>
-                            <div style="display: flex; gap: 5px; align-items: center;">
-                                <input type="number" id="recipeSucrose" class="form-control" step="0.1" /> g
-                            </div>
-                        </div>
-                        <div class="form-group">
-                            <label for="recipePPM">PPM:</label>
-                            <div style="display: flex; gap: 5px; align-items: center;">
-                                <input type="number" id="recipePPM" class="form-control" step="0.01" /> mL
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <h5 style="margin: 20px 0 10px 0; color: #2c3e50;">Post-Autoclave Additions</h5>
-                    <div id="postAutoclaveAdditions">
-                        <!-- Post-autoclave additions will be populated here -->
-                    </div>
-                    
-                    <div class="form-row" style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px;">
-                        <div class="form-group">
-                            <label for="recipePH">pH:</label>
-                            <input type="number" id="recipePH" class="form-control" step="0.1" min="5.0" max="7.0" />
-                        </div>
-                        <div class="form-group">
-                            <label for="recipeNotes">Notes (optional):</label>
-                            <input type="text" id="recipeNotes" class="form-control" placeholder="Special instructions or modifications" />
-                        </div>
-                    </div>
-                    
-                    <div class="recipe-actions" style="margin-top: 20px; display: flex; gap: 10px; justify-content: flex-end;">
-                        <button class="btn btn-secondary" onclick="BuilderStepManager.resetRecipeValues()">
-                            🔄 Reset to Recommended
-                        </button>
-                        <button class="btn btn-primary" onclick="BuilderStepManager.confirmRecipe()">
-                            ✅ Use This Recipe
-                        </button>
-                    </div>
+                </div>
+
+                <!-- Action Buttons -->
+                <div class="recipe-actions">
+                    <button class="action-btn secondary" onclick="BuilderStepManager.resetRecipeValues()">
+                        🔄 Reset
+                    </button>
+                    <button class="action-btn primary" onclick="BuilderStepManager.confirmRecipe()">
+                        ✅ Use This Recipe
+                    </button>
+                </div>
+
+                <!-- Hidden inputs for form data -->
+                <div style="display: none;">
+                    <input type="number" id="recipeBasalSaltAmount" />
+                    <input type="number" id="recipeGellingAgentAmount" />
+                    <input type="number" id="recipeGamborgVitamin" />
+                    <input type="number" id="recipeSucrose" />
+                    <input type="number" id="recipePPM" />
+                    <input type="number" id="recipePH" />
                 </div>
             </div>
         `;
@@ -762,6 +821,22 @@ window.BuilderStepManager = {
         this.continueFromRecipeStep(recipeData);
     },
     
+    // Toggle advanced options in recipe wizard
+    toggleAdvancedOptions: function() {
+        const content = document.getElementById('advancedContent');
+        const icon = document.getElementById('advancedToggleIcon');
+        
+        if (content && icon) {
+            if (content.style.display === 'none' || !content.style.display) {
+                content.style.display = 'block';
+                icon.textContent = '▲';
+            } else {
+                content.style.display = 'none';
+                icon.textContent = '▼';
+            }
+        }
+    },
+    
     // Update basal salt amount when type is changed
     updateBasalSaltAmount: function() {
         const basalSaltSelect = document.getElementById('recipeBasalSalt');
@@ -774,8 +849,8 @@ window.BuilderStepManager = {
             
             // Define recommended amounts for different basal salts (per 1L)
             const basalSaltAmounts = {
-                'M&S': 4.4,
-                'DKW': 3.9
+                'M&S': 4.48,
+                'DKW': 5.32
             };
             
             // Define volume scales
@@ -786,7 +861,7 @@ window.BuilderStepManager = {
             };
             
             const scale = volumeScales[volume] || 1;
-            const baseAmount = basalSaltAmounts[selectedType] || 4.4;
+            const baseAmount = basalSaltAmounts[selectedType] || 4.48;
             
             // Update the amount based on the selected type
             basalSaltAmountInput.value = (baseAmount * scale).toFixed(2);
@@ -988,5 +1063,242 @@ window.BuilderStepManager = {
                 this.validateAndProceed();
             }, 100);
         }
+    },
+
+    // Update field preview with current values
+    updateFieldPreview: function() {
+        const compactStatus = document.getElementById('barcodeStatusCompact');
+        const values = window.appState.builderState.values;
+
+        // Toggle display based on values
+        if (Object.values(values).some(value => value)) {
+            compactStatus.style.display = 'block';
+            compactStatus.classList.add('active');
+
+            // Update composite string in main display
+            const statusComposite = document.getElementById('statusComposite');
+            if (statusComposite) {
+                const barcodeFields = ['owner', 'strain', 'media', 'stage', 'tissue', 'date'];
+                const compositeString = barcodeFields.map(field => values[field] || '').join('');
+                statusComposite.textContent = compositeString || 'Building...';
+            }
+
+            // Update detail fields
+            for (const field in values) {
+                const detailElement = document.getElementById(`detail-${field}`);
+                if (detailElement) {
+                    const value = values[field];
+                    detailElement.textContent = value || '-';
+                    detailElement.parentElement.style.opacity = value ? '1' : '0.5';
+                }
+            }
+        } else {
+            compactStatus.style.display = 'none';
+            compactStatus.classList.remove('active');
+        }
+    },
+
+    // Set up real-time preview monitoring
+    setupRealTimePreview: function() {
+        const input = document.getElementById('builderInput');
+        if (!input) return;
+
+        // Remove existing listener to avoid duplicates
+        input.removeEventListener('input', this.handleRealtimeInput);
+        
+        // Add input listener for real-time updates
+        input.addEventListener('input', this.handleRealtimeInput.bind(this));
+        
+        // Update current field highlighting
+        this.updateCurrentFieldHighlight();
+    },
+
+    // Handle real-time input changes
+    handleRealtimeInput: function(event) {
+        const input = event.target.value.trim();
+        const currentStep = window.appState.builderState.currentStep;
+        const stepName = window.appState.builderState.steps[currentStep];
+        
+        // Create a temporary values object with current input
+        const tempValues = { ...window.appState.builderState.values };
+        if (input) {
+            const processedValue = stepName === 'container' ? input : input.toUpperCase();
+            tempValues[stepName] = processedValue;
+        }
+        
+        // Update preview with temporary values
+        this.updateFieldPreviewWithValues(tempValues);
+    },
+
+    // Update preview with specific values (for real-time updates)
+    updateFieldPreviewWithValues: function(values) {
+        const previewElement = document.getElementById('barcodeFieldPreview');
+        
+        // Toggle display based on values
+        if (Object.values(values).some(value => value)) {
+            previewElement.style.display = 'block';
+
+            // Update each field in preview
+            for (const field in values) {
+                const valueElement = document.getElementById(`preview-${field}-value`);
+                if (valueElement) {
+                    const value = values[field];
+                    valueElement.textContent = value || '-';
+                    valueElement.className = value ? 'field-value filled' : 'field-value empty';
+                }
+            }
+
+            // Update composite string (for barcode fields only)
+            const compositeElement = document.getElementById('compositeStringPreview');
+            if (compositeElement) {
+                const barcodeFields = ['owner', 'strain', 'media', 'stage', 'tissue', 'date'];
+                const compositeString = barcodeFields.map(field => values[field] || '').join('');
+                compositeElement.textContent = compositeString || '-';
+                compositeElement.className = compositeString ? 'composite-value building' : 'composite-value empty';
+            }
+        } else {
+            previewElement.style.display = 'none';
+        }
+    },
+
+    // Update current field highlighting
+    updateCurrentFieldHighlight: function() {
+        const currentStep = window.appState.builderState.currentStep;
+        const stepName = window.appState.builderState.steps[currentStep];
+        
+        // Remove current highlighting from all fields
+        document.querySelectorAll('.preview-field').forEach(field => {
+            field.classList.remove('current');
+        });
+        
+        // Add current highlighting to active field
+        const currentField = document.getElementById(`preview-${stepName}`);
+        if (currentField) {
+            currentField.classList.add('current');
+        }
+    },
+
+    // Reset field preview to initial state
+    resetFieldPreview: function() {
+        const previewElement = document.getElementById('barcodeFieldPreview');
+        if (previewElement) {
+            previewElement.style.display = 'none';
+        }
+        
+        // Reset all field values
+        const fieldNames = ['container', 'owner', 'strain', 'media', 'recipe', 'stage', 'tissue', 'date'];
+        fieldNames.forEach(fieldName => {
+            const valueElement = document.getElementById(`preview-${fieldName}-value`);
+            if (valueElement) {
+                valueElement.textContent = '-';
+                valueElement.className = 'field-value empty';
+            }
+            
+            const fieldElement = document.getElementById(`preview-${fieldName}`);
+            if (fieldElement) {
+                fieldElement.classList.remove('current', 'filled');
+            }
+        });
+        
+        // Reset composite string
+        const compositeElement = document.getElementById('compositeStringPreview');
+        if (compositeElement) {
+            compositeElement.textContent = '-';
+            compositeElement.className = 'composite-value empty';
+        }
+    },
+
+    // Navigate to a specific step (for clickable step navigation)
+    goToStep: function(stepIndex) {
+        const currentStep = window.appState.builderState.currentStep;
+        const totalSteps = window.appState.builderState.steps.length;
+        
+        // Validate step index
+        if (stepIndex < 0 || stepIndex >= totalSteps) {
+            console.warn(`Invalid step index: ${stepIndex}`);
+            return;
+        }
+        
+        // Can only go back to completed steps or current step
+        if (stepIndex > currentStep) {
+            NotificationSystem.showBuilderFeedback('Complete current step before proceeding', 'warning');
+            return;
+        }
+        
+        const stepName = window.appState.builderState.steps[stepIndex];
+        const currentValue = window.appState.builderState.values[stepName];
+        
+        // Show confirmation if going back to a completed step
+        if (stepIndex < currentStep && currentValue) {
+            const confirmEdit = confirm(`Do you want to edit the ${stepName} field?\n\nCurrent value: ${currentValue}\n\nClick OK to edit or Cancel to stay on current step.`);
+            if (!confirmEdit) {
+                return;
+            }
+        }
+        
+        // Update current step
+        StateManager.setState('builderState.currentStep', stepIndex);
+        
+        // Update all step visual states
+        this.updateAllStepStates();
+        
+        // Update the step UI
+        this.updateStep();
+        
+        // Pre-fill input with current value if editing
+        if (currentValue) {
+            const input = document.getElementById('builderInput');
+            if (input) {
+                input.value = currentValue;
+                input.style.background = '#fff3cd';
+                input.style.borderColor = '#ffc107';
+                
+                // Show editing feedback
+                NotificationSystem.showBuilderFeedback(
+                    `📝 Editing ${stepName}: ${currentValue}\nEnter new value or press Next to keep current value`,
+                    'info'
+                );
+            }
+        }
+        
+        // Log navigation
+        console.log(`Navigated to step ${stepIndex + 1}: ${stepName}`);
+    },
+    
+    // Update all step visual states based on current progress
+    updateAllStepStates: function() {
+        const currentStep = window.appState.builderState.currentStep;
+        const values = window.appState.builderState.values;
+        
+        window.appState.builderState.steps.forEach((stepName, index) => {
+            const stepElement = document.getElementById(`step-${stepName}`);
+            if (!stepElement) return;
+            
+            // Remove all state classes
+            stepElement.classList.remove('active', 'completed');
+            
+            if (index === currentStep) {
+                // Current step
+                stepElement.classList.add('active');
+            } else if (index < currentStep && values[stepName]) {
+                // Completed step with value
+                stepElement.classList.add('completed');
+            }
+            
+            // Add tooltip data for clickable feedback
+            const circle = stepElement.querySelector('.progress-circle');
+            if (circle) {
+                if (index === currentStep) {
+                    circle.setAttribute('data-tooltip', 'Current step');
+                } else if (index < currentStep && values[stepName]) {
+                    circle.setAttribute('data-tooltip', `Click to edit ${stepName}`);
+                } else if (index > currentStep) {
+                    circle.setAttribute('data-tooltip', 'Complete current step first');
+                } else {
+                    circle.setAttribute('data-tooltip', `Click to set ${stepName}`);
+                }
+            }
+        });
     }
+
 };

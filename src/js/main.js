@@ -47,6 +47,9 @@ function initializeApp() {
     // Initialize recipe management module
     if (window.RecipeManager) {
         RecipeManager.initialize();
+        // Force setup of recipe UI
+        RecipeManager.setupRecipeUI();
+        console.log('✅ RecipeManager initialized with UI setup');
     }
     
     // Show initial status
@@ -431,6 +434,20 @@ function clearInventory() {
 }
 
 
+// Toggle barcode details in compact preview
+function toggleBarcodeDetails() {
+    const details = document.getElementById('statusDetails');
+    const toggleIcon = document.getElementById('toggleIcon');
+    
+    if (details.style.display === 'none' || !details.style.display) {
+        details.style.display = 'block';
+        toggleIcon.textContent = '▲';
+    } else {
+        details.style.display = 'none';
+        toggleIcon.textContent = '▼';
+    }
+}
+
 // Legacy compatibility for global function references
 window.switchMode = switchMode;
 window.nextBuilderStep = nextBuilderStep;
@@ -442,4 +459,5 @@ window.processTransfer = processTransfer;
 window.clearTransfer = clearTransfer;
 window.exportInventory = exportInventory;
 window.clearInventory = clearInventory;
+window.toggleBarcodeDetails = toggleBarcodeDetails;
 

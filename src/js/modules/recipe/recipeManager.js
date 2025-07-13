@@ -11,6 +11,64 @@ window.RecipeManager = (function() {
     let currentRecipe = null;
     let isRecipeStepActive = false;
     let recipeMode = 'new'; // 'new' or 'existing'
+    let currentTemplate = 'Initiation';
+    let originalValues = {};
+    let wizardContainer = null;
+
+    // Volume scaling factors
+    const VOLUME_SCALES = { '500mL': 0.5, '1L': 1.0, '2L': 2.0 };
+
+    // Recipe templates from the wizard - based on exact specifications
+    const TEMPLATES = {
+        'Initiation': {
+            basalSalt: { type: 'M&S', amount: 4.48 },
+            gellingAgent: { type: 'Phytogel', amount: 2.3 },
+            preAutoclave: { gamborgVitamin: 1.0, sucrose: 30.0, ppm: 1.0 },
+            postAutoclave: [
+                { name: 'AgNO3', amount: 40, unit: 'μL' },
+                { name: 'Meta-Topolin', amount: 500, unit: 'μL' }
+            ],
+            pH: 5.8,
+            instructions: {
+                preAutoclave: 'pH the media before AUTOCLAVE to 5.7-6.0',
+                autoclave: 'Autoclave at 120°C WITH Pressure for 20 mins',
+                postAutoclave: 'Media Cools to 55°C before adding post-autoclave ingredients'
+            }
+        },
+        'Multiplication': {
+            basalSalt: { type: 'M&S', amount: 4.48 },
+            gellingAgent: { type: 'Phytogel', amount: 2.3 },
+            preAutoclave: { gamborgVitamin: 1.0, sucrose: 30.0, ppm: 1.0 },
+            postAutoclave: [
+                { name: 'AgNO3', amount: 40, unit: 'μL' },
+                { name: 'Meta-Topolin', amount: 500, unit: 'μL' },
+                { name: 'Gibberellic Acid', amount: 100, unit: 'μL' }
+            ],
+            pH: 5.8,
+            instructions: {
+                preAutoclave: 'pH the media before AUTOCLAVE to 5.7-6.0',
+                autoclave: 'Autoclave at 120°C WITH Pressure for 20 mins',
+                postAutoclave: 'Media Cools to 55°C before adding post-autoclave ingredients'
+            }
+        },
+        'Rooting': {
+            basalSalt: { type: 'M&S', amount: 4.48 },
+            gellingAgent: { type: 'Phytogel', amount: 2.3 },
+            preAutoclave: { gamborgVitamin: 1.0, sucrose: 30.0, ppm: 1.0 },
+            postAutoclave: [
+                { name: 'IBA', amount: 5, unit: 'μL', range: '2-5' },
+                { name: 'NAA', amount: 2, unit: 'μL' },
+                { name: 'AgNO3', amount: 40, unit: 'μL' },
+                { name: 'Sodium Metacylitate', amount: 6, unit: 'mL' }
+            ],
+            pH: 5.8,
+            instructions: {
+                preAutoclave: 'pH the media before AUTOCLAVE to 5.7-6.0',
+                autoclave: 'Autoclave at 120°C WITH Pressure for 20 mins',
+                postAutoclave: 'Media Cools to 55°C before adding post-autoclave ingredients'
+            }
+        }
+    };
 
     /**
      * Initialize the recipe manager
@@ -26,9 +84,6 @@ window.RecipeManager = (function() {
         if (window.RecipeStorage) {
             RecipeStorage.initialize();
         }
-        
-        // Setup UI components
-        setupRecipeUI();
         
         // Setup event listeners
         setupEventListeners();
@@ -66,7 +121,7 @@ window.RecipeManager = (function() {
                     <div class="form-grid" style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 20px;">
                         <div class="form-group">
                             <label for="mediaType">Media Type:</label>
-                            <select id="mediaType" class="form-control">
+                            <select id="mediaType" class="form-control" onchange="RecipeManager.loadTemplate(this.value)">
                                 <option value="Initiation">Initiation</option>
                                 <option value="Multiplication">Multiplication</option>
                                 <option value="Rooting">Rooting</option>
@@ -432,6 +487,13 @@ window.RecipeManager = (function() {
             }, 200);
         }
         
+        // Setup dynamic event listeners for form elements
+        setTimeout(() => {
+            setupDynamicEventListeners();
+            // Load initial template
+            loadTemplate('Initiation');
+        }, 300);
+        
         // Update builder feedback
         updateBuilderFeedback('Select or create a recipe for this media');
     }
@@ -769,9 +831,195 @@ window.RecipeManager = (function() {
         return isRecipeStepActive;
     }
 
+    /**
+     * Load template based on media type
+     */
+    function loadTemplate(mediaType) {
+        currentTemplate = mediaType;
+        const template = TEMPLATES[mediaType];
+        
+        if (!template) {
+            console.warn('Template not found for media type:', mediaType);
+            return;
+        }
+        
+        // Store original values if first time loading
+        if (Object.keys(originalValues).length === 0) {
+            captureOriginalValues();
+        }
+        
+        // Update basal salt
+        const basalSalt = document.getElementById('basalSalt');
+        const basalSaltAmount = document.getElementById('basalSaltAmount');
+        if (basalSalt && basalSaltAmount) {
+            basalSalt.value = template.basalSalt.type;
+            basalSaltAmount.value = template.basalSalt.amount;
+        }
+        
+        // Update gelling agent
+        const gellingAgent = document.getElementById('gellingAgent');
+        const gellingAgentAmount = document.getElementById('gellingAgentAmount');
+        if (gellingAgent && gellingAgentAmount) {
+            gellingAgent.value = template.gellingAgent.type;
+            gellingAgentAmount.value = template.gellingAgent.amount;
+        }
+        
+        // Update pre-autoclave ingredients
+        const gamborgVitamin = document.getElementById('gamborgVitamin');
+        const sucrose = document.getElementById('sucrose');
+        const ppm = document.getElementById('ppm');
+        
+        if (gamborgVitamin) gamborgVitamin.value = template.preAutoclave.gamborgVitamin;
+        if (sucrose) sucrose.value = template.preAutoclave.sucrose;
+        if (ppm) ppm.value = template.preAutoclave.ppm;
+        
+        // Update pH
+        const phValue = document.getElementById('phValue');
+        if (phValue) phValue.value = template.pH;
+        
+        // Update post-autoclave additions
+        updatePostAutoclaveList(template.postAutoclave);
+        
+        // Trigger volume scaling if needed
+        const volume = document.getElementById('volume');
+        if (volume && window.RecipeCalculator) {
+            RecipeCalculator.updateVolumeAmounts();
+        }
+        
+        console.log('Template loaded:', mediaType, template);
+    }
+    
+    /**
+     * Capture original values for restoration
+     */
+    function captureOriginalValues() {
+        const fields = ['basalSaltAmount', 'gellingAgentAmount', 'gamborgVitamin', 'sucrose', 'ppm'];
+        fields.forEach(fieldId => {
+            const element = document.getElementById(fieldId);
+            if (element) {
+                originalValues[fieldId] = element.value;
+            }
+        });
+    }
+    
+    /**
+     * Update post-autoclave additions list
+     */
+    function updatePostAutoclaveList(postAutoclaveItems) {
+        const container = document.getElementById('postAutoclaveList');
+        if (!container || !postAutoclaveItems) return;
+        
+        container.innerHTML = postAutoclaveItems.map((item, index) => `
+            <div class="ingredient-row">
+                <div class="ingredient-label">${item.name}:</div>
+                <div class="input-with-unit">
+                    <input type="number" 
+                           id="postAutoclave_${index}" 
+                           class="ingredient-input" 
+                           value="${item.amount}" 
+                           step="0.01" 
+                           min="0"
+                           onchange="RecipeManager.updatePostAutoclaveAmount(${index}, this.value)">
+                    <span class="input-unit">${item.unit}</span>
+                    ${item.range ? `<span class="ingredient-range">(${item.range}${item.unit})</span>` : ''}
+                </div>
+            </div>
+        `).join('');
+        
+        // Store current post-autoclave data
+        currentPostAutoclaveItems = [...postAutoclaveItems];
+    }
+    
+    /**
+     * Update post-autoclave amount
+     */
+    function updatePostAutoclaveAmount(index, newAmount) {
+        if (currentPostAutoclaveItems && currentPostAutoclaveItems[index]) {
+            currentPostAutoclaveItems[index].amount = parseFloat(newAmount) || 0;
+            console.log('Updated post-autoclave item:', currentPostAutoclaveItems[index]);
+        }
+    }
+    
+    /**
+     * Setup dynamic event listeners for form elements
+     */
+    function setupDynamicEventListeners() {
+        // Volume change listener
+        const volumeSelect = document.getElementById('volume');
+        if (volumeSelect) {
+            volumeSelect.addEventListener('change', function() {
+                if (window.RecipeCalculator) {
+                    RecipeCalculator.updateVolumeAmounts();
+                }
+            });
+        }
+        
+        // Basal salt change listener
+        const basalSaltSelect = document.getElementById('basalSalt');
+        if (basalSaltSelect) {
+            basalSaltSelect.addEventListener('change', function() {
+                updateBasalSaltAmount(this.value);
+            });
+        }
+        
+        // Gelling agent change listener
+        const gellingAgentSelect = document.getElementById('gellingAgent');
+        if (gellingAgentSelect) {
+            gellingAgentSelect.addEventListener('change', function() {
+                updateGellingAgentAmount(this.value);
+            });
+        }
+    }
+    
+    /**
+     * Update basal salt amount based on type
+     */
+    function updateBasalSaltAmount(saltType) {
+        const amountInput = document.getElementById('basalSaltAmount');
+        if (!amountInput) return;
+        
+        // Default amounts for different salt types
+        const defaultAmounts = {
+            'M&S': 4.48,
+            'DKW': 5.32
+        };
+        
+        const baseAmount = defaultAmounts[saltType] || 4.48;
+        const volume = document.getElementById('volume')?.value || '1L';
+        const scale = VOLUME_SCALES[volume] || 1.0;
+        
+        amountInput.value = (baseAmount * scale).toFixed(2);
+        console.log('Updated basal salt amount:', saltType, amountInput.value);
+    }
+    
+    /**
+     * Update gelling agent amount based on type
+     */
+    function updateGellingAgentAmount(agentType) {
+        const amountInput = document.getElementById('gellingAgentAmount');
+        if (!amountInput) return;
+        
+        // Default amounts for different gelling agents
+        const defaultAmounts = {
+            'Phytogel': 2.3,
+            'Agar': 8.0
+        };
+        
+        const baseAmount = defaultAmounts[agentType] || 2.3;
+        const volume = document.getElementById('volume')?.value || '1L';
+        const scale = VOLUME_SCALES[volume] || 1.0;
+        
+        amountInput.value = (baseAmount * scale).toFixed(2);
+        console.log('Updated gelling agent amount:', agentType, amountInput.value);
+    }
+    
+    // Store current post-autoclave items
+    let currentPostAutoclaveItems = [];
+
     // Public API
     return {
         initialize,
+        setupRecipeUI,
         showRecipeStep,
         hideRecipeStep,
         setRecipeMode,
@@ -783,6 +1031,9 @@ window.RecipeManager = (function() {
         cancelRecipeSelection,
         showImportDialog,
         getCurrentRecipe,
-        isRecipeActive
+        isRecipeActive,
+        loadTemplate,
+        updatePostAutoclaveAmount,
+        setupDynamicEventListeners
     };
 })();

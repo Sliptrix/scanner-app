@@ -21,36 +21,81 @@ window.Code128BarcodeGenerator = {
         try {
             // If owner is already provided, don't override
             if (fields.owner && fields.owner.toString().trim()) {
-                return fields;
+                // Validate and clean existing owner
+                const cleanOwner = this.cleanOwnerCode(fields.owner.toString().trim());
+                if (cleanOwner) {
+                    fields.owner = cleanOwner;
+                    return fields;
+                }
             }
             
             // Look up owner from strain
             const strainId = fields.strain ? fields.strain.toString() : null;
             if (!strainId) {
+                // If no strain and no valid owner, use default
+                fields.owner = fields.owner || 'LAB';
                 return fields;
             }
             
             // Get strain-owner mapping from demo data
             const demoData = this.getDemoData();
             if (demoData && demoData.strainOwnerMapping && demoData.strainOwnerMapping[strainId]) {
-                const ownerCode = demoData.strainOwnerMapping[strainId];
-                fields.owner = ownerCode;
-                
-                console.log(`Auto-populated owner '${ownerCode}' for strain '${strainId}'`);
-                
-                // Log this auto-population for user awareness
-                if (window.NotificationSystem) {
-                    const ownerName = demoData.owners && demoData.owners[ownerCode] ? 
-                        demoData.owners[ownerCode] : ownerCode;
-                    NotificationSystem.info(`Auto-populated owner: ${ownerName} (${ownerCode})`);
+                const ownerCode = this.cleanOwnerCode(demoData.strainOwnerMapping[strainId]);
+                if (ownerCode) {
+                    fields.owner = ownerCode;
+                    
+                    console.log(`Auto-populated owner '${ownerCode}' for strain '${strainId}'`);
+                    
+                    // Log this auto-population for user awareness
+                    if (window.NotificationSystem) {
+                        const ownerName = demoData.owners && demoData.owners[ownerCode] ? 
+                            demoData.owners[ownerCode] : ownerCode;
+                        NotificationSystem.info(`Auto-populated owner: ${ownerName} (${ownerCode})`);
+                    }
+                } else {
+                    // Use default if mapping exists but is invalid
+                    fields.owner = 'LAB';
                 }
+            } else {
+                // No mapping found, use default
+                fields.owner = fields.owner || 'LAB';
             }
             
             return fields;
         } catch (error) {
             console.warn('Failed to auto-populate owner:', error);
+            // Ensure we always have a valid owner
+            fields.owner = fields.owner || 'LAB';
             return fields;
         }
+    },
+    
+    /**
+     * Clean and validate owner code
+     * @param {String} ownerCode - Raw owner code
+     * @returns {String|null} Clean owner code or null if invalid
+     */
+    cleanOwnerCode: function(ownerCode) {
+        if (!ownerCode) return null;
+        
+        // Clean the owner code
+        let cleaned = ownerCode.toString().trim().toUpperCase();
+        
+        // Remove any non-letter characters
+        cleaned = cleaned.replace(/[^A-Z]/g, '');
+        
+        // Ensure it's 1-3 characters
+        if (cleaned.length >= 1 && cleaned.length <= 3) {
+            return cleaned;
+        }
+        
+        // If too long, take first 3 characters
+        if (cleaned.length > 3) {
+            return cleaned.substring(0, 3);
+        }
+        
+        // If empty after cleaning, return null
+        return null;
     },
     
     /**
