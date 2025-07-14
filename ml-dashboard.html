@@ -1,0 +1,1312 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🤖 ML Intelligence Dashboard - Lab Analytics</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            color: #333;
+        }
+        
+        .dashboard-container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        
+        .dashboard-header {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            padding: 30px;
+            margin-bottom: 30px;
+            text-align: center;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+        }
+        
+        .dashboard-header h1 {
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        
+        .dashboard-header .subtitle {
+            font-size: 1.1rem;
+            color: #6c757d;
+            margin-bottom: 20px;
+        }
+        
+        .status-indicators {
+            display: flex;
+            justify-content: center;
+            gap: 30px;
+            flex-wrap: wrap;
+        }
+        
+        .status-indicator {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 16px;
+            background: rgba(0,0,0,0.05);
+            border-radius: 20px;
+            font-size: 0.9rem;
+        }
+        
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            animation: pulse 2s infinite;
+        }
+        
+        .status-learning { background: #ffc107; }
+        .status-active { background: #28a745; }
+        .status-analyzing { background: #17a2b8; }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+        
+        .dashboard-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+            gap: 25px;
+            margin-bottom: 25px;
+        }
+        
+        .dashboard-card {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 16px;
+            padding: 25px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+            border: 1px solid rgba(255,255,255,0.2);
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+        
+        .dashboard-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 20px 40px rgba(0,0,0,0.15);
+        }
+        
+        .card-header {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 20px;
+            padding-bottom: 15px;
+            border-bottom: 2px solid #f8f9fa;
+        }
+        
+        .card-icon {
+            font-size: 1.5rem;
+        }
+        
+        .card-title {
+            font-size: 1.3rem;
+            font-weight: 600;
+            color: #2c3e50;
+        }
+        
+        .metric-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+            gap: 15px;
+            margin: 20px 0;
+        }
+        
+        .metric-item {
+            text-align: center;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 12px;
+            border-left: 4px solid #007bff;
+        }
+        
+        .metric-value {
+            font-size: 1.8rem;
+            font-weight: bold;
+            color: #2c3e50;
+            margin-bottom: 5px;
+        }
+        
+        .metric-label {
+            font-size: 0.8rem;
+            color: #6c757d;
+            font-weight: 500;
+        }
+        
+        .recommendations-list {
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        
+        .recommendation-item {
+            background: #f8f9fa;
+            border: 1px solid #e9ecef;
+            border-radius: 8px;
+            padding: 12px;
+            margin: 8px 0;
+            border-left: 4px solid #007bff;
+            transition: all 0.3s ease;
+        }
+        
+        .recommendation-item:hover {
+            background: #e3f2fd;
+            transform: translateX(5px);
+        }
+        
+        .recommendation-high { border-left-color: #dc3545; }
+        .recommendation-medium { border-left-color: #ffc107; }
+        .recommendation-low { border-left-color: #28a745; }
+        
+        .recommendation-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+        }
+        
+        .recommendation-title {
+            font-weight: 600;
+            color: #2c3e50;
+        }
+        
+        .recommendation-priority {
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 0.7rem;
+            font-weight: bold;
+            text-transform: uppercase;
+        }
+        
+        .priority-high { background: #f8d7da; color: #721c24; }
+        .priority-medium { background: #fff3cd; color: #856404; }
+        .priority-low { background: #d4edda; color: #155724; }
+        
+        .recommendation-message {
+            font-size: 0.9rem;
+            color: #495057;
+            line-height: 1.4;
+        }
+        
+        .pattern-item {
+            background: #f8f9fa;
+            border-radius: 8px;
+            padding: 12px;
+            margin: 8px 0;
+            border-left: 4px solid #17a2b8;
+        }
+        
+        .pattern-title {
+            font-weight: 600;
+            color: #2c3e50;
+            margin-bottom: 5px;
+        }
+        
+        .pattern-confidence {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin: 8px 0;
+        }
+        
+        .confidence-bar {
+            flex: 1;
+            height: 6px;
+            background: #e9ecef;
+            border-radius: 3px;
+            overflow: hidden;
+        }
+        
+        .confidence-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #ffc107, #28a745);
+            transition: width 0.3s ease;
+        }
+        
+        .strain-performance-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px 12px;
+            background: #f8f9fa;
+            border-radius: 6px;
+            margin: 5px 0;
+        }
+        
+        .strain-name {
+            font-weight: 600;
+            color: #2c3e50;
+        }
+        
+        .strain-stats {
+            display: flex;
+            gap: 15px;
+            font-size: 0.9rem;
+        }
+        
+        .stat-success {
+            color: #28a745;
+            font-weight: 600;
+        }
+        
+        .stat-total {
+            color: #6c757d;
+        }
+        
+        .chart-container {
+            height: 200px;
+            background: #f8f9fa;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #6c757d;
+            margin: 15px 0;
+        }
+        
+        .refresh-button {
+            background: linear-gradient(135deg, #007bff, #0056b3);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            margin: 10px 5px;
+        }
+        
+        .refresh-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0,123,255,0.3);
+        }
+        
+        .export-button {
+            background: linear-gradient(135deg, #28a745, #1e7e34);
+        }
+        
+        .export-button:hover {
+            box-shadow: 0 5px 15px rgba(40,167,69,0.3);
+        }
+        
+        .learning-progress {
+            background: #f8f9fa;
+            border-radius: 8px;
+            padding: 15px;
+            margin: 15px 0;
+        }
+        
+        .progress-bar {
+            width: 100%;
+            height: 12px;
+            background: #e9ecef;
+            border-radius: 6px;
+            overflow: hidden;
+            margin: 10px 0;
+        }
+        
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #007bff, #0056b3);
+            transition: width 0.3s ease;
+        }
+        
+        .alert-banner {
+            background: linear-gradient(135deg, #ff6b6b, #ee5a5a);
+            color: white;
+            padding: 15px 20px;
+            border-radius: 12px;
+            margin: 20px 0;
+            box-shadow: 0 5px 15px rgba(255,107,107,0.3);
+        }
+        
+        .alert-banner.success {
+            background: linear-gradient(135deg, #51cf66, #40c057);
+        }
+        
+        .alert-banner.warning {
+            background: linear-gradient(135deg, #ffd43b, #fcc419);
+            color: #212529;
+        }
+        
+        .scrollable {
+            max-height: 300px;
+            overflow-y: auto;
+            padding-right: 5px;
+        }
+        
+        .scrollable::-webkit-scrollbar {
+            width: 6px;
+        }
+        
+        .scrollable::-webkit-scrollbar-track {
+            background: #f1f1f1;
+            border-radius: 3px;
+        }
+        
+        .scrollable::-webkit-scrollbar-thumb {
+            background: #c1c1c1;
+            border-radius: 3px;
+        }
+        
+        .scrollable::-webkit-scrollbar-thumb:hover {
+            background: #a8a8a8;
+        }
+        
+        .data-source-info {
+            background: #e3f2fd;
+            border: 1px solid #bbdefb;
+            border-radius: 8px;
+            padding: 12px;
+            margin: 15px 0;
+            font-size: 0.9rem;
+            color: #1976d2;
+        }
+    </style>
+</head>
+<body>
+    <div class="dashboard-container">
+        <!-- Dashboard Header -->
+        <div class="dashboard-header">
+            <h1>🤖 ML Intelligence Dashboard</h1>
+            <p class="subtitle">Real-time insights and recommendations from your lab data</p>
+            <div class="status-indicators">
+                <div class="status-indicator">
+                    <div class="status-dot status-learning"></div>
+                    <span id="learningStatus">Learning Active</span>
+                </div>
+                <div class="status-indicator">
+                    <div class="status-dot status-active"></div>
+                    <span id="dataStatus">Data Connected</span>
+                </div>
+                <div class="status-indicator">
+                    <div class="status-dot status-analyzing"></div>
+                    <span id="analysisStatus">Analyzing Patterns</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Alert Banners -->
+        <div id="alertContainer"></div>
+
+        <!-- Main Dashboard Grid -->
+        <div class="dashboard-grid">
+            <!-- ML Learning Progress -->
+            <div class="dashboard-card">
+                <div class="card-header">
+                    <span class="card-icon">🧠</span>
+                    <h3 class="card-title">ML Learning Progress</h3>
+                </div>
+                
+                <div class="metric-grid">
+                    <div class="metric-item">
+                        <div class="metric-value" id="totalContainers">0</div>
+                        <div class="metric-label">Containers Analyzed</div>
+                    </div>
+                    <div class="metric-item">
+                        <div class="metric-value" id="totalRecipes">0</div>
+                        <div class="metric-label">Recipes Processed</div>
+                    </div>
+                    <div class="metric-item">
+                        <div class="metric-value" id="patternsFound">0</div>
+                        <div class="metric-label">Patterns Discovered</div>
+                    </div>
+                    <div class="metric-item">
+                        <div class="metric-value" id="confidenceLevel">0%</div>
+                        <div class="metric-label">Confidence Level</div>
+                    </div>
+                </div>
+                
+                <div class="learning-progress">
+                    <strong>Learning Stage: <span id="learningStage">Initial Analysis</span></strong>
+                    <div class="progress-bar">
+                        <div class="progress-fill" id="learningProgressBar" style="width: 0%"></div>
+                    </div>
+                    <small id="learningDescription">Analyzing existing lab data...</small>
+                </div>
+                
+                <button class="refresh-button" onclick="refreshLearningData()">🔄 Refresh Analysis</button>
+            </div>
+
+            <!-- High Priority Recommendations -->
+            <div class="dashboard-card">
+                <div class="card-header">
+                    <span class="card-icon">⚡</span>
+                    <h3 class="card-title">Priority Recommendations</h3>
+                </div>
+                
+                <div class="scrollable" id="priorityRecommendations">
+                    <!-- Recommendations will be populated here -->
+                </div>
+                
+                <button class="refresh-button export-button" onclick="exportRecommendations()">📊 Export Report</button>
+            </div>
+
+            <!-- Strain Performance Analysis -->
+            <div class="dashboard-card">
+                <div class="card-header">
+                    <span class="card-icon">🌱</span>
+                    <h3 class="card-title">Strain Performance Analytics</h3>
+                </div>
+                
+                <div class="scrollable" id="strainPerformance">
+                    <!-- Strain data will be populated here -->
+                </div>
+                
+                <button class="refresh-button" onclick="refreshStrainData()">🔄 Update Analysis</button>
+            </div>
+
+            <!-- Recipe Effectiveness -->
+            <div class="dashboard-card">
+                <div class="card-header">
+                    <span class="card-icon">🧪</span>
+                    <h3 class="card-title">Recipe Effectiveness</h3>
+                </div>
+                
+                <div class="metric-grid">
+                    <div class="metric-item">
+                        <div class="metric-value" id="topRecipeSuccess">0%</div>
+                        <div class="metric-label">Best Recipe Success</div>
+                    </div>
+                    <div class="metric-item">
+                        <div class="metric-value" id="avgRecipeSuccess">0%</div>
+                        <div class="metric-label">Average Success Rate</div>
+                    </div>
+                </div>
+                
+                <div class="scrollable" id="recipeAnalysis">
+                    <!-- Recipe analysis will be populated here -->
+                </div>
+            </div>
+
+            <!-- Transfer Success Patterns -->
+            <div class="dashboard-card">
+                <div class="card-header">
+                    <span class="card-icon">🔄</span>
+                    <h3 class="card-title">Transfer Success Patterns</h3>
+                </div>
+                
+                <div class="metric-grid">
+                    <div class="metric-item">
+                        <div class="metric-value" id="singleTransferSuccess">0%</div>
+                        <div class="metric-label">Single Transfer Success</div>
+                    </div>
+                    <div class="metric-item">
+                        <div class="metric-value" id="splitTransferSuccess">0%</div>
+                        <div class="metric-label">Split Transfer Success</div>
+                    </div>
+                </div>
+                
+                <div class="chart-container">
+                    📈 Transfer success visualization would appear here
+                </div>
+            </div>
+
+            <!-- Recent Discoveries -->
+            <div class="dashboard-card">
+                <div class="card-header">
+                    <span class="card-icon">🔍</span>
+                    <h3 class="card-title">Recent Discoveries</h3>
+                </div>
+                
+                <div class="scrollable" id="recentDiscoveries">
+                    <!-- Recent patterns will be populated here -->
+                </div>
+            </div>
+
+            <!-- Media Type Analysis -->
+            <div class="dashboard-card">
+                <div class="card-header">
+                    <span class="card-icon">📊</span>
+                    <h3 class="card-title">Media Type Performance</h3>
+                </div>
+                
+                <div class="metric-grid">
+                    <div class="metric-item">
+                        <div class="metric-value" id="initiationSuccess">0%</div>
+                        <div class="metric-label">Initiation Success</div>
+                    </div>
+                    <div class="metric-item">
+                        <div class="metric-value" id="multiplicationSuccess">0%</div>
+                        <div class="metric-label">Multiplication Success</div>
+                    </div>
+                    <div class="metric-item">
+                        <div class="metric-value" id="rootingSuccess">0%</div>
+                        <div class="metric-label">Rooting Success</div>
+                    </div>
+                </div>
+                
+                <div class="scrollable" id="mediaAnalysis">
+                    <!-- Media analysis will be populated here -->
+                </div>
+            </div>
+
+            <!-- Optimization Opportunities -->
+            <div class="dashboard-card">
+                <div class="card-header">
+                    <span class="card-icon">🎯</span>
+                    <h3 class="card-title">Optimization Opportunities</h3>
+                </div>
+                
+                <div class="scrollable" id="optimizationOpportunities">
+                    <!-- Optimization suggestions will be populated here -->
+                </div>
+                
+                <button class="refresh-button" onclick="generateOptimizationReport()">📋 Generate Report</button>
+            </div>
+        </div>
+
+        <!-- Data Source Information -->
+        <div class="data-source-info">
+            <strong>Data Sources:</strong> Reading from localStorage: labInventory, labRecipes, labRecipesBackup
+            <br><strong>Last Updated:</strong> <span id="lastUpdated">--</span>
+            <br><strong>Auto-refresh:</strong> Every 30 seconds
+        </div>
+    </div>
+
+    <script>
+        // ML Dashboard Intelligence Engine
+        class MLDashboard {
+            constructor() {
+                this.data = {
+                    inventory: [],
+                    recipes: [],
+                    patterns: {},
+                    recommendations: [],
+                    discoveries: []
+                };
+                
+                this.learningProgress = {
+                    stage: 'Initial Analysis',
+                    progress: 0,
+                    description: 'Analyzing existing lab data...'
+                };
+                
+                this.initialize();
+            }
+
+            initialize() {
+                this.loadLabData();
+                this.analyzePatterns();
+                this.generateRecommendations();
+                this.updateDashboard();
+                
+                // Auto-refresh every 30 seconds
+                setInterval(() => {
+                    this.loadLabData();
+                    this.analyzePatterns();
+                    this.updateDashboard();
+                }, 30000);
+                
+                console.log('🤖 ML Dashboard initialized');
+            }
+
+            loadLabData() {
+                try {
+                    // Load inventory data
+                    const inventoryData = localStorage.getItem('labInventory');
+                    this.data.inventory = inventoryData ? JSON.parse(inventoryData) : [];
+                    
+                    // Load recipe data
+                    const recipeData = localStorage.getItem('labRecipes');
+                    this.data.recipes = recipeData ? JSON.parse(recipeData) : [];
+                    
+                    // Load backup data as fallback
+                    if (this.data.inventory.length === 0) {
+                        const backupData = localStorage.getItem('labRecipesBackup');
+                        if (backupData) {
+                            const backup = JSON.parse(backupData);
+                            this.data.inventory = backup.inventory || [];
+                        }
+                    }
+                    
+                    // Update learning progress based on data size
+                    this.updateLearningProgress();
+                    
+                    console.log('📊 Data loaded:', {
+                        containers: this.data.inventory.length,
+                        recipes: this.data.recipes.length
+                    });
+                    
+                } catch (error) {
+                    console.warn('⚠️ Could not load lab data:', error);
+                    this.showAlert('Unable to load lab data. Please ensure your lab system is running.', 'warning');
+                }
+            }
+
+            updateLearningProgress() {
+                const totalContainers = this.data.inventory.length;
+                const totalRecipes = this.data.recipes.length;
+                
+                let progress = 0;
+                let stage = 'Initial Analysis';
+                let description = 'Waiting for lab data...';
+                
+                if (totalContainers > 0) {
+                    progress = Math.min((totalContainers / 100) * 100, 100);
+                    
+                    if (totalContainers < 10) {
+                        stage = 'Data Collection';
+                        description = 'Gathering initial patterns from lab operations';
+                    } else if (totalContainers < 50) {
+                        stage = 'Pattern Recognition';
+                        description = 'Identifying strain and media performance patterns';
+                    } else if (totalContainers < 100) {
+                        stage = 'Advanced Analysis';
+                        description = 'Building predictive models and optimization strategies';
+                    } else {
+                        stage = 'Expert Intelligence';
+                        description = 'Providing high-confidence recommendations and predictions';
+                    }
+                }
+                
+                this.learningProgress = { stage, progress, description };
+            }
+
+            analyzePatterns() {
+                // Media type success rates
+                this.data.patterns.mediaSuccess = this.calculateMediaSuccessRates();
+                
+                // Strain performance analysis
+                this.data.patterns.strainPerformance = this.analyzeStrainPerformance();
+                
+                // Recipe effectiveness
+                this.data.patterns.recipeEffectiveness = this.analyzeRecipeEffectiveness();
+                
+                // Transfer patterns
+                this.data.patterns.transferPatterns = this.analyzeTransferPatterns();
+                
+                // Generate recent discoveries
+                this.generateDiscoveries();
+            }
+
+            calculateMediaSuccessRates() {
+                const mediaStats = {};
+                
+                this.data.inventory.forEach(container => {
+                    const media = container.media || 'Unknown';
+                    if (!mediaStats[media]) {
+                        mediaStats[media] = { total: 0, successful: 0 };
+                    }
+                    
+                    mediaStats[media].total++;
+                    if (container.status === 'Complete' || container.status === 'Active') {
+                        mediaStats[media].successful++;
+                    }
+                });
+                
+                // Calculate success rates
+                const successRates = {};
+                Object.keys(mediaStats).forEach(media => {
+                    const stats = mediaStats[media];
+                    successRates[media] = {
+                        rate: stats.total > 0 ? stats.successful / stats.total : 0,
+                        total: stats.total,
+                        successful: stats.successful,
+                        confidence: Math.min(stats.total / 10, 1)
+                    };
+                });
+                
+                return successRates;
+            }
+
+            analyzeStrainPerformance() {
+                const strainStats = {};
+                
+                this.data.inventory.forEach(container => {
+                    const strain = container.strain || 'Unknown';
+                    if (!strainStats[strain]) {
+                        strainStats[strain] = { 
+                            total: 0, 
+                            successful: 0,
+                            mediaPreferences: {},
+                            avgTissueCount: 0
+                        };
+                    }
+                    
+                    strainStats[strain].total++;
+                    strainStats[strain].avgTissueCount += parseInt(container.tissueCount) || 0;
+                    
+                    if (container.status === 'Complete') {
+                        strainStats[strain].successful++;
+                    }
+                    
+                    // Track media preferences
+                    const media = container.media || 'Unknown';
+                    if (!strainStats[strain].mediaPreferences[media]) {
+                        strainStats[strain].mediaPreferences[media] = 0;
+                    }
+                    strainStats[strain].mediaPreferences[media]++;
+                });
+                
+                // Calculate success rates and averages
+                Object.keys(strainStats).forEach(strain => {
+                    const stats = strainStats[strain];
+                    stats.successRate = stats.total > 0 ? stats.successful / stats.total : 0;
+                    stats.avgTissueCount = stats.total > 0 ? stats.avgTissueCount / stats.total : 0;
+                    stats.confidence = Math.min(stats.total / 5, 1);
+                });
+                
+                return strainStats;
+            }
+
+            analyzeRecipeEffectiveness() {
+                const recipeStats = {};
+                
+                this.data.recipes.forEach(recipe => {
+                    // Find containers using this recipe
+                    const containersWithRecipe = this.data.inventory.filter(container => 
+                        container.recipe && container.recipe.id === recipe.id
+                    );
+                    
+                    if (containersWithRecipe.length > 0) {
+                        const successful = containersWithRecipe.filter(c => c.status === 'Complete').length;
+                        recipeStats[recipe.id] = {
+                            name: recipe.name,
+                            successRate: successful / containersWithRecipe.length,
+                            sampleSize: containersWithRecipe.length,
+                            mediaType: recipe.mediaType,
+                            volume: recipe.volume,
+                            successful: successful,
+                            total: containersWithRecipe.length
+                        };
+                    }
+                });
+                
+                return recipeStats;
+            }
+
+            analyzeTransferPatterns() {
+                // Analyze transfer success patterns from lineage data
+                const transferStats = {
+                    single: { total: 0, successful: 0 },
+                    split: { total: 0, successful: 0 }
+                };
+                
+                this.data.inventory.forEach(container => {
+                    if (container.lineage) {
+                        const isTransfer = container.lineage.includes('→');
+                        const isSplit = container.lineage.includes('split');
+                        
+                        if (isTransfer) {
+                            if (isSplit) {
+                                transferStats.split.total++;
+                                if (container.status === 'Complete') {
+                                    transferStats.split.successful++;
+                                }
+                            } else {
+                                transferStats.single.total++;
+                                if (container.status === 'Complete') {
+                                    transferStats.single.successful++;
+                                }
+                            }
+                        }
+                    }
+                });
+                
+                // Calculate success rates
+                transferStats.single.successRate = transferStats.single.total > 0 ? 
+                    transferStats.single.successful / transferStats.single.total : 0;
+                transferStats.split.successRate = transferStats.split.total > 0 ? 
+                    transferStats.split.successful / transferStats.split.total : 0;
+                
+                return transferStats;
+            }
+
+            generateRecommendations() {
+                this.data.recommendations = [];
+                
+                // Analyze strain performance for recommendations
+                const strainPerf = this.data.patterns.strainPerformance || {};
+                const mediaSuccess = this.data.patterns.mediaSuccess || {};
+                
+                // Find underperforming strains
+                Object.keys(strainPerf).forEach(strain => {
+                    const perf = strainPerf[strain];
+                    if (perf.total >= 5 && perf.successRate < 0.7) {
+                        this.data.recommendations.push({
+                            priority: 'high',
+                            type: 'strain_optimization',
+                            title: `Optimize ${strain} Protocol`,
+                            message: `${strain} shows ${Math.round(perf.successRate * 100)}% success rate (${perf.successful}/${perf.total}). Consider reviewing media type or environmental conditions.`,
+                            action: 'review_strain_protocol',
+                            data: { strain, performance: perf }
+                        });
+                    }
+                });
+                
+                // Find highly successful strain-media combinations
+                Object.keys(strainPerf).forEach(strain => {
+                    const perf = strainPerf[strain];
+                    if (perf.total >= 3 && perf.successRate >= 0.9) {
+                        const bestMedia = Object.keys(perf.mediaPreferences)
+                            .sort((a, b) => perf.mediaPreferences[b] - perf.mediaPreferences[a])[0];
+                        
+                        this.data.recommendations.push({
+                            priority: 'low',
+                            type: 'best_practice',
+                            title: `${strain} + ${bestMedia} Success`,
+                            message: `${strain} with ${bestMedia} media shows excellent ${Math.round(perf.successRate * 100)}% success rate. Consider using this combination as standard protocol.`,
+                            action: 'standardize_protocol',
+                            data: { strain, media: bestMedia, performance: perf }
+                        });
+                    }
+                });
+                
+                // Media type recommendations
+                Object.keys(mediaSuccess).forEach(media => {
+                    const success = mediaSuccess[media];
+                    if (success.total >= 10 && success.rate < 0.6) {
+                        this.data.recommendations.push({
+                            priority: 'medium',
+                            type: 'media_optimization',
+                            title: `${media} Media Performance`,
+                            message: `${media} media shows ${Math.round(success.rate * 100)}% success rate. Consider reviewing recipe formulation or environmental conditions.`,
+                            action: 'optimize_media',
+                            data: { media, performance: success }
+                        });
+                    }
+                });
+                
+                // Recipe optimization recommendations
+                const recipeEffectiveness = this.data.patterns.recipeEffectiveness || {};
+                Object.keys(recipeEffectiveness).forEach(recipeId => {
+                    const recipe = recipeEffectiveness[recipeId];
+                    if (recipe.sampleSize >= 5 && recipe.successRate < 0.6) {
+                        this.data.recommendations.push({
+                            priority: 'medium',
+                            type: 'recipe_optimization',
+                            title: `Recipe "${recipe.name}" Performance`,
+                            message: `Recipe shows ${Math.round(recipe.successRate * 100)}% success rate (${recipe.successful}/${recipe.total}). Consider ingredient adjustments.`,
+                            action: 'optimize_recipe',
+                            data: { recipe }
+                        });
+                    }
+                });
+                
+                // Sort recommendations by priority
+                this.data.recommendations.sort((a, b) => {
+                    const priorityOrder = { high: 3, medium: 2, low: 1 };
+                    return priorityOrder[b.priority] - priorityOrder[a.priority];
+                });
+            }
+
+            generateDiscoveries() {
+                this.data.discoveries = [];
+                
+                const strainPerf = this.data.patterns.strainPerformance || {};
+                const mediaSuccess = this.data.patterns.mediaSuccess || {};
+                
+                // Find top performing strains
+                const topStrains = Object.keys(strainPerf)
+                    .filter(strain => strainPerf[strain].total >= 3)
+                    .sort((a, b) => strainPerf[b].successRate - strainPerf[a].successRate)
+                    .slice(0, 3);
+                
+                topStrains.forEach(strain => {
+                    const perf = strainPerf[strain];
+                    this.data.discoveries.push({
+                        title: `${strain} High Performance`,
+                        description: `${strain} achieves ${Math.round(perf.successRate * 100)}% success rate across ${perf.total} containers`,
+                        confidence: perf.confidence,
+                        impact: 'high',
+                        date: new Date().toLocaleDateString()
+                    });
+                });
+                
+                // Find media type insights
+                const bestMedia = Object.keys(mediaSuccess)
+                    .filter(media => mediaSuccess[media].total >= 5)
+                    .sort((a, b) => mediaSuccess[b].rate - mediaSuccess[a].rate)[0];
+                
+                if (bestMedia) {
+                    const success = mediaSuccess[bestMedia];
+                    this.data.discoveries.push({
+                        title: `${bestMedia} Media Excellence`,
+                        description: `${bestMedia} media shows ${Math.round(success.rate * 100)}% success rate across ${success.total} containers`,
+                        confidence: success.confidence,
+                        impact: 'medium',
+                        date: new Date().toLocaleDateString()
+                    });
+                }
+                
+                // Add volume analysis
+                const recipesByVolume = {};
+                this.data.recipes.forEach(recipe => {
+                    if (!recipesByVolume[recipe.volume]) {
+                        recipesByVolume[recipe.volume] = 0;
+                    }
+                    recipesByVolume[recipe.volume]++;
+                });
+                
+                const mostUsedVolume = Object.keys(recipesByVolume)
+                    .sort((a, b) => recipesByVolume[b] - recipesByVolume[a])[0];
+                
+                if (mostUsedVolume) {
+                    this.data.discoveries.push({
+                        title: `Volume Preference: ${mostUsedVolume}`,
+                        description: `${mostUsedVolume} is the most commonly used volume (${recipesByVolume[mostUsedVolume]} recipes)`,
+                        confidence: 0.8,
+                        impact: 'low',
+                        date: new Date().toLocaleDateString()
+                    });
+                }
+            }
+
+            updateDashboard() {
+                // Update learning progress
+                document.getElementById('totalContainers').textContent = this.data.inventory.length;
+                document.getElementById('totalRecipes').textContent = this.data.recipes.length;
+                document.getElementById('patternsFound').textContent = Object.keys(this.data.patterns).length;
+                document.getElementById('confidenceLevel').textContent = Math.round(this.learningProgress.progress) + '%';
+                
+                document.getElementById('learningStage').textContent = this.learningProgress.stage;
+                document.getElementById('learningProgressBar').style.width = this.learningProgress.progress + '%';
+                document.getElementById('learningDescription').textContent = this.learningProgress.description;
+                
+                // Update recommendations
+                this.updateRecommendations();
+                
+                // Update strain performance
+                this.updateStrainPerformance();
+                
+                // Update recipe analysis
+                this.updateRecipeAnalysis();
+                
+                // Update media analysis
+                this.updateMediaAnalysis();
+                
+                // Update recent discoveries
+                this.updateRecentDiscoveries();
+                
+                // Update transfer patterns
+                this.updateTransferPatterns();
+                
+                // Update optimization opportunities
+                this.updateOptimizationOpportunities();
+                
+                // Update timestamp
+                document.getElementById('lastUpdated').textContent = new Date().toLocaleString();
+                
+                // Show success alert if data is loaded
+                if (this.data.inventory.length > 0) {
+                    this.showAlert(`Dashboard updated successfully! Analyzing ${this.data.inventory.length} containers and ${this.data.recipes.length} recipes.`, 'success');
+                }
+            }
+
+            updateRecommendations() {
+                const container = document.getElementById('priorityRecommendations');
+                
+                if (this.data.recommendations.length === 0) {
+                    container.innerHTML = `
+                        <div class="recommendation-item">
+                            <div class="recommendation-title">No Critical Issues Found</div>
+                            <div class="recommendation-message">Your lab operations are performing well! Continue monitoring for optimization opportunities.</div>
+                        </div>
+                    `;
+                    return;
+                }
+                
+                container.innerHTML = this.data.recommendations.map(rec => `
+                    <div class="recommendation-item recommendation-${rec.priority}">
+                        <div class="recommendation-header">
+                            <div class="recommendation-title">${rec.title}</div>
+                            <div class="recommendation-priority priority-${rec.priority}">${rec.priority}</div>
+                        </div>
+                        <div class="recommendation-message">${rec.message}</div>
+                    </div>
+                `).join('');
+            }
+
+            updateStrainPerformance() {
+                const container = document.getElementById('strainPerformance');
+                const strainPerf = this.data.patterns.strainPerformance || {};
+                
+                if (Object.keys(strainPerf).length === 0) {
+                    container.innerHTML = '<div class="strain-performance-item">No strain data available yet.</div>';
+                    return;
+                }
+                
+                const sortedStrains = Object.keys(strainPerf)
+                    .sort((a, b) => strainPerf[b].successRate - strainPerf[a].successRate)
+                    .slice(0, 10);
+                
+                container.innerHTML = sortedStrains.map(strain => {
+                    const perf = strainPerf[strain];
+                    return `
+                        <div class="strain-performance-item">
+                            <div class="strain-name">${strain}</div>
+                            <div class="strain-stats">
+                                <span class="stat-success">${Math.round(perf.successRate * 100)}%</span>
+                                <span class="stat-total">(${perf.successful}/${perf.total})</span>
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+            }
+
+            updateRecipeAnalysis() {
+                const recipeEffectiveness = this.data.patterns.recipeEffectiveness || {};
+                const recipes = Object.values(recipeEffectiveness);
+                
+                if (recipes.length > 0) {
+                    const topSuccess = Math.max(...recipes.map(r => r.successRate));
+                    const avgSuccess = recipes.reduce((sum, r) => sum + r.successRate, 0) / recipes.length;
+                    
+                    document.getElementById('topRecipeSuccess').textContent = Math.round(topSuccess * 100) + '%';
+                    document.getElementById('avgRecipeSuccess').textContent = Math.round(avgSuccess * 100) + '%';
+                }
+                
+                const container = document.getElementById('recipeAnalysis');
+                const sortedRecipes = recipes
+                    .sort((a, b) => b.successRate - a.successRate)
+                    .slice(0, 5);
+                
+                container.innerHTML = sortedRecipes.map(recipe => `
+                    <div class="pattern-item">
+                        <div class="pattern-title">${recipe.name}</div>
+                        <div class="pattern-confidence">
+                            <span>${Math.round(recipe.successRate * 100)}% success</span>
+                            <div class="confidence-bar">
+                                <div class="confidence-fill" style="width: ${recipe.successRate * 100}%"></div>
+                            </div>
+                            <span>(${recipe.successful}/${recipe.total})</span>
+                        </div>
+                    </div>
+                `).join('') || '<div class="pattern-item">No recipe data available yet.</div>';
+            }
+
+            updateMediaAnalysis() {
+                const mediaSuccess = this.data.patterns.mediaSuccess || {};
+                
+                // Update media success metrics
+                document.getElementById('initiationSuccess').textContent = 
+                    mediaSuccess['Initiation'] ? Math.round(mediaSuccess['Initiation'].rate * 100) + '%' : 'N/A';
+                document.getElementById('multiplicationSuccess').textContent = 
+                    mediaSuccess['Multiplication'] ? Math.round(mediaSuccess['Multiplication'].rate * 100) + '%' : 'N/A';
+                document.getElementById('rootingSuccess').textContent = 
+                    mediaSuccess['Rooting'] ? Math.round(mediaSuccess['Rooting'].rate * 100) + '%' : 'N/A';
+                
+                const container = document.getElementById('mediaAnalysis');
+                const mediaTypes = Object.keys(mediaSuccess);
+                
+                container.innerHTML = mediaTypes.map(media => {
+                    const success = mediaSuccess[media];
+                    return `
+                        <div class="pattern-item">
+                            <div class="pattern-title">${media} Media</div>
+                            <div class="pattern-confidence">
+                                <span>${Math.round(success.rate * 100)}% success</span>
+                                <div class="confidence-bar">
+                                    <div class="confidence-fill" style="width: ${success.rate * 100}%"></div>
+                                </div>
+                                <span>(${success.successful}/${success.total})</span>
+                            </div>
+                        </div>
+                    `;
+                }).join('') || '<div class="pattern-item">No media data available yet.</div>';
+            }
+
+            updateRecentDiscoveries() {
+                const container = document.getElementById('recentDiscoveries');
+                
+                container.innerHTML = this.data.discoveries.map(discovery => `
+                    <div class="pattern-item">
+                        <div class="pattern-title">${discovery.title}</div>
+                        <div style="font-size: 0.9rem; color: #495057; margin: 5px 0;">${discovery.description}</div>
+                        <div class="pattern-confidence">
+                            <span>Confidence: ${Math.round(discovery.confidence * 100)}%</span>
+                            <div class="confidence-bar">
+                                <div class="confidence-fill" style="width: ${discovery.confidence * 100}%"></div>
+                            </div>
+                            <span>${discovery.date}</span>
+                        </div>
+                    </div>
+                `).join('') || '<div class="pattern-item">No discoveries yet. More patterns will emerge as data grows.</div>';
+            }
+
+            updateTransferPatterns() {
+                const transferPatterns = this.data.patterns.transferPatterns || {};
+                
+                if (transferPatterns.single) {
+                    document.getElementById('singleTransferSuccess').textContent = 
+                        Math.round(transferPatterns.single.successRate * 100) + '%';
+                }
+                
+                if (transferPatterns.split) {
+                    document.getElementById('splitTransferSuccess').textContent = 
+                        Math.round(transferPatterns.split.successRate * 100) + '%';
+                }
+            }
+
+            updateOptimizationOpportunities() {
+                const container = document.getElementById('optimizationOpportunities');
+                const opportunities = [];
+                
+                // Find optimization opportunities from low-performing areas
+                const strainPerf = this.data.patterns.strainPerformance || {};
+                const mediaSuccess = this.data.patterns.mediaSuccess || {};
+                
+                // Low-performing strains
+                Object.keys(strainPerf).forEach(strain => {
+                    const perf = strainPerf[strain];
+                    if (perf.total >= 3 && perf.successRate < 0.8) {
+                        opportunities.push({
+                            title: `Optimize ${strain} Performance`,
+                            description: `Current success rate: ${Math.round(perf.successRate * 100)}%. Potential improvement: +${Math.round((0.9 - perf.successRate) * perf.total)} successful containers`,
+                            impact: 'high',
+                            effort: 'medium'
+                        });
+                    }
+                });
+                
+                // Media type optimization
+                Object.keys(mediaSuccess).forEach(media => {
+                    const success = mediaSuccess[media];
+                    if (success.total >= 5 && success.rate < 0.85) {
+                        opportunities.push({
+                            title: `Improve ${media} Media Results`,
+                            description: `Current success rate: ${Math.round(success.rate * 100)}%. Recipe optimization could improve outcomes`,
+                            impact: 'medium',
+                            effort: 'low'
+                        });
+                    }
+                });
+                
+                // Add general opportunities
+                if (this.data.inventory.length > 20) {
+                    opportunities.push({
+                        title: 'Implement Predictive Analytics',
+                        description: 'With sufficient data, implement ML-powered success prediction for transfers',
+                        impact: 'high',
+                        effort: 'high'
+                    });
+                }
+                
+                container.innerHTML = opportunities.map(opp => `
+                    <div class="pattern-item">
+                        <div class="pattern-title">${opp.title}</div>
+                        <div style="font-size: 0.9rem; color: #495057; margin: 5px 0;">${opp.description}</div>
+                        <div style="font-size: 0.8rem; color: #6c757d;">
+                            Impact: <strong>${opp.impact}</strong> | Effort: <strong>${opp.effort}</strong>
+                        </div>
+                    </div>
+                `).join('') || '<div class="pattern-item">All systems performing well! Continue monitoring for new opportunities.</div>';
+            }
+
+            showAlert(message, type = 'info') {
+                const alertContainer = document.getElementById('alertContainer');
+                const alert = document.createElement('div');
+                alert.className = `alert-banner ${type}`;
+                alert.innerHTML = `
+                    <strong>${type === 'success' ? '✅' : type === 'warning' ? '⚠️' : 'ℹ️'}</strong> ${message}
+                `;
+                
+                alertContainer.appendChild(alert);
+                
+                // Auto-remove after 5 seconds
+                setTimeout(() => {
+                    alert.remove();
+                }, 5000);
+            }
+
+            // Export functions
+            exportRecommendations() {
+                const data = {
+                    exportDate: new Date().toISOString(),
+                    recommendations: this.data.recommendations,
+                    summary: {
+                        totalContainers: this.data.inventory.length,
+                        totalRecipes: this.data.recipes.length,
+                        learningStage: this.learningProgress.stage,
+                        confidenceLevel: this.learningProgress.progress
+                    }
+                };
+                
+                const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `ml-recommendations-${new Date().toISOString().split('T')[0]}.json`;
+                a.click();
+                URL.revokeObjectURL(url);
+                
+                this.showAlert('Recommendations exported successfully!', 'success');
+            }
+
+            generateOptimizationReport() {
+                const report = {
+                    generatedDate: new Date().toISOString(),
+                    labAnalytics: {
+                        totalContainers: this.data.inventory.length,
+                        totalRecipes: this.data.recipes.length,
+                        learningProgress: this.learningProgress
+                    },
+                    strainPerformance: this.data.patterns.strainPerformance,
+                    mediaAnalysis: this.data.patterns.mediaSuccess,
+                    recommendations: this.data.recommendations,
+                    discoveries: this.data.discoveries
+                };
+                
+                const blob = new Blob([JSON.stringify(report, null, 2)], { type: 'application/json' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `lab-optimization-report-${new Date().toISOString().split('T')[0]}.json`;
+                a.click();
+                URL.revokeObjectURL(url);
+                
+                this.showAlert('Optimization report generated successfully!', 'success');
+            }
+        }
+
+        // Global functions for button handlers
+        function refreshLearningData() {
+            dashboard.loadLabData();
+            dashboard.analyzePatterns();
+            dashboard.updateDashboard();
+            dashboard.showAlert('Learning data refreshed!', 'success');
+        }
+
+        function refreshStrainData() {
+            dashboard.analyzePatterns();
+            dashboard.updateStrainPerformance();
+            dashboard.showAlert('Strain analysis updated!', 'success');
+        }
+
+        function exportRecommendations() {
+            dashboard.exportRecommendations();
+        }
+
+        function generateOptimizationReport() {
+            dashboard.generateOptimizationReport();
+        }
+
+        // Initialize dashboard
+        const dashboard = new MLDashboard();
+        
+        // Show welcome message
+        setTimeout(() => {
+            dashboard.showAlert('ML Dashboard initialized and analyzing your lab data!', 'success');
+        }, 1000);
+    </script>
+</body>
+</html>
+

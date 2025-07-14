@@ -32,6 +32,8 @@
             <div class="data-status" id="dataStatus">
                 <span>❌ Excel data not loaded</span>
                 <button class="btn btn-secondary" onclick="document.getElementById('fileInput').click()">Load Excel File</button>
+                <button class="btn btn-info" onclick="document.getElementById('importInput').click()" style="margin-left: 10px;">📥 Import Data</button>
+                <input type="file" id="importInput" accept=".json" style="display: none;">
             </div>
         </div>
 
@@ -391,6 +393,8 @@
 <script src="src/js/modules/ml/mlIntegration.js"></script>
 <!-- ML Engine Tests -->
 <script src="tests/ml-engine-tests.js"></script>
+<!-- Import/Export Tests -->
+<script src="tests/import-export.test.js"></script>
 <!-- Core Infrastructure -->
     <script src="src/js/core/state.js"></script>
     <script src="src/js/core/notifications.js"></script>

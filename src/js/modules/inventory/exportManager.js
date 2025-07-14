@@ -77,6 +77,14 @@ window.DataExportManager = (function() {
                                 <small style="color: #6c757d;">Statistics & overview</small>
                             </div>
                         </label>
+                        
+                        <label style="display: flex; align-items: center; padding: 10px; border: 1px solid #dee2e6; border-radius: 6px; cursor: pointer; background: #f8f9fa;">
+                            <input type="checkbox" id="exportFullAppState" style="margin-right: 8px;">
+                            <div>
+                                <strong>Full App State</strong><br>
+                                <small style="color: #6c757d;">Complete system state for reimport</small>
+                            </div>
+                        </label>
                     </div>
                 </div>
 
@@ -90,6 +98,10 @@ window.DataExportManager = (function() {
                         <label style="display: flex; align-items: center;">
                             <input type="radio" name="exportFormat" value="csv" style="margin-right: 8px;">
                             <strong>CSV (.csv)</strong> <small style="color: #6c757d; margin-left: 5px;">- Inventory only</small>
+                        </label>
+                        <label style="display: flex; align-items: center;">
+                            <input type="radio" name="exportFormat" value="json" style="margin-right: 8px;">
+                            <strong>JSON (.json)</strong> <small style="color: #6c757d; margin-left: 5px;">- Full app state (for reimport)</small>
                         </label>
                     </div>
                 </div>
@@ -150,6 +162,8 @@ window.DataExportManager = (function() {
             
             if (options.format === 'xlsx') {
                 exportToExcel(options);
+            } else if (options.format === 'json') {
+                exportToJSON(options);
             } else {
                 exportToCSV(options);
             }
@@ -175,6 +189,7 @@ window.DataExportManager = (function() {
             transfers: document.getElementById('exportTransfers').checked,
             lineage: document.getElementById('exportLineage').checked,
             summary: document.getElementById('exportSummary').checked,
+            fullAppState: document.getElementById('exportFullAppState').checked,
             format: document.querySelector('input[name="exportFormat"]:checked').value,
             fileName: document.getElementById('exportFileName').value.trim(),
             scope: document.querySelector('input[name="dataScope"]:checked').value
@@ -219,6 +234,43 @@ window.DataExportManager = (function() {
         const inventoryData = getInventoryData(options.scope);
         const csvData = convertToCSV(inventoryData);
         downloadCSV(csvData, options.fileName + '.csv');
+    }
+    
+    // Export to JSON format (full app state)
+    function exportToJSON(options) {
+        const exportData = {
+            metadata: {
+                exportDate: new Date().toISOString(),
+                exportedBy: 'Lab Scanner System',
+                version: '1.0.0',
+                fileName: options.fileName
+            },
+            appState: {
+                inventory: options.inventory ? getInventoryData(options.scope) : [],
+                transferHistory: options.transfers ? getTransferHistoryData() : [],
+                containerLineage: options.lineage ? window.appState.containerLineage : {},
+                highestContainerId: window.appState.highestContainerId,
+                sessionCounter: window.appState.sessionCounter,
+                // Include lookup tables if they exist
+                strainsTable: window.appState.strainsTable || {},
+                ownersTable: window.appState.ownersTable || {},
+                stagesTable: window.appState.stagesTable || {},
+                locationsTable: window.appState.locationsTable || [],
+                mediaTypesTable: window.appState.mediaTypesTable || {},
+                strainOwnerMapping: window.appState.strainOwnerMapping || {}
+            }
+        };
+        
+        if (options.fullAppState) {
+            // Export complete app state
+            exportData.appState = {
+                ...exportData.appState,
+                ...window.appState
+            };
+        }
+        
+        const jsonData = JSON.stringify(exportData, null, 2);
+        downloadJSON(jsonData, options.fileName + '.json');
     }
 
     // Get inventory data based on scope
@@ -436,6 +488,22 @@ window.DataExportManager = (function() {
     // Download CSV file
     function downloadCSV(csvData, fileName) {
         const blob = new Blob([csvData], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement('a');
+        
+        if (link.download !== undefined) {
+            const url = URL.createObjectURL(blob);
+            link.setAttribute('href', url);
+            link.setAttribute('download', fileName);
+            link.style.visibility = 'hidden';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+    }
+    
+    // Download JSON file
+    function downloadJSON(jsonData, fileName) {
+        const blob = new Blob([jsonData], { type: 'application/json;charset=utf-8;' });
         const link = document.createElement('a');
         
         if (link.download !== undefined) {

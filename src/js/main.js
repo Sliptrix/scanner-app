@@ -44,6 +44,9 @@ function initializeApp() {
         InventoryManager.initialize();
     }
     
+    // Setup import data event
+    setupImportEventListener();
+
     // Initialize recipe management module
     if (window.RecipeManager) {
         RecipeManager.initialize();
@@ -103,6 +106,179 @@ function setupEventListeners() {
     }
     
     console.log('Event listeners setup complete');
+}
+
+// Setup import event listener
+function setupImportEventListener() {
+    const importInput = document.getElementById('importInput');
+    if (importInput) {
+        importInput.addEventListener('change', handleFileImport);
+    }
+}
+
+// Handle the import file
+function handleFileImport(event) {
+    const file = event.target.files[0];
+    if (file) {
+        // Check file extension
+        if (!file.name.match(/\.(json)$/i)) {
+            NotificationSystem.error('Please select a JSON file exported from this system');
+            return;
+        }
+        
+        NotificationSystem.info('Importing data...');
+        
+        const reader = new FileReader();
+
+        reader.onload = function(e) {
+            try {
+                const data = JSON.parse(e.target.result);
+                
+                // Validate the imported data structure
+                if (!validateImportData(data)) {
+                    NotificationSystem.error('Invalid file format. Please select a file exported from this system.');
+                    return;
+                }
+                
+                restoreDataToAppState(data);
+                NotificationSystem.success(`Data imported successfully from ${file.name}!`);
+                console.log('Data imported:', data);
+                
+                // Update UI after import
+                updateUIAfterImport();
+                
+            } catch (error) {
+                console.error('Error importing data:', error);
+                NotificationSystem.error('Failed to import data: ' + error.message);
+            }
+        };
+
+        reader.readAsText(file);
+    }
+}
+
+// Validate imported data structure
+function validateImportData(data) {
+    try {
+        // Check for expected structure
+        if (!data.metadata || !data.appState) {
+            return false;
+        }
+        
+        // Check metadata
+        if (!data.metadata.exportDate || !data.metadata.exportedBy) {
+            return false;
+        }
+        
+        // Check appState structure
+        if (typeof data.appState !== 'object') {
+            return false;
+        }
+        
+        return true;
+    } catch (error) {
+        console.error('Error validating import data:', error);
+        return false;
+    }
+}
+
+// Restore imported data to appState
+function restoreDataToAppState(data) {
+    try {
+        const importedAppState = data.appState;
+        
+        // Restore core data
+        if (importedAppState.inventory && Array.isArray(importedAppState.inventory)) {
+            window.appState.inventory = importedAppState.inventory;
+        }
+        
+        if (importedAppState.transferHistory && Array.isArray(importedAppState.transferHistory)) {
+            window.appState.transferHistory = importedAppState.transferHistory;
+        }
+        
+        if (importedAppState.containerLineage && typeof importedAppState.containerLineage === 'object') {
+            window.appState.containerLineage = importedAppState.containerLineage;
+        }
+        
+        // Restore counters and IDs
+        if (typeof importedAppState.highestContainerId === 'number') {
+            window.appState.highestContainerId = importedAppState.highestContainerId;
+        }
+        
+        if (typeof importedAppState.sessionCounter === 'number') {
+            window.appState.sessionCounter = importedAppState.sessionCounter;
+        }
+        
+        // Restore lookup tables
+        if (importedAppState.strainsTable && typeof importedAppState.strainsTable === 'object') {
+            window.appState.strainsTable = importedAppState.strainsTable;
+            window.appState.isDataLoaded = true;
+        }
+        
+        if (importedAppState.ownersTable && typeof importedAppState.ownersTable === 'object') {
+            window.appState.ownersTable = importedAppState.ownersTable;
+        }
+        
+        if (importedAppState.stagesTable && typeof importedAppState.stagesTable === 'object') {
+            window.appState.stagesTable = importedAppState.stagesTable;
+        }
+        
+        if (importedAppState.locationsTable && Array.isArray(importedAppState.locationsTable)) {
+            window.appState.locationsTable = importedAppState.locationsTable;
+        }
+        
+        if (importedAppState.mediaTypesTable && typeof importedAppState.mediaTypesTable === 'object') {
+            window.appState.mediaTypesTable = importedAppState.mediaTypesTable;
+        }
+        
+        if (importedAppState.strainOwnerMapping && typeof importedAppState.strainOwnerMapping === 'object') {
+            window.appState.strainOwnerMapping = importedAppState.strainOwnerMapping;
+        }
+        
+        console.log('AppState restored successfully from imported data');
+        
+        // Log import statistics
+        console.log('=== DATA IMPORT SUMMARY ===');
+        console.log(`Import Date: ${data.metadata.exportDate}`);
+        console.log(`Inventory Items: ${window.appState.inventory.length}`);
+        console.log(`Transfer History: ${window.appState.transferHistory.length}`);
+        console.log(`Container Lineage: ${Object.keys(window.appState.containerLineage).length} containers`);
+        console.log(`Highest Container ID: ${window.appState.highestContainerId}`);
+        console.log(`Session Counter: ${window.appState.sessionCounter}`);
+        console.log(`Strains: ${Object.keys(window.appState.strainsTable).length}`);
+        console.log(`Owners: ${Object.keys(window.appState.ownersTable).length}`);
+        
+    } catch (error) {
+        console.error('Error restoring appState:', error);
+        throw error;
+    }
+}
+
+// Update UI components after import
+function updateUIAfterImport() {
+    try {
+        // Update statistics
+        UIUtils.updateStats();
+        
+        // Update data status if we have lookup tables
+        if (window.appState.strainsTable && Object.keys(window.appState.strainsTable).length > 0) {
+            UIUtils.updateDataStatus(true, 'Imported Data', false);
+        }
+        
+        // Rebuild inventory table if it exists
+        if (window.InventoryTableManager) {
+            InventoryTableManager.rebuildTable();
+        }
+        
+        // Update builder if active
+        if (window.appState.mode === 'builder') {
+            UIUtils.focusBuilderInput();
+        }
+        
+        console.log('UI updated after import');
+    } catch (error) {
+        console.error('Error updating UI after import:', error);
+    }
 }
 
 // File handling functions
