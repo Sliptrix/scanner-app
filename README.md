@@ -1,47 +1,77 @@
 # Lab Barcode Builder & Transfer System
 
-A comprehensive laboratory management system for barcode generation and container transfers with tissue splitting capabilities.
+A comprehensive laboratory management system for barcode generation, container transfers, recipe management, and tissue culture operations with ML-enhanced recommendations.
 
-## 🚀 Current Status: Phase 6 Complete
+## 🚀 Current Status: Production Ready
 
-**Phase 1: Setup and Foundation** ✅
-**Phase 2: Extract and Modularize CSS** ✅
-**Phase 3: Extract Core JavaScript Infrastructure** ✅
-**Phase 4: Extract Barcode Builder Feature** ✅
-**Phase 5: Extract Container Transfer Feature** ✅
-**Phase 6: Extract Inventory Management** ✅
-- ✅ Basic project structure created
-- ✅ HTML template with external CSS/JS references
-- ✅ Main CSS file extracted and organized
-- ✅ Basic JavaScript framework with placeholder functions
-- ✅ UI loads correctly with proper styling
-- ✅ File upload functionality (basic)
-- ✅ Mode switching between Builder and Transfer
-- ✅ Validation tests implemented
+**✅ All Core Features Implemented:**
+- Barcode generation with Code128 format
+- Container transfer system with tissue splitting
+- Recipe management with dynamic templates
+- Inventory management with export/import
+- ML recommendations and analytics
+- Comprehensive testing suite
+
+## 🎯 Key Features
+
+- **Barcode Generation**: Create Code128 barcodes with customizable metadata
+- **Container Management**: Track containers with detailed lineage information
+- **Transfer System**: Handle container-to-container transfers with validation
+- **Recipe Management**: Create and manage tissue culture media recipes with dynamic templates
+- **Import/Export**: Multi-format data export (Excel, CSV, JSON) with import capabilities
+- **ML Integration**: Smart recommendations for recipes and transfer success prediction
+- **Dashboard Analytics**: Visual insights into lab operations
+
+## 🚀 Quick Start
+
+### Using Python Server (Recommended)
+```bash
+python3 server.py
+```
+Open http://localhost:8000 in your browser.
+
+### Using Node.js (Alternative)
+```bash
+npm install
+npm start
+```
+
+### Direct File Access
+Open `index.html` directly in a modern web browser (may have CORS limitations).
 
 ## 📁 Project Structure
 
 ```
 Scanner/
-├── public/                     # Web application files
-│   ├── index.html             # Main HTML entry point
-│   └── assets/
-│       ├── css/
-│       │   └── main.css       # Main stylesheet
-│       └── js/
-│           └── app.js         # Application JavaScript
-├── src/                       # Source code modules (future phases)
-│   ├── components/            # UI components
-│   ├── utils/                 # Utility functions
-│   └── styles/                # Modular styles
-├── tests/                     # Test files
-│   ├── phase1-validation.html # Phase 1 validation test
-│   ├── unit/                  # Unit tests
-│   ├── integration/           # Integration tests
-│   └── e2e/                   # End-to-end tests
-├── docs/                      # Documentation
-├── package.json               # Project configuration
-└── README.md                  # This file
+├── index.html                 # Main application entry point
+├── server.py                  # Python development server
+├── package.json               # Node.js dependencies
+├── .gitignore                 # Git ignore patterns
+├── README.md                  # This file
+├── src/                       # Source code modules
+│   ├── js/
+│   │   ├── main.js           # Application entry point
+│   │   ├── modules/          # Feature modules
+│   │   │   ├── barcode/      # Barcode generation
+│   │   │   ├── transfer/     # Container transfers
+│   │   │   ├── inventory/    # Inventory management
+│   │   │   ├── recipe/       # Recipe management
+│   │   │   └── ml/          # ML engine and integration
+│   │   └── utils/           # Utility functions
+│   └── css/                 # Stylesheets
+├── tests/                   # Test files
+│   ├── unit/               # Unit tests
+│   ├── integration/        # Integration tests
+│   ├── import-export.test.js
+│   └── recipe-wizard.test.js
+├── docs/                    # Documentation
+│   ├── DEMO_GUIDE.md
+│   ├── DEPLOYMENT_PLAN.md
+│   └── [other documentation]
+├── tools/                   # Development tools
+│   └── legacy-tests/       # Legacy test files
+├── node_modules/           # Node.js dependencies (ignored)
+└── venv/                   # Python virtual environment (ignored)
 ```
 
 ## 🎯 Features Implemented (Phase 1)
