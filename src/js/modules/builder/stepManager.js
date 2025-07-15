@@ -113,44 +113,77 @@ window.BuilderStepManager = {
     // Populate options based on step type
     populateOptions: function(stepName, stepConfig) {
         const optionsDiv = document.getElementById('builderOptions');
-        if (!optionsDiv) return;
+        if (!optionsDiv) {
+            console.error('ERROR: builderOptions div not found in DOM');
+            return;
+        }
         
+        // Clear existing options
         optionsDiv.innerHTML = '';
         
         let options = [];
         
+        console.log(`Populating options for step: ${stepName}, config:`, stepConfig);
+        console.log('Current app state tables:', {
+            owners: Object.keys(window.appState.ownersTable || {}).length,
+            strains: Object.keys(window.appState.strainsTable || {}).length,
+            stages: Object.keys(window.appState.stagesTable || {}).length,
+            media: Object.keys(window.appState.mediaTypesTable || {}).length,
+            isDataLoaded: window.appState.isDataLoaded
+        });
+        
         switch(stepConfig.options) {
             case 'owners':
-                options = Object.entries(window.appState.ownersTable).map(([id, name]) => ({
-                    value: id,
-                    display: `${name} (${id})`
-                }));
+                if (window.appState.ownersTable && Object.keys(window.appState.ownersTable).length > 0) {
+                    options = Object.entries(window.appState.ownersTable).map(([id, name]) => ({
+                        value: id,
+                        display: `${name} (${id})`
+                    }));
+                } else {
+                    console.warn('No owners data available - providing fallback options');
+                    options = this.getFallbackOwners();
+                }
                 break;
                 
             case 'strains':
-                // Show first 20 strains as options
-                options = Object.entries(window.appState.strainsTable).slice(0, 20).map(([id, name]) => ({
-                    value: id.padStart(5, '0'),
-                    display: `${name} (${id.padStart(5, '0')})`
-                }));
+                if (window.appState.strainsTable && Object.keys(window.appState.strainsTable).length > 0) {
+                    // Show first 20 strains as options
+                    options = Object.entries(window.appState.strainsTable).slice(0, 20).map(([id, name]) => ({
+                        value: id.padStart(5, '0'),
+                        display: `${name} (${id.padStart(5, '0')})`
+                    }));
+                } else {
+                    console.warn('No strains data available - providing fallback options');
+                    options = this.getFallbackStrains();
+                }
                 break;
                 
             case 'media':
-                options = Object.entries(window.appState.mediaTypesTable).map(([id, name]) => ({
-                    value: id,
-                    display: `${name} (${id})`
-                }));
+                if (window.appState.mediaTypesTable && Object.keys(window.appState.mediaTypesTable).length > 0) {
+                    options = Object.entries(window.appState.mediaTypesTable).map(([id, name]) => ({
+                        value: id,
+                        display: `${name} (${id})`
+                    }));
+                } else {
+                    console.warn('No media data available - providing fallback options');
+                    options = this.getFallbackMedia();
+                }
                 break;
                 
             case 'stages':
-                options = Object.entries(window.appState.stagesTable).map(([id, name]) => ({
-                    value: id,
-                    display: `${name} (Stage ${id})`
-                }));
+                if (window.appState.stagesTable && Object.keys(window.appState.stagesTable).length > 0) {
+                    options = Object.entries(window.appState.stagesTable).map(([id, name]) => ({
+                        value: id,
+                        display: `${name} (Stage ${id})`
+                    }));
+                } else {
+                    console.warn('No stages data available - providing fallback options');
+                    options = this.getFallbackStages();
+                }
                 break;
                 
             case 'tissue_counts':
-                // Common tissue counts
+                // Common tissue counts - always available
                 options = [1, 5, 10, 15, 20, 25, 30, 50].map(count => ({
                     value: count.toString(),
                     display: `${count} samples`
@@ -158,7 +191,7 @@ window.BuilderStepManager = {
                 break;
                 
             case 'dates':
-                // Today and recent dates
+                // Today and recent dates - always available
                 const today = new Date();
                 options = [];
                 for (let i = 0; i < 7; i++) {
@@ -171,16 +204,32 @@ window.BuilderStepManager = {
                     });
                 }
                 break;
+                
+            default:
+                console.warn(`Unknown option type: ${stepConfig.options}`);
+                break;
         }
         
+        console.log(`Generated ${options.length} options for ${stepName}:`, options);
+        
         // Create option buttons
-        options.forEach(option => {
-            const btn = document.createElement('button');
-            btn.className = 'option-btn';
-            btn.textContent = option.display;
-            btn.onclick = () => this.selectOption(option.value);
-            optionsDiv.appendChild(btn);
-        });
+        if (options.length > 0) {
+            options.forEach(option => {
+                const btn = document.createElement('button');
+                btn.className = 'option-btn';
+                btn.textContent = option.display;
+                btn.onclick = () => this.selectOption(option.value);
+                optionsDiv.appendChild(btn);
+            });
+            
+            // Show the options div
+            optionsDiv.style.display = 'grid';
+            console.log(`Added ${options.length} option buttons to DOM`);
+        } else {
+            // Hide the options div if no options
+            optionsDiv.style.display = 'none';
+            console.log('No options to display - hiding options div');
+        }
     },
     
     // Handle option selection
@@ -1299,6 +1348,58 @@ window.BuilderStepManager = {
                 }
             }
         });
+    },
+    
+    // Fallback options when Excel data is not available
+    getFallbackOwners: function() {
+        return [
+            { value: 'LW', display: 'Lab Works (LW)' },
+            { value: 'J', display: 'J Research (J)' },
+            { value: 'LWB', display: 'Lawrence Botanical (LWB)' },
+            { value: 'VIBE', display: 'Vibe Research (VIBE)' },
+            { value: 'BEAU', display: 'Beau Labs (BEAU)' },
+            { value: 'JAY', display: 'Jay Genetics (JAY)' }
+        ];
+    },
+    
+    getFallbackStrains: function() {
+        return [
+            { value: '00001', display: 'Cannabis sativa - Strain 1 (00001)' },
+            { value: '00002', display: 'Cannabis sativa - Strain 2 (00002)' },
+            { value: '00003', display: 'Cannabis sativa - Strain 3 (00003)' },
+            { value: '00004', display: 'Cannabis sativa - Strain 4 (00004)' },
+            { value: '00005', display: 'Cannabis sativa - Strain 5 (00005)' },
+            { value: '00010', display: 'Cannabis sativa - Strain 10 (00010)' },
+            { value: '00022', display: 'Cannabis sativa - Strain 22 (00022)' },
+            { value: '00023', display: 'Cannabis sativa - Strain 23 (00023)' },
+            { value: '00068', display: 'Cannabis sativa - Strain 68 (00068)' },
+            { value: '00071', display: 'Cannabis sativa - Strain 71 (00071)' }
+        ];
+    },
+    
+    getFallbackMedia: function() {
+        return [
+            { value: 'IA', display: 'Initiation Agar (IA)' },
+            { value: 'MA', display: 'Multiplication Agar (MA)' },
+            { value: 'RA', display: 'Rooting Agar (RA)' },
+            { value: 'MS', display: 'Murashige and Skoog (MS)' },
+            { value: 'DKW', display: 'Driver and Kuniyuki Walnut (DKW)' },
+            { value: 'WPM', display: 'Woody Plant Medium (WPM)' }
+        ];
+    },
+    
+    getFallbackStages: function() {
+        return [
+            { value: '1', display: 'Initiation (Stage 1)' },
+            { value: '2', display: 'Proliferation (Stage 2)' },
+            { value: '3', display: 'Elongation (Stage 3)' },
+            { value: '4', display: 'Rooting (Stage 4)' },
+            { value: '5', display: 'Acclimatization (Stage 5)' },
+            { value: '6', display: 'Hardening (Stage 6)' },
+            { value: '7', display: 'Transplant (Stage 7)' },
+            { value: '8', display: 'Mature (Stage 8)' },
+            { value: '9', display: 'Harvest (Stage 9)' }
+        ];
     }
 
 };
