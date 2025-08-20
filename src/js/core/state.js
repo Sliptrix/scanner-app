@@ -59,6 +59,14 @@ window.appState = {
         splitCount: 2,
         sourceContainer: null,
         destContainer: null
+    },
+    
+    // Container Initiator state
+    initiatorState: {
+        currentStep: 'owner',
+        owner: null,
+        strain: null,
+        media: null
     }
 };
 
@@ -124,6 +132,16 @@ window.StateManager = {
             destContainer: null
         };
         console.log('Transfer state reset');
+    },
+    
+    resetInitiatorState: function() {
+        window.appState.initiatorState = {
+            currentStep: 'owner',
+            owner: null,
+            strain: null,
+            media: null
+        };
+        console.log('Initiator state reset');
     },
     
     // Initialize state from existing inventory

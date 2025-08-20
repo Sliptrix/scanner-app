@@ -20,6 +20,9 @@
             <button class="mode-btn" onclick="switchMode('transfer')">
                 🔄 Container Transfer
             </button>
+            <button class="mode-btn" onclick="switchMode('initiator')">
+                ✨ Initiate Container
+            </button>
         </div>
 
         <div class="file-upload-section">
@@ -351,6 +354,30 @@
                     </div>
                 </div>
             </div>
+            <div class="initiator-section" id="initiatorSection">
+                <h2 style="margin-bottom: 20px; color: #2c3e50;">✨ Initiate New Container</h2>
+                <div class="initiator-prompt" id="initiatorPrompt">Enter Owner ID:</div>
+                <div class="initiator-hint" id="initiatorHint">Type the owner identifier (e.g., LW, JR)</div>
+                <div class="input-group">
+                    <input type="text" id="initiatorInput" class="barcode-input" placeholder="Enter value..." autocomplete="off">
+                </div>
+                <div class="scan-feedback" id="initiatorFeedback">Ready to initiate a new container</div>
+                <button class="btn btn-primary" id="initiateBtn">Next Step</button>
+                <div class="initiator-summary" id="initiatorSummary">
+                    <div class="status-item">👤 Owner: <strong>-</strong></div>
+                    <div class="status-item">🧬 Strain: <strong>-</strong></div>
+                    <div class="status-item">🧪 Media: <strong>-</strong></div>
+                    <div class="status-item">📦 Next ID: <strong>-</strong></div>
+                </div>
+                <div class="initiator-confirmation" id="initiatorConfirmation" style="display: none;">
+                    <h4>Container Created Successfully!</h4>
+                    <p><strong>Container ID:</strong> <span id="confirmContainerId"></span></p>
+                    <p><strong>Owner:</strong> <span id="confirmOwner"></span></p>
+                    <p><strong>Strain:</strong> <span id="confirmStrain"></span></p>
+                    <p><strong>Media:</strong> <span id="confirmMedia"></span></p>
+                    <p><strong>Date:</strong> <span id="confirmDate"></span></p>
+                </div>
+            </div>
 
             <div class="inventory-section">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
@@ -422,6 +449,8 @@
     <script src="src/js/modules/inventory/tableManager.js"></script>
     <script src="src/js/modules/inventory/exportManager.js"></script>
     <script src="src/js/modules/inventory/inventoryMain.js"></script>
+    <!-- Initiator Module -->
+    <script src="src/js/modules/initiator/containerInitiator.js"></script>
     <!-- Main Application -->
     <script src="src/js/main.js"></script>
 </body>

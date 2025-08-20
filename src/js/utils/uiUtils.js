@@ -8,11 +8,12 @@ window.UIUtils = {
         
         // Clear any cross-contamination before switching
         if (mode === 'builder') {
-            console.log('🏗️ Entering BUILDER mode - Transfer functions disabled');
+            console.log('🏗️ Entering BUILDER mode - Transfer and Initiator functions disabled');
             // Clear any transfer state that might cause conflicts
             StateManager.resetTransferState();
+            StateManager.resetInitiatorState();
         } else if (mode === 'transfer') {
-            console.log('🔄 Entering TRANSFER mode - Builder functions disabled');
+            console.log('🔄 Entering TRANSFER mode - Builder and Initiator functions disabled');
             // Clear any builder state that might cause conflicts
             if (window.appState.currentContainer) {
                 console.log('⚠️ Clearing builder state before entering transfer mode');
@@ -22,6 +23,20 @@ window.UIUtils = {
                 window.appState.currentBarcodeResult = null;
                 window.appState.currentBarcodeIsSaved = false;
             }
+            StateManager.resetInitiatorState();
+        } else if (mode === 'initiator') {
+            console.log('✨ Entering INITIATOR mode - Builder and Transfer functions disabled');
+            // Clear any builder or transfer state that might cause conflicts
+            if (window.appState.currentContainer) {
+                console.log('⚠️ Clearing builder state before entering initiator mode');
+                window.appState.currentContainer = null;
+                window.appState.currentSample = null;
+                window.appState.currentMetadata = null;
+                window.appState.currentBarcodeResult = null;
+                window.appState.currentBarcodeIsSaved = false;
+            }
+            StateManager.resetTransferState();
+            StateManager.resetInitiatorState();
         }
         
         window.appState.mode = mode;
@@ -37,11 +52,14 @@ window.UIUtils = {
             modeButtons[0].classList.add('active');
         } else if (mode === 'transfer' && modeButtons[1]) {
             modeButtons[1].classList.add('active');
+        } else if (mode === 'initiator' && modeButtons[2]) {
+            modeButtons[2].classList.add('active');
         }
         
         // Show/hide sections based on mode
         const builderSection = document.getElementById('builderSection');
         const transferSection = document.getElementById('transferSection');
+        const initiatorSection = document.getElementById('initiatorSection');
         
         if (builderSection) {
             builderSection.classList.toggle('active', mode === 'builder');
@@ -49,11 +67,17 @@ window.UIUtils = {
         if (transferSection) {
             transferSection.classList.toggle('active', mode === 'transfer');
         }
+        if (initiatorSection) {
+            initiatorSection.classList.toggle('active', mode === 'initiator');
+        }
         
         // Update current mode display
         const currentModeElement = document.getElementById('currentMode');
         if (currentModeElement) {
-            currentModeElement.textContent = mode === 'builder' ? 'Builder' : 'Transfer';
+            let modeText = 'Builder';
+            if (mode === 'transfer') modeText = 'Transfer';
+            else if (mode === 'initiator') modeText = 'Initiator';
+            currentModeElement.textContent = modeText;
         }
         
         console.log(`Mode switched to: ${mode}`);
@@ -128,6 +152,15 @@ window.UIUtils = {
         }, 100);
     },
     
+    focusInitiatorInput: function() {
+        setTimeout(() => {
+            const input = document.getElementById('initiatorInput');
+            if (input) {
+                input.focus();
+            }
+        }, 100);
+    },
+    
     // Form utilities
     clearInput: function(inputId) {
         const input = document.getElementById(inputId);
@@ -140,7 +173,8 @@ window.UIUtils = {
         const inputs = [
             'builderInput',
             'sourceContainerInput',
-            'destContainerInput'
+            'destContainerInput',
+            'initiatorInput'
         ];
         
         inputs.forEach(id => this.clearInput(id));

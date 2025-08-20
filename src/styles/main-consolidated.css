@@ -375,6 +375,107 @@ body {
     display: block;
 }
 
+/* Initiator Section Components */
+
+/* Initiator Mode Styles */
+.initiator-section {
+    background: #f3e5f5;
+    border-radius: 12px;
+    padding: 25px;
+    border: 2px solid #e1bee7;
+    display: none;
+}
+
+.initiator-section.active {
+    display: block;
+}
+
+.initiator-prompt {
+    font-size: 1.25rem;
+    font-weight: 600;
+    color: #2c3e50;
+    margin-bottom: 15px;
+    text-align: center;
+}
+
+.initiator-hint {
+    font-size: 0.9rem;
+    color: #6c757d;
+    text-align: center;
+    margin-bottom: 20px;
+}
+
+.initiator-summary {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 10px;
+    margin: 20px 0;
+    padding: 15px;
+    background: white;
+    border-radius: 8px;
+    border: 1px solid #e1bee7;
+}
+
+.status-item {
+    padding: 8px 12px;
+    background: #f9fbe7;
+    border-radius: 4px;
+    text-align: center;
+    font-size: 0.85rem;
+    border: 1px solid #dce775;
+}
+
+.initiator-confirmation {
+    background: #e8f5e8;
+    border: 2px solid #4caf50;
+    border-radius: 8px;
+    padding: 20px;
+    margin-top: 20px;
+    text-align: center;
+}
+
+.initiator-confirmation h4 {
+    color: #2e7d32;
+    margin-bottom: 15px;
+}
+
+.initiator-confirmation p {
+    margin: 8px 0;
+    color: #424242;
+}
+
+.scan-feedback {
+    padding: 10px;
+    margin: 15px 0;
+    border-radius: 6px;
+    text-align: center;
+    font-weight: 500;
+}
+
+.scan-feedback.info {
+    background: #e3f2fd;
+    color: #1976d2;
+    border: 1px solid #bbdefb;
+}
+
+.scan-feedback.success {
+    background: #e8f5e8;
+    color: #2e7d32;
+    border: 1px solid #c8e6c9;
+}
+
+.scan-feedback.error {
+    background: #ffebee;
+    color: #c62828;
+    border: 1px solid #ffcdd2;
+}
+
+.scan-feedback.warning {
+    background: #fff8e1;
+    color: #f57c00;
+    border: 1px solid #ffecb3;
+}
+
 .transfer-flow {
     display: flex;
     align-items: center;

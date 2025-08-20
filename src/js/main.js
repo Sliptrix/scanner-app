@@ -44,6 +44,11 @@ function initializeApp() {
         InventoryManager.initialize();
     }
     
+    // Initialize container initiator module
+    if (window.ContainerInitiator) {
+        ContainerInitiator.initialize();
+    }
+    
     // Setup import data event
     setupImportEventListener();
 
@@ -92,6 +97,16 @@ function setupEventListeners() {
         sourceInput.addEventListener('keypress', function(e) {
             if (e.key === 'Enter') {
                 handleSourceContainerInput();
+            }
+        });
+    }
+    
+    // Initiator input events
+    const initiatorInput = document.getElementById('initiatorInput');
+    if (initiatorInput) {
+        initiatorInput.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                ContainerInitiator.handleInitiatorInput();
             }
         });
     }
