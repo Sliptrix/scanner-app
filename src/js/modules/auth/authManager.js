@@ -92,18 +92,33 @@ window.AuthManager = {
      */
     async signOut() {
         try {
-            const logoutRequest = {
-                account: this.currentUser
-            };
-            
             // Clear inactivity timer and remove listeners
             this.clearInactivityTimeout();
             this.removeActivityListeners();
             
+            // Clear the current user
             this.currentUser = null;
+            
+            // Clear MSAL cache
+            if (this.msalInstance) {
+                const accounts = this.msalInstance.getAllAccounts();
+                if (accounts.length > 0) {
+                    this.msalInstance.setActiveAccount(null);
+                }
+            }
+            
+            // Clear session storage
+            sessionStorage.clear();
+            
+            // Update UI to show login page
             this.updateUI(false);
             
-            await this.msalInstance.logoutRedirect(logoutRequest);
+            // Show notification
+            if (window.NotificationSystem) {
+                NotificationSystem.info('Signed out successfully');
+            }
+            
+            console.log('User signed out locally');
             
         } catch (error) {
             console.error('Logout error:', error);
