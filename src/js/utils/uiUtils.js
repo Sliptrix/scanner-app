@@ -55,6 +55,14 @@ window.UIUtils = {
             if (window.RecipeManager && window.RecipeManager.initializeStandalone) {
                 window.RecipeManager.initializeStandalone();
             }
+        } else if (mode === 'builder') {
+            console.log('🏗️ Returning to BUILDER mode - Refreshing recipe dropdown');
+            // Refresh recipe dropdown when returning from Recipe Manager
+            setTimeout(() => {
+                if (window.BuilderStepManager && window.BuilderStepManager.refreshRecipeDropdown) {
+                    window.BuilderStepManager.refreshRecipeDropdown();
+                }
+            }, 100);
         }
 
         window.appState.mode = mode;

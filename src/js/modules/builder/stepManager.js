@@ -272,21 +272,35 @@ window.BuilderStepManager = {
             dropdown.appendChild(option);
         });
 
-        // Add event listener to store recipe selection
-        dropdown.addEventListener('change', (e) => {
-            const recipeId = e.target.value;
-            if (recipeId) {
-                const recipe = window.RecipeStorage.loadRecipe(recipeId);
-                if (recipe) {
-                    window.appState.builderState.values.recipe = recipe.name;
-                    window.appState.builderState.recipeData = recipe;  // Store full recipe data
-                    console.log('Recipe selected:', recipe.name);
+        // Add event listener to store recipe selection (only once)
+        if (!dropdown._listenerAttached) {
+            dropdown.addEventListener('change', (e) => {
+                const recipeId = e.target.value;
+                if (recipeId) {
+                    const recipe = window.RecipeStorage.loadRecipe(recipeId);
+                    if (recipe) {
+                        window.appState.builderState.values.recipe = recipe.name;
+                        window.appState.builderState.recipeData = recipe;  // Store full recipe data
+                        console.log('Recipe selected:', recipe.name);
+                    }
+                } else {
+                    window.appState.builderState.values.recipe = null;
+                    window.appState.builderState.recipeData = null;
                 }
-            } else {
-                window.appState.builderState.values.recipe = null;
-                window.appState.builderState.recipeData = null;
-            }
-        });
+            });
+            dropdown._listenerAttached = true;
+        }
+
+        console.log(`Loaded ${recipes.length} recipes into dropdown`);
+    },
+
+    // Refresh recipe dropdown (called when returning from Recipe Manager)
+    refreshRecipeDropdown: function() {
+        const dropdown = document.getElementById('recipeDropdown');
+        if (dropdown) {
+            console.log('Refreshing recipe dropdown...');
+            this.loadRecipesIntoDropdown();
+        }
     },
     
     // Handle option selection

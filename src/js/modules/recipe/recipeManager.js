@@ -1125,17 +1125,22 @@ window.RecipeManager = (function() {
             return;
         }
 
-        // Initialize calculator and storage
-        if (window.RecipeCalculator) {
+        // Initialize calculator and storage ONLY if not already initialized
+        if (window.RecipeCalculator && !window.RecipeCalculator._initialized) {
             RecipeCalculator.initialize();
+            window.RecipeCalculator._initialized = true;
         }
 
-        if (window.RecipeStorage) {
+        if (window.RecipeStorage && !window.RecipeStorage._initialized) {
             RecipeStorage.initialize();
+            window.RecipeStorage._initialized = true;
         }
 
-        // Setup UI event listeners for the standalone section
-        setupStandaloneEventListeners();
+        // Setup UI event listeners for the standalone section (only once)
+        if (!recipeSection._listenersSetup) {
+            setupStandaloneEventListeners();
+            recipeSection._listenersSetup = true;
+        }
 
         // Set default mode to 'new' recipe
         setRecipeMode('new');

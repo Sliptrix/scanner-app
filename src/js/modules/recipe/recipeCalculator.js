@@ -114,10 +114,17 @@ window.RecipeCalculator = (function() {
      * Setup event listeners for recipe form elements
      */
     function setupEventListeners() {
-        // Media type change handler - auto-populate when media type changes
+        // Check if listeners already set up
         const mediaTypeSelect = document.getElementById('mediaType');
+        if (mediaTypeSelect && mediaTypeSelect._calculatorListenersSetup) {
+            console.log('RecipeCalculator event listeners already setup, skipping...');
+            return;
+        }
+
+        // Media type change handler - auto-populate when media type changes
         if (mediaTypeSelect) {
             mediaTypeSelect.addEventListener('change', autoPopulateRecipe);
+            mediaTypeSelect._calculatorListenersSetup = true;
         }
 
         // Volume change handler
@@ -142,6 +149,8 @@ window.RecipeCalculator = (function() {
         setTimeout(() => {
             autoPopulateRecipe();
         }, 100);
+
+        console.log('RecipeCalculator event listeners setup complete');
     }
 
     /**
