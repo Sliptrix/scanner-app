@@ -17,7 +17,7 @@ window.IntakeMain = {
  * Submit intake form
  * Called from HTML button
  */
-function submitIntakeForm() {
+async function submitIntakeForm() {
     console.log('Submitting intake form...');
     
     // Validate form
@@ -48,6 +48,25 @@ function submitIntakeForm() {
     showNotification('Intake submitted successfully!', 'success');
     
     console.log('Intake submitted successfully');
+    
+    // Auto-send email if user is signed in
+    if (window.AuthManager && AuthManager.isSignedIn()) {
+        try {
+            console.log('Auto-sending intake email...');
+            showNotification('Sending email to lab...', 'info');
+            
+            const recipients = ['pozersky@lonewolfgenetics.com'];
+            const result = await EmailService.sendIntakeForm(formData, recipients);
+            
+            showNotification(`✅ Email sent to lab successfully!`, 'success');
+            console.log('Intake email sent automatically:', result);
+        } catch (error) {
+            console.error('Error auto-sending email:', error);
+            showNotification('⚠️ Intake saved but email failed. You can manually send it using the Email button.', 'warning');
+        }
+    } else {
+        console.log('User not signed in - skipping auto-email');
+    }
 }
 
 /**

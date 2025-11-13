@@ -31,8 +31,8 @@ function initializeApp() {
         }, 1000); // Give JSON loading 1 second to complete
     }
     
-    // Set initial mode
-    UIUtils.switchMode('builder');
+    // Set initial mode to intake
+    UIUtils.switchMode('intake');
     
     // Setup event listeners
     setupEventListeners();

@@ -7,20 +7,42 @@
     <link rel="stylesheet" href="src/styles/main-consolidated.css">
 </head>
 <body>
+    <!-- Login Page (shown when not authenticated) -->
+    <div id="loginPage" style="display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white;">
+        <div style="text-align: center; max-width: 500px; padding: 40px; background: rgba(255, 255, 255, 0.1); backdrop-filter: blur(10px); border-radius: 20px; box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);">
+            <div style="font-size: 4rem; margin-bottom: 20px;">🧪</div>
+            <h1 style="font-size: 2.5rem; margin-bottom: 10px; font-weight: 700;">LoneWolf Biotech</h1>
+            <h2 style="font-size: 1.5rem; margin-bottom: 30px; font-weight: 400; opacity: 0.9;">Lab Scanner System</h2>
+            <p style="margin-bottom: 30px; font-size: 1.1rem; opacity: 0.8;">Sign in with your Microsoft 365 account to access the lab management system</p>
+            <button onclick="signIn()" style="background: white; color: #667eea; border: none; padding: 15px 40px; font-size: 1.1rem; font-weight: 600; border-radius: 50px; cursor: pointer; transition: all 0.3s ease; box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);" onmouseover="this.style.transform='scale(1.05)'" onmouseout="this.style.transform='scale(1)'">
+                🔐 Sign In with Microsoft 365
+            </button>
+            <p style="margin-top: 30px; font-size: 0.9rem; opacity: 0.7;">Secure authentication powered by Azure AD</p>
+        </div>
+    </div>
+    
+    <!-- Main App Content (shown when authenticated) -->
+    <div id="appContent" style="display: none;">
     <div class="container">
         <div class="header" style="position: relative;">
             <h1>🧪 Lab Barcode Builder & Transfer System</h1>
             <p>Create barcodes and manage container transfers with tissue splitting</p>
             
             <!-- Authentication Controls -->
-            <div class="auth-controls" style="position: absolute; top: 20px; right: 20px; display: flex; align-items: center; gap: 10px;">
-                <div id="userInfo" style="display: none; color: #2c3e50; font-size: 0.9rem;">
-                    👤 <span id="userEmail"></span>
+            <div class="auth-controls" style="position: absolute; top: 20px; right: 20px; display: flex; align-items: center; gap: 8px;">
+                <div id="userInfo" style="display: none; background: rgba(102, 126, 234, 0.1); padding: 6px 12px; border-radius: 16px; border: 1.5px solid #667eea;">
+                    <div style="display: flex; align-items: center; gap: 6px;">
+                        <span style="font-size: 1rem;">👤</span>
+                        <div style="display: flex; flex-direction: column; align-items: flex-start;">
+                            <span id="userName" style="font-weight: 600; color: #667eea; font-size: 0.8rem; line-height: 1.1;"></span>
+                            <span id="userEmail" style="color: #667eea; font-size: 0.7rem; line-height: 1.1;"></span>
+                        </div>
+                    </div>
                 </div>
-                <button id="loginBtn" class="btn btn-primary btn-sm" onclick="signIn()" style="padding: 8px 16px; font-size: 0.9rem;">
+                <button id="loginBtn" class="btn btn-primary btn-sm" onclick="signIn()" style="padding: 6px 14px; font-size: 0.85rem;">
                     🔐 Sign In
                 </button>
-                <button id="logoutBtn" class="btn btn-secondary btn-sm" onclick="signOut()" style="display: none; padding: 8px 16px; font-size: 0.9rem;">
+                <button id="logoutBtn" class="btn btn-secondary btn-sm" onclick="signOut()" style="display: none; padding: 6px 14px; font-size: 0.85rem;">
                     Sign Out
                 </button>
             </div>
@@ -676,6 +698,7 @@
             </div>
         </div>
     </div>
+    </div> <!-- End appContent -->
 
     <div id="notification" class="notification"></div>
 

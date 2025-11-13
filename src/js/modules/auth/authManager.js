@@ -6,6 +6,8 @@
 window.AuthManager = {
     msalInstance: null,
     currentUser: null,
+    inactivityTimer: null,
+    inactivityTimeout: 30 * 60 * 1000, // 30 minutes in milliseconds (configurable)
     
     // MSAL Configuration - REPLACE THESE VALUES WITH YOUR AZURE AD APP REGISTRATION
     msalConfig: {
@@ -58,6 +60,11 @@ window.AuthManager = {
             }
             
             console.log('AuthManager initialized');
+            
+            // Setup inactivity timeout if user is signed in
+            if (this.currentUser) {
+                this.setupInactivityTimeout();
+            }
         } catch (error) {
             console.error('Error initializing auth:', error);
             this.showError('Failed to initialize authentication');
@@ -88,6 +95,10 @@ window.AuthManager = {
             const logoutRequest = {
                 account: this.currentUser
             };
+            
+            // Clear inactivity timer and remove listeners
+            this.clearInactivityTimeout();
+            this.removeActivityListeners();
             
             this.currentUser = null;
             this.updateUI(false);
@@ -161,6 +172,18 @@ window.AuthManager = {
         this.updateUI(true);
         console.log('Login successful:', this.currentUser.username);
         
+        // Setup inactivity timeout
+        this.setupInactivityTimeout();
+        
+        // Restore last active mode or default to intake
+        const lastMode = sessionStorage.getItem('lastActiveMode') || 'intake';
+        if (window.UIUtils && typeof window.UIUtils.switchMode === 'function') {
+            setTimeout(() => {
+                window.UIUtils.switchMode(lastMode);
+                console.log(`Restored mode: ${lastMode}`);
+            }, 100); // Small delay to ensure app is fully loaded
+        }
+        
         if (window.NotificationSystem) {
             NotificationSystem.success(`Welcome, ${this.currentUser.name || this.currentUser.username}!`);
         }
@@ -173,17 +196,35 @@ window.AuthManager = {
         const loginBtn = document.getElementById('loginBtn');
         const logoutBtn = document.getElementById('logoutBtn');
         const userInfo = document.getElementById('userInfo');
+        const userName = document.getElementById('userName');
         const userEmail = document.getElementById('userEmail');
+        const loginPage = document.getElementById('loginPage');
+        const appContent = document.getElementById('appContent');
         
         if (isSignedIn && this.currentUser) {
+            // Hide login page, show app
+            if (loginPage) loginPage.style.display = 'none';
+            if (appContent) appContent.style.display = 'block';
+            
             if (loginBtn) loginBtn.style.display = 'none';
             if (logoutBtn) logoutBtn.style.display = 'inline-block';
-            if (userInfo) userInfo.style.display = 'inline-block';
-            if (userEmail) userEmail.textContent = this.currentUser.username;
+            if (userInfo) userInfo.style.display = 'block';
+            
+            // Display user name and email
+            if (userName) {
+                userName.textContent = this.currentUser.name || this.currentUser.username.split('@')[0];
+            }
+            if (userEmail) {
+                userEmail.textContent = this.currentUser.username;
+            }
             
             // Enable email functionality in intake form
             this.enableEmailFeatures();
         } else {
+            // Show login page, hide app
+            if (loginPage) loginPage.style.display = 'flex';
+            if (appContent) appContent.style.display = 'none';
+            
             if (loginBtn) loginBtn.style.display = 'inline-block';
             if (logoutBtn) logoutBtn.style.display = 'none';
             if (userInfo) userInfo.style.display = 'none';
@@ -222,6 +263,87 @@ window.AuthManager = {
             NotificationSystem.error(message);
         } else {
             alert(message);
+        }
+    },
+    
+    /**
+     * Setup inactivity timeout
+     * Automatically signs out user after period of inactivity
+     */
+    setupInactivityTimeout() {
+        console.log(`Setting up inactivity timeout: ${this.inactivityTimeout / 60000} minutes`);
+        
+        // Clear any existing timer
+        this.clearInactivityTimeout();
+        
+        // Events that indicate user activity
+        const activityEvents = ['mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart', 'click'];
+        
+        // Reset timer function
+        const resetTimer = () => {
+            this.clearInactivityTimeout();
+            
+            this.inactivityTimer = setTimeout(() => {
+                console.log('Inactivity timeout reached - signing out user');
+                
+                // Save current mode before signing out
+                if (window.appState && window.appState.mode) {
+                    sessionStorage.setItem('lastActiveMode', window.appState.mode);
+                }
+                
+                if (window.NotificationSystem) {
+                    NotificationSystem.warning('You have been signed out due to inactivity');
+                }
+                
+                // Sign out the user
+                this.signOut();
+            }, this.inactivityTimeout);
+        };
+        
+        // Add event listeners for user activity
+        activityEvents.forEach(event => {
+            document.addEventListener(event, resetTimer, true);
+        });
+        
+        // Start the initial timer
+        resetTimer();
+        
+        // Store event listeners so we can remove them later if needed
+        this.activityResetFunction = resetTimer;
+        this.activityEvents = activityEvents;
+    },
+    
+    /**
+     * Clear inactivity timeout
+     */
+    clearInactivityTimeout() {
+        if (this.inactivityTimer) {
+            clearTimeout(this.inactivityTimer);
+            this.inactivityTimer = null;
+        }
+    },
+    
+    /**
+     * Remove activity event listeners
+     */
+    removeActivityListeners() {
+        if (this.activityResetFunction && this.activityEvents) {
+            this.activityEvents.forEach(event => {
+                document.removeEventListener(event, this.activityResetFunction, true);
+            });
+        }
+    },
+    
+    /**
+     * Set inactivity timeout duration (in minutes)
+     */
+    setInactivityTimeout(minutes) {
+        this.inactivityTimeout = minutes * 60 * 1000;
+        console.log(`Inactivity timeout set to ${minutes} minutes`);
+        
+        // Restart timer with new timeout if user is signed in
+        if (this.currentUser) {
+            this.setupInactivityTimeout();
         }
     }
 };
