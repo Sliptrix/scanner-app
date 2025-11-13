@@ -1112,9 +1112,132 @@ window.RecipeManager = (function() {
     // Store current post-autoclave items
     let currentPostAutoclaveItems = [];
 
+    /**
+     * Initialize standalone recipe manager mode
+     */
+    function initializeStandalone() {
+        console.log('RecipeManager: Initializing standalone mode...');
+
+        // Initialize calculator and storage
+        if (window.RecipeCalculator) {
+            RecipeCalculator.initialize();
+        }
+
+        if (window.RecipeStorage) {
+            RecipeStorage.initialize();
+        }
+
+        // Setup UI event listeners
+        setupEventListeners();
+
+        // Load recipes for existing recipe mode
+        loadRecipeList();
+
+        // Auto-populate default values for new recipe mode
+        if (window.RecipeCalculator && window.RecipeCalculator.autoPopulateRecipe) {
+            setTimeout(() => {
+                window.RecipeCalculator.autoPopulateRecipe();
+            }, 200);
+        }
+
+        console.log('RecipeManager: Standalone mode initialized');
+    }
+
+    /**
+     * Export all recipes to JSON file
+     */
+    function exportAllRecipes() {
+        if (!window.RecipeStorage) {
+            console.error('RecipeStorage not available');
+            if (window.UIUtils) {
+                UIUtils.showNotification('Recipe storage not available', 'error');
+            }
+            return;
+        }
+
+        try {
+            const recipes = RecipeStorage.getAllRecipes();
+            if (recipes.length === 0) {
+                if (window.UIUtils) {
+                    UIUtils.showNotification('No recipes to export', 'warning');
+                }
+                return;
+            }
+
+            const jsonData = JSON.stringify(recipes, null, 2);
+            const blob = new Blob([jsonData], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = `recipes_${new Date().toISOString().slice(0, 10)}.json`;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            URL.revokeObjectURL(url);
+
+            if (window.UIUtils) {
+                UIUtils.showNotification(`Exported ${recipes.length} recipes successfully`, 'success');
+            }
+        } catch (error) {
+            console.error('Failed to export recipes:', error);
+            if (window.UIUtils) {
+                UIUtils.showNotification('Failed to export recipes: ' + error.message, 'error');
+            }
+        }
+    }
+
+    /**
+     * Delete the currently selected recipe
+     */
+    function deleteSelectedRecipe() {
+        if (!currentRecipe || !currentRecipe.id) {
+            if (window.UIUtils) {
+                UIUtils.showNotification('No recipe selected', 'warning');
+            }
+            return;
+        }
+
+        if (!window.RecipeStorage) {
+            console.error('RecipeStorage not available');
+            if (window.UIUtils) {
+                UIUtils.showNotification('Recipe storage not available', 'error');
+            }
+            return;
+        }
+
+        // Confirm deletion
+        if (!confirm(`Are you sure you want to delete "${currentRecipe.name}"?`)) {
+            return;
+        }
+
+        try {
+            RecipeStorage.deleteRecipe(currentRecipe.id);
+            currentRecipe = null;
+
+            // Refresh recipe list
+            loadRecipeList();
+
+            if (window.UIUtils) {
+                UIUtils.showNotification('Recipe deleted successfully', 'success');
+            }
+
+            // Hide delete button
+            const deleteBtn = document.getElementById('deleteRecipeBtn');
+            if (deleteBtn) {
+                deleteBtn.style.display = 'none';
+            }
+        } catch (error) {
+            console.error('Failed to delete recipe:', error);
+            if (window.UIUtils) {
+                UIUtils.showNotification('Failed to delete recipe: ' + error.message, 'error');
+            }
+        }
+    }
+
     // Public API
     return {
         initialize,
+        initializeStandalone,
         setupRecipeUI,
         showRecipeStep,
         hideRecipeStep,
@@ -1126,6 +1249,8 @@ window.RecipeManager = (function() {
         confirmRecipeSelection,
         cancelRecipeSelection,
         showImportDialog,
+        exportAllRecipes,
+        deleteSelectedRecipe,
         getCurrentRecipe,
         isRecipeActive,
         loadTemplate,

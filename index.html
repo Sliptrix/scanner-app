@@ -58,6 +58,9 @@
             <button class="mode-btn active" onclick="switchMode('builder')">
                 🏗️ Barcode Builder
             </button>
+            <button class="mode-btn" onclick="switchMode('recipes')">
+                🧪 Recipe Manager
+            </button>
             <button class="mode-btn" onclick="switchMode('transfer')">
                 🔄 Container Transfer
             </button>
@@ -121,20 +124,16 @@
                         <div class="progress-circle">4</div>
                         <div class="progress-label">Media</div>
                     </div>
-                    <div class="progress-step clickable" id="step-recipe" onclick="BuilderStepManager.goToStep(4)">
+                    <div class="progress-step clickable" id="step-stage" onclick="BuilderStepManager.goToStep(4)">
                         <div class="progress-circle">5</div>
-                        <div class="progress-label">Recipe</div>
-                    </div>
-                    <div class="progress-step clickable" id="step-stage" onclick="BuilderStepManager.goToStep(5)">
-                        <div class="progress-circle">6</div>
                         <div class="progress-label">Stage</div>
                     </div>
-                    <div class="progress-step clickable" id="step-tissue" onclick="BuilderStepManager.goToStep(6)">
-                        <div class="progress-circle">7</div>
+                    <div class="progress-step clickable" id="step-tissue" onclick="BuilderStepManager.goToStep(5)">
+                        <div class="progress-circle">6</div>
                         <div class="progress-label">Tissue</div>
                     </div>
-                    <div class="progress-step clickable" id="step-date" onclick="BuilderStepManager.goToStep(7)">
-                        <div class="progress-circle">8</div>
+                    <div class="progress-step clickable" id="step-date" onclick="BuilderStepManager.goToStep(6)">
+                        <div class="progress-circle">7</div>
                         <div class="progress-label">Date</div>
                     </div>
                 </div>
@@ -663,6 +662,158 @@
                     <p><strong>Strain:</strong> <span id="confirmStrain"></span></p>
                     <p><strong>Media:</strong> <span id="confirmMedia"></span></p>
                     <p><strong>Date:</strong> <span id="confirmDate"></span></p>
+                </div>
+            </div>
+
+            <!-- Recipe Manager Section -->
+            <div class="recipe-section" id="recipeSection" style="display: none;">
+                <h2 style="margin-bottom: 20px; color: #2c3e50;">🧪 Recipe Manager</h2>
+
+                <div class="recipe-mode-selector" style="margin-bottom: 20px;">
+                    <div style="display: flex; gap: 10px; margin-bottom: 15px;">
+                        <button id="newRecipeBtn" class="mode-btn active" onclick="RecipeManager.setRecipeMode('new')">
+                            ➕ Create New Recipe
+                        </button>
+                        <button id="existingRecipeBtn" class="mode-btn" onclick="RecipeManager.setRecipeMode('existing')">
+                            📋 Browse Recipes
+                        </button>
+                    </div>
+                </div>
+
+                <!-- New Recipe Form -->
+                <div id="newRecipeForm" class="recipe-form">
+                    <div class="form-grid" style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 20px;">
+                        <div class="form-group">
+                            <label for="mediaType">Media Type:</label>
+                            <select id="mediaType" class="form-control">
+                                <option value="Initiation">Initiation</option>
+                                <option value="Multiplication">Multiplication</option>
+                                <option value="Rooting">Rooting</option>
+                            </select>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="volume">Volume:</label>
+                            <select id="volume" class="form-control">
+                                <option value="500mL">500mL</option>
+                                <option value="1L" selected>1L</option>
+                                <option value="2L">2L</option>
+                            </select>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="basalSalt">Basal Salt:</label>
+                            <select id="basalSalt" class="form-control">
+                                <option value="M&S" selected>M&S</option>
+                                <option value="DKW">DKW</option>
+                            </select>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="basalSaltAmount">Amount (g):</label>
+                            <input type="number" id="basalSaltAmount" class="form-control" step="0.01" min="0">
+                        </div>
+
+                        <div class="form-group">
+                            <label for="gellingAgent">Gelling Agent:</label>
+                            <select id="gellingAgent" class="form-control">
+                                <option value="Phytogel" selected>Phytogel</option>
+                                <option value="Agar">Agar</option>
+                            </select>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="gellingAgentAmount">Amount (g):</label>
+                            <input type="number" id="gellingAgentAmount" class="form-control" step="0.01" min="0">
+                        </div>
+                    </div>
+
+                    <div class="ingredients-section">
+                        <h4>Pre-Autoclave Ingredients</h4>
+                        <div class="form-grid" style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 15px; margin-bottom: 20px;">
+                            <div class="form-group">
+                                <label for="gamborgVitamin">Gamborg Vitamin (g):</label>
+                                <input type="number" id="gamborgVitamin" class="form-control" step="0.01" min="0">
+                            </div>
+
+                            <div class="form-group">
+                                <label for="sucrose">Sucrose (g):</label>
+                                <input type="number" id="sucrose" class="form-control" step="0.01" min="0">
+                            </div>
+
+                            <div class="form-group">
+                                <label for="ppm">PPM (mL):</label>
+                                <input type="number" id="ppm" class="form-control" step="0.01" min="0">
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="post-autoclave-section">
+                        <h4>Post-Autoclave Additions</h4>
+                        <div id="postAutoclaveList" class="ingredients-list">
+                            <!-- Post-autoclave ingredients will be populated here -->
+                        </div>
+                    </div>
+
+                    <div class="form-grid" style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 20px;">
+                        <div class="form-group">
+                            <label for="phValue">pH:</label>
+                            <input type="number" id="phValue" class="form-control" step="0.01" min="5" max="7" value="5.8">
+                        </div>
+                    </div>
+
+                    <div class="recipe-metadata">
+                        <div class="form-group">
+                            <label for="recipeName">Recipe Name:</label>
+                            <input type="text" id="recipeName" class="form-control" placeholder="Enter a name for this recipe">
+                        </div>
+
+                        <div class="form-group">
+                            <label for="recipeNotes">Notes (optional):</label>
+                            <textarea id="recipeNotes" class="form-control" rows="3" placeholder="Add any notes about this recipe"></textarea>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Existing Recipe Form -->
+                <div id="existingRecipeForm" class="recipe-form" style="display: none;">
+                    <div class="recipe-search" style="margin-bottom: 15px;">
+                        <input type="text" id="recipeSearch" class="form-control" placeholder="Search recipes..." style="margin-bottom: 10px;">
+                        <div class="quick-filters" style="display: flex; gap: 10px; margin-bottom: 15px;">
+                            <button class="filter-btn" onclick="RecipeManager.filterRecipes('recent')">Recent</button>
+                            <button class="filter-btn" onclick="RecipeManager.filterRecipes('popular')">Popular</button>
+                            <button class="filter-btn" onclick="RecipeManager.filterRecipes('Initiation')">Initiation</button>
+                            <button class="filter-btn" onclick="RecipeManager.filterRecipes('Multiplication')">Multiplication</button>
+                            <button class="filter-btn" onclick="RecipeManager.filterRecipes('Rooting')">Rooting</button>
+                        </div>
+                    </div>
+
+                    <div class="recipe-list" id="recipeList" style="max-height: 300px; overflow-y: auto; border: 1px solid #ddd; border-radius: 4px;">
+                        <!-- Recipe list will be populated here -->
+                    </div>
+
+                    <div id="recipePreview" class="recipe-preview" style="margin-top: 15px; display: none;">
+                        <!-- Selected recipe preview will be shown here -->
+                    </div>
+                </div>
+
+                <div class="recipe-actions" style="margin-top: 20px; display: flex; gap: 10px; justify-content: space-between;">
+                    <div>
+                        <button id="saveRecipeBtn" class="btn btn-success" onclick="RecipeManager.saveCurrentRecipe()">
+                            💾 Save Recipe
+                        </button>
+                        <button id="importRecipeBtn" class="btn btn-secondary" onclick="RecipeManager.showImportDialog()">
+                            📥 Import Recipes
+                        </button>
+                        <button id="exportRecipesBtn" class="btn btn-secondary" onclick="RecipeManager.exportAllRecipes()">
+                            📤 Export All Recipes
+                        </button>
+                    </div>
+                    <div>
+                        <button id="deleteRecipeBtn" class="btn btn-danger" onclick="RecipeManager.deleteSelectedRecipe()" style="display: none;">
+                            🗑️ Delete Recipe
+                        </button>
+                    </div>
                 </div>
             </div>
 
