@@ -580,7 +580,7 @@ window.RecipeManager = (function() {
         }
         
         recipeList.innerHTML = recipesToShow.map(recipe => `
-            <div class="recipe-item" onclick="RecipeManager.selectRecipe('${recipe.id}')">
+            <div class="recipe-item" onclick="RecipeManager.selectRecipe('${recipe.id}', this)">
                 <h5>${recipe.name}</h5>
                 <div class="recipe-meta">
                     ${recipe.mediaType} • ${recipe.volume} • ${recipe.basalSalt.type} + ${recipe.gellingAgent.type}
@@ -636,27 +636,59 @@ window.RecipeManager = (function() {
     /**
      * Select a recipe from the list
      */
-    function selectRecipe(recipeId) {
-        if (!window.RecipeStorage) return;
-        
-        const recipe = RecipeStorage.loadRecipe(recipeId);
-        if (!recipe) return;
-        
-        currentRecipe = recipe;
-        
-        // Update visual selection
-        document.querySelectorAll('.recipe-item').forEach(item => {
-            item.classList.remove('selected');
-        });
-        
-        event.target.closest('.recipe-item').classList.add('selected');
-        
-        // Show recipe preview
-        showRecipePreview(recipe);
-        
-        // Load recipe into form for editing
-        if (window.RecipeCalculator) {
-            RecipeCalculator.loadRecipeIntoForm(recipe);
+    function selectRecipe(recipeId, eventTarget) {
+        // Validate inputs
+        if (!recipeId) {
+            console.error('selectRecipe: recipeId is required');
+            return;
+        }
+
+        if (!window.RecipeStorage) {
+            console.error('selectRecipe: RecipeStorage module not available');
+            if (window.UIUtils) {
+                UIUtils.showNotification('Recipe storage not available', 'error');
+            }
+            return;
+        }
+
+        try {
+            const recipe = RecipeStorage.loadRecipe(recipeId);
+            if (!recipe) {
+                console.error('selectRecipe: Recipe not found:', recipeId);
+                if (window.UIUtils) {
+                    UIUtils.showNotification('Recipe not found', 'error');
+                }
+                return;
+            }
+
+            currentRecipe = recipe;
+
+            // Update visual selection
+            document.querySelectorAll('.recipe-item').forEach(item => {
+                item.classList.remove('selected');
+            });
+
+            // Use eventTarget if provided, otherwise use global event (legacy support)
+            const target = eventTarget || (typeof event !== 'undefined' ? event.target : null);
+            if (target) {
+                const recipeItem = target.closest('.recipe-item');
+                if (recipeItem) {
+                    recipeItem.classList.add('selected');
+                }
+            }
+
+            // Show recipe preview
+            showRecipePreview(recipe);
+
+            // Load recipe into form for editing
+            if (window.RecipeCalculator) {
+                RecipeCalculator.loadRecipeIntoForm(recipe);
+            }
+        } catch (error) {
+            console.error('selectRecipe: Error selecting recipe:', error);
+            if (window.UIUtils) {
+                UIUtils.showNotification('Error loading recipe: ' + error.message, 'error');
+            }
         }
     }
 
@@ -699,29 +731,93 @@ window.RecipeManager = (function() {
      * Save current recipe
      */
     function saveCurrentRecipe() {
-        if (!window.RecipeCalculator || !window.RecipeStorage) return;
-        
-        const recipeName = document.getElementById('recipeName')?.value?.trim();
-        if (!recipeName) {
-            UIUtils.showNotification('Please enter a recipe name', 'warning');
+        if (!window.RecipeCalculator) {
+            console.error('saveCurrentRecipe: RecipeCalculator module not available');
+            if (window.UIUtils) {
+                UIUtils.showNotification('Recipe calculator not available', 'error');
+            }
             return;
         }
-        
+
+        if (!window.RecipeStorage) {
+            console.error('saveCurrentRecipe: RecipeStorage module not available');
+            if (window.UIUtils) {
+                UIUtils.showNotification('Recipe storage not available', 'error');
+            }
+            return;
+        }
+
+        // Validate recipe name
+        const recipeName = document.getElementById('recipeName')?.value?.trim();
+        if (!recipeName) {
+            if (window.UIUtils) {
+                UIUtils.showNotification('Please enter a recipe name', 'warning');
+            }
+            return;
+        }
+
+        // Get recipe data
         const recipeData = RecipeCalculator.getCurrentRecipeData();
         recipeData.name = recipeName;
         recipeData.notes = document.getElementById('recipeNotes')?.value?.trim() || '';
-        
+
+        // Validate recipe using RecipeCalculator
+        if (RecipeCalculator.validateRecipe) {
+            const validation = RecipeCalculator.validateRecipe(recipeData);
+            if (!validation.valid) {
+                console.error('saveCurrentRecipe: Validation failed:', validation.errors);
+                if (window.UIUtils) {
+                    UIUtils.showNotification('Validation failed: ' + validation.errors.join(', '), 'error');
+                }
+                return;
+            }
+
+            // Show warnings if any
+            if (validation.warnings && validation.warnings.length > 0 && window.UIUtils) {
+                validation.warnings.forEach(warning => {
+                    UIUtils.showNotification(warning, 'warning');
+                });
+            }
+        }
+
+        // Additional basic validation
+        if (!recipeData.mediaType || !recipeData.volume) {
+            if (window.UIUtils) {
+                UIUtils.showNotification('Media type and volume are required', 'error');
+            }
+            return;
+        }
+
+        if (!recipeData.basalSalt || !recipeData.basalSalt.amount || recipeData.basalSalt.amount <= 0) {
+            if (window.UIUtils) {
+                UIUtils.showNotification('Valid basal salt amount is required', 'error');
+            }
+            return;
+        }
+
+        if (!recipeData.gellingAgent || !recipeData.gellingAgent.amount || recipeData.gellingAgent.amount <= 0) {
+            if (window.UIUtils) {
+                UIUtils.showNotification('Valid gelling agent amount is required', 'error');
+            }
+            return;
+        }
+
         try {
             const recipeId = RecipeStorage.saveRecipe(recipeData);
             currentRecipe = { ...recipeData, id: recipeId };
-            UIUtils.showNotification(`Recipe "${recipeName}" saved successfully`, 'success');
-            
+            if (window.UIUtils) {
+                UIUtils.showNotification(`Recipe "${recipeName}" saved successfully`, 'success');
+            }
+
             // Refresh recipe list if in existing mode
             if (recipeMode === 'existing') {
                 loadRecipeList();
             }
         } catch (error) {
-            UIUtils.showNotification(`Failed to save recipe: ${error.message}`, 'error');
+            console.error('saveCurrentRecipe: Error saving recipe:', error);
+            if (window.UIUtils) {
+                UIUtils.showNotification(`Failed to save recipe: ${error.message}`, 'error');
+            }
         }
     }
 

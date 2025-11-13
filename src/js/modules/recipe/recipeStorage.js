@@ -15,17 +15,41 @@ window.RecipeStorage = (function() {
     const MAX_BACKUP_COUNT = 5;
 
     /**
+     * Check if localStorage is available
+     */
+    function isLocalStorageAvailable() {
+        try {
+            const test = '__localStorage_test__';
+            localStorage.setItem(test, test);
+            localStorage.removeItem(test);
+            return true;
+        } catch (e) {
+            console.error('localStorage is not available:', e);
+            return false;
+        }
+    }
+
+    /**
      * Initialize the recipe storage system
      */
     function initialize() {
         console.log('RecipeStorage initializing...');
-        
+
+        // Check localStorage availability
+        if (!isLocalStorageAvailable()) {
+            console.error('RecipeStorage: localStorage is not available. Recipe persistence will not work.');
+            if (window.UIUtils) {
+                UIUtils.showNotification('Warning: Recipe storage is not available. Recipes cannot be saved.', 'warning');
+            }
+            return;
+        }
+
         // Ensure default recipes are available
         ensureDefaultRecipes();
-        
+
         // Setup periodic backup
         setupPeriodicBackup();
-        
+
         console.log('RecipeStorage initialized');
     }
 
@@ -42,6 +66,13 @@ window.RecipeStorage = (function() {
      * Save a recipe to localStorage
      */
     function saveRecipe(recipeData) {
+        // Check localStorage availability
+        if (!isLocalStorageAvailable()) {
+            const error = new Error('localStorage is not available');
+            console.error('saveRecipe:', error);
+            throw error;
+        }
+
         try {
             // Validate recipe data
             if (!recipeData.name || !recipeData.mediaType) {
@@ -63,10 +94,10 @@ window.RecipeStorage = (function() {
 
             // Get existing recipes
             const recipes = getAllRecipes();
-            
+
             // Check if recipe already exists (update) or is new
             const existingIndex = recipes.findIndex(r => r.id === recipe.id);
-            
+
             if (existingIndex >= 0) {
                 // Update existing recipe
                 recipes[existingIndex] = recipe;
@@ -95,6 +126,12 @@ window.RecipeStorage = (function() {
      * Load a recipe by ID
      */
     function loadRecipe(recipeId) {
+        // Check localStorage availability
+        if (!isLocalStorageAvailable()) {
+            console.error('loadRecipe: localStorage is not available');
+            return null;
+        }
+
         try {
             const recipes = getAllRecipes();
             const recipe = recipes.find(r => r.id === recipeId);
