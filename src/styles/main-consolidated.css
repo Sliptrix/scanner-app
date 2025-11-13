@@ -459,6 +459,32 @@ body {
     display: block;
 }
 
+/* Recipe Section Styles */
+.recipe-section {
+    background: #f8f9fa;
+    border-radius: 12px;
+    padding: 25px;
+    border: 2px solid #e9ecef;
+    display: none;
+}
+
+.recipe-section.active {
+    display: block;
+}
+
+/* Inventory Section Styles */
+.inventory-section {
+    background: #f8f9fa;
+    border-radius: 12px;
+    padding: 25px;
+    border: 2px solid #e9ecef;
+    display: none;
+}
+
+.inventory-section.active {
+    display: block;
+}
+
 .intake-form-group {
     background: white;
     padding: 20px;

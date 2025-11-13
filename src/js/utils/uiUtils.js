@@ -74,8 +74,10 @@ window.UIUtils = {
             modeButtons[2].classList.add('active');
         } else if (mode === 'recipes' && modeButtons[3]) {
             modeButtons[3].classList.add('active');
-        } else if (mode === 'transfer' && modeButtons[4]) {
+        } else if (mode === 'inventory' && modeButtons[4]) {
             modeButtons[4].classList.add('active');
+        } else if (mode === 'transfer' && modeButtons[5]) {
+            modeButtons[5].classList.add('active');
         }
 
         // Show/hide sections based on mode
@@ -84,6 +86,7 @@ window.UIUtils = {
         const transferSection = document.getElementById('transferSection');
         const initiatorSection = document.getElementById('initiatorSection');
         const recipeSection = document.getElementById('recipeSection');
+        const inventorySection = document.getElementById('inventorySection');
 
         if (intakeSection) {
             intakeSection.classList.toggle('active', mode === 'intake');
@@ -98,7 +101,10 @@ window.UIUtils = {
             initiatorSection.classList.toggle('active', mode === 'initiator');
         }
         if (recipeSection) {
-            recipeSection.style.display = mode === 'recipes' ? 'block' : 'none';
+            recipeSection.classList.toggle('active', mode === 'recipes');
+        }
+        if (inventorySection) {
+            inventorySection.classList.toggle('active', mode === 'inventory');
         }
 
         // Update current mode display
@@ -109,6 +115,7 @@ window.UIUtils = {
             else if (mode === 'transfer') modeText = 'Transfer';
             else if (mode === 'initiator') modeText = 'Initiator';
             else if (mode === 'recipes') modeText = 'Recipes';
+            else if (mode === 'inventory') modeText = 'Inventory';
             currentModeElement.textContent = modeText;
         }
         

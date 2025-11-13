@@ -61,6 +61,9 @@
             <button class="mode-btn" onclick="switchMode('recipes')">
                 🧪 Recipe Manager
             </button>
+            <button class="mode-btn" onclick="switchMode('inventory')">
+                📦 Inventory
+            </button>
             <button class="mode-btn" onclick="switchMode('transfer')">
                 🔄 Container Transfer
             </button>
@@ -666,7 +669,7 @@
             </div>
 
             <!-- Recipe Manager Section -->
-            <div class="recipe-section" id="recipeSection" style="display: none;">
+            <div class="recipe-section" id="recipeSection">
                 <h2 style="margin-bottom: 20px; color: #2c3e50;">🧪 Recipe Manager</h2>
 
                 <div class="recipe-mode-selector" style="margin-bottom: 20px;">
@@ -817,7 +820,7 @@
                 </div>
             </div>
 
-            <div class="inventory-section">
+            <div class="inventory-section" id="inventorySection">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
                     <h2 style="color: #2c3e50;">📦 Inventory Log</h2>
                     <div>
