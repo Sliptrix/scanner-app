@@ -70,6 +70,13 @@ function initializeApp() {
         });
     }
     
+    // Initialize authentication
+    if (window.AuthManager) {
+        AuthManager.init().catch(error => {
+            console.error('Error initializing auth:', error);
+        });
+    }
+    
     // Setup import data event
     setupImportEventListener();
 
@@ -652,6 +659,42 @@ function toggleBarcodeDetails() {
     }
 }
 
+/**
+ * Email intake form
+ */
+async function emailIntakeForm() {
+    const formData = IntakeFormManager.currentIntakeData;
+    if (!formData) {
+        NotificationSystem.error('No intake data to email');
+        return;
+    }
+    
+    if (!AuthManager.isSignedIn()) {
+        NotificationSystem.error('Please sign in to send emails');
+        return;
+    }
+    
+    const recipientsInput = document.getElementById('emailRecipients');
+    const recipientsText = recipientsInput ? recipientsInput.value : 'pozersky@lonewolfgenetics.com';
+    const recipients = recipientsText.split(',').map(e => e.trim()).filter(e => e);
+    
+    if (recipients.length === 0) {
+        NotificationSystem.error('Please enter at least one email address');
+        return;
+    }
+    
+    try {
+        NotificationSystem.info('Sending email...');
+        
+        const result = await EmailService.sendIntakeForm(formData, recipients);
+        
+        NotificationSystem.success(`Email sent successfully to ${result.recipientCount} recipient(s)!`);
+    } catch (error) {
+        console.error('Error sending email:', error);
+        NotificationSystem.error('Failed to send email: ' + error.message);
+    }
+}
+
 // Legacy compatibility for global function references
 window.switchMode = switchMode;
 window.nextBuilderStep = nextBuilderStep;
@@ -664,4 +707,5 @@ window.clearTransfer = clearTransfer;
 window.exportInventory = exportInventory;
 window.clearInventory = clearInventory;
 window.toggleBarcodeDetails = toggleBarcodeDetails;
+window.emailIntakeForm = emailIntakeForm;
 

@@ -8,9 +8,22 @@
 </head>
 <body>
     <div class="container">
-        <div class="header">
+        <div class="header" style="position: relative;">
             <h1>🧪 Lab Barcode Builder & Transfer System</h1>
             <p>Create barcodes and manage container transfers with tissue splitting</p>
+            
+            <!-- Authentication Controls -->
+            <div class="auth-controls" style="position: absolute; top: 20px; right: 20px; display: flex; align-items: center; gap: 10px;">
+                <div id="userInfo" style="display: none; color: #2c3e50; font-size: 0.9rem;">
+                    👤 <span id="userEmail"></span>
+                </div>
+                <button id="loginBtn" class="btn btn-primary btn-sm" onclick="signIn()" style="padding: 8px 16px; font-size: 0.9rem;">
+                    🔐 Sign In
+                </button>
+                <button id="logoutBtn" class="btn btn-secondary btn-sm" onclick="signOut()" style="display: none; padding: 8px 16px; font-size: 0.9rem;">
+                    Sign Out
+                </button>
+            </div>
         </div>
 
         <div class="mode-selector">
@@ -528,6 +541,20 @@
                     <div id="intakeSummaryContent">
                         <!-- Summary will be populated here -->
                     </div>
+                    
+                    <!-- Email Section (only visible when signed in) -->
+                    <div id="intakeEmailSection" style="display: none; margin: 20px 0; padding: 15px; background: #e3f2fd; border-radius: 6px; border-left: 4px solid #2196f3;">
+                        <h4 style="margin: 0 0 10px 0; color: #1976d2;">📧 Email This Form</h4>
+                        <div style="margin-bottom: 10px;">
+                            <label style="display: block; margin-bottom: 5px; font-weight: 600;">Recipients:</label>
+                            <input type="text" id="emailRecipients" class="form-input" placeholder="pozersky@lonewolfgenetics.com" value="pozersky@lonewolfgenetics.com" style="width: 100%; padding: 8px;">
+                            <p style="margin: 5px 0 0 0; font-size: 0.85rem; color: #6c757d;">Separate multiple emails with commas</p>
+                        </div>
+                        <button class="btn btn-primary" onclick="emailIntakeForm()">
+                            📧 Send Email
+                        </button>
+                    </div>
+                    
                     <div style="margin-top: 20px; display: flex; gap: 10px; flex-wrap: wrap;">
                         <button class="btn btn-success" onclick="downloadIntakePDF()">
                             📝 Download PDF
@@ -654,6 +681,8 @@
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<!-- Microsoft Authentication Library -->
+<script src="https://alcdn.msauth.net/browser/2.32.2/js/msal-browser.min.js"></script>
 <!-- ML Enhancement Modules -->
 <script src="src/js/modules/ml/basicMLEngine.js"></script>
 <script src="src/js/modules/ml/mlIntegration.js"></script>
@@ -696,6 +725,10 @@
     <script src="src/js/modules/intake/bulkUploadParser.js"></script>
     <script src="src/js/modules/intake/pdfGenerator.js"></script>
     <script src="src/js/modules/intake/intakeMain.js"></script>
+    <!-- Authentication Module -->
+    <script src="src/js/modules/auth/authManager.js"></script>
+    <!-- Email Service Module -->
+    <script src="src/js/modules/email/emailService.js"></script>
     <!-- Main Application -->
     <script src="src/js/main.js?v=1.0"></script>
 </body>

@@ -192,5 +192,20 @@ window.IntakePDFGenerator = {
             console.error('Error generating PDF:', error);
             throw error;
         }
+    },
+    
+    /**
+     * Generate PDF as base64 string (for email attachments)
+     */
+    async generateBase64(data) {
+        try {
+            const doc = this.generatePDF(data);
+            // Get PDF as base64 string
+            const pdfBase64 = doc.output('datauristring');
+            return pdfBase64;
+        } catch (error) {
+            console.error('Error generating PDF base64:', error);
+            throw error;
+        }
     }
 };
