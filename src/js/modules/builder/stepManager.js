@@ -233,16 +233,14 @@ window.BuilderStepManager = {
         recipeContainer.innerHTML = `
             <div style="margin-bottom: 10px;">
                 <label style="display: block; font-weight: 600; margin-bottom: 8px; color: #495057;">
-                    🧪 Select Recipe:
+                    🧪 Select Recipe (required):
                 </label>
                 <select id="recipeDropdown" class="form-control" style="width: 100%; padding: 8px 12px; border: 1px solid #ced4da; border-radius: 4px;">
                     <option value="">-- Select a recipe --</option>
                 </select>
-            </div>
-            <div style="margin-top: 10px;">
-                <button class="btn btn-secondary" onclick="switchMode('recipes')" style="font-size: 14px;">
-                    ➕ Create New Recipe
-                </button>
+                <div style="margin-top: 8px; font-size: 12px; color: #6c757d;">
+                    💡 No recipes available? Create recipes in the <a href="#" onclick="switchMode('recipes'); return false;" style="color: #007bff; text-decoration: underline;">Recipe Manager</a>
+                </div>
             </div>
         `;
         optionsDiv.appendChild(recipeContainer);

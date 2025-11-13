@@ -1118,6 +1118,13 @@ window.RecipeManager = (function() {
     function initializeStandalone() {
         console.log('RecipeManager: Initializing standalone mode...');
 
+        // Verify recipe section exists in HTML
+        const recipeSection = document.getElementById('recipeSection');
+        if (!recipeSection) {
+            console.error('Recipe section not found in HTML');
+            return;
+        }
+
         // Initialize calculator and storage
         if (window.RecipeCalculator) {
             RecipeCalculator.initialize();
@@ -1127,13 +1134,16 @@ window.RecipeManager = (function() {
             RecipeStorage.initialize();
         }
 
-        // Setup UI event listeners
-        setupEventListeners();
+        // Setup UI event listeners for the standalone section
+        setupStandaloneEventListeners();
 
-        // Load recipes for existing recipe mode
+        // Set default mode to 'new' recipe
+        setRecipeMode('new');
+
+        // Load recipes for the browse mode
         loadRecipeList();
 
-        // Auto-populate default values for new recipe mode
+        // Auto-populate default values for new recipe form
         if (window.RecipeCalculator && window.RecipeCalculator.autoPopulateRecipe) {
             setTimeout(() => {
                 window.RecipeCalculator.autoPopulateRecipe();
@@ -1141,6 +1151,32 @@ window.RecipeManager = (function() {
         }
 
         console.log('RecipeManager: Standalone mode initialized');
+    }
+
+    /**
+     * Setup event listeners for standalone recipe manager
+     */
+    function setupStandaloneEventListeners() {
+        // Media type change triggers auto-population
+        const mediaTypeSelect = document.getElementById('mediaType');
+        if (mediaTypeSelect) {
+            mediaTypeSelect.addEventListener('change', function() {
+                loadTemplate(this.value);
+            });
+        }
+
+        // Recipe search functionality
+        const searchInput = document.getElementById('recipeSearch');
+        if (searchInput) {
+            searchInput.addEventListener('input', (e) => {
+                const query = e.target.value;
+                if (query.length >= 2 || query.length === 0) {
+                    searchRecipes(query);
+                }
+            });
+        }
+
+        console.log('Standalone event listeners setup complete');
     }
 
     /**
