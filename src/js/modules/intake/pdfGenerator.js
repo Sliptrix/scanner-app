@@ -8,7 +8,7 @@ window.IntakePDFGenerator = {
      * Generate PDF from intake data
      */
     generatePDF(data) {
-        if (typeof jsPDF === 'undefined') {
+        if (typeof window.jspdf === 'undefined') {
             throw new Error('jsPDF library not loaded');
         }
         
