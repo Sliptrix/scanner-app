@@ -194,13 +194,18 @@ window.InventoryManager = (function() {
             if (savedData) {
                 const state = JSON.parse(savedData);
                 
-                StateManager.setState('inventory', state.inventory || []);
-                StateManager.setState('transferHistory', state.transferHistory || []);
-                StateManager.setState('containerLineage', state.containerLineage || {});
-                StateManager.setState('highestContainerId', state.highestContainerId || 0);
+                // Update appState directly to ensure all modules see the changes
+                window.appState.inventory = state.inventory || [];
+                window.appState.transferHistory = state.transferHistory || [];
+                window.appState.containerLineage = state.containerLineage || {};
+                window.appState.highestContainerId = state.highestContainerId || 0;
                 
                 console.log('Loaded inventory data from localStorage');
-                NotificationSystem.info(`Loaded ${state.inventory.length} inventory entries from previous session`);
+                console.log(`Restored: ${state.inventory.length} inventory entries, highest container ID: ${state.highestContainerId}`);
+                
+                if (state.inventory.length > 0) {
+                    NotificationSystem.info(`Loaded ${state.inventory.length} inventory entries from previous session`);
+                }
             }
         } catch (error) {
             console.error('Failed to load from localStorage:', error);

@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Intake Module Test</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            max-width: 800px;
+            margin: 40px auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .test-section {
+            background: white;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        .test-result {
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 4px;
+        }
+        .test-result.pass {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .test-result.fail {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .test-result.info {
+            background: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+        button {
+            background: #667eea;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            margin: 5px;
+        }
+        button:hover {
+            background: #5568d3;
+        }
+        .code {
+            background: #f4f4f4;
+            padding: 10px;
+            border-radius: 4px;
+            font-family: monospace;
+            overflow-x: auto;
+        }
+    </style>
+</head>
+<body>
+    <h1>🧪 Intake Module Test Suite</h1>
+    
+    <div class="test-section">
+        <h2>1. Module Loading Test</h2>
+        <button onclick="testModuleLoading()">Run Test</button>
+        <div id="moduleLoadingResults"></div>
+    </div>
+    
+    <div class="test-section">
+        <h2>2. Data Manager Test</h2>
+        <button onclick="testDataManager()">Run Test</button>
+        <div id="dataManagerResults"></div>
+    </div>
+    
+    <div class="test-section">
+        <h2>3. Owner ID Generation Test</h2>
+        <button onclick="testOwnerIDGeneration()">Run Test</button>
+        <div id="ownerIDResults"></div>
+    </div>
+    
+    <div class="test-section">
+        <h2>4. JSON Loading Test</h2>
+        <button onclick="testJSONLoading()">Run Test</button>
+        <div id="jsonLoadingResults"></div>
+    </div>
+    
+    <div class="test-section">
+        <h2>5. Full Workflow Test</h2>
+        <button onclick="testFullWorkflow()">Run Test</button>
+        <div id="workflowResults"></div>
+    </div>
+    
+    <div class="test-section">
+        <h2>Quick Links</h2>
+        <button onclick="window.open('http://localhost:8000/index.html', '_blank')">
+            Open Scanner App
+        </button>
+        <button onclick="window.open('http://localhost:8000/strain_owner_mapping.json', '_blank')">
+            View JSON Data
+        </button>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="src/js/modules/intake/dataManager.js"></script>
+    <script src="src/js/modules/intake/formManager.js"></script>
+    <script src="src/js/modules/intake/intakeMain.js"></script>
+    
+    <script>
+        function showResult(containerId, message, type = 'info') {
+            const container = document.getElementById(containerId);
+            const div = document.createElement('div');
+            div.className = `test-result ${type}`;
+            div.textContent = message;
+            container.appendChild(div);
+        }
+        
+        function clearResults(containerId) {
+            const container = document.getElementById(containerId);
+            container.innerHTML = '';
+        }
+        
+        function testModuleLoading() {
+            clearResults('moduleLoadingResults');
+            
+            if (typeof IntakeDataManager !== 'undefined') {
+                showResult('moduleLoadingResults', '✓ IntakeDataManager loaded', 'pass');
+            } else {
+                showResult('moduleLoadingResults', '✗ IntakeDataManager not loaded', 'fail');
+            }
+            
+            if (typeof IntakeFormManager !== 'undefined') {
+                showResult('moduleLoadingResults', '✓ IntakeFormManager loaded', 'pass');
+            } else {
+                showResult('moduleLoadingResults', '✗ IntakeFormManager not loaded', 'fail');
+            }
+            
+            if (typeof IntakeMain !== 'undefined') {
+                showResult('moduleLoadingResults', '✓ IntakeMain loaded', 'pass');
+            } else {
+                showResult('moduleLoadingResults', '✗ IntakeMain not loaded', 'fail');
+            }
+        }
+        
+        function testDataManager() {
+            clearResults('dataManagerResults');
+            
+            // Test getUniqueOwners
+            const owners = IntakeDataManager.getUniqueOwners();
+            if (Array.isArray(owners)) {
+                showResult('dataManagerResults', `✓ getUniqueOwners() returns array: ${owners.length} owners`, 'pass');
+            } else {
+                showResult('dataManagerResults', '✗ getUniqueOwners() failed', 'fail');
+            }
+            
+            // Test getNextStrainID
+            const nextID = IntakeDataManager.getNextStrainID();
+            if (nextID) {
+                showResult('dataManagerResults', `✓ getNextStrainID() returns: ${nextID}`, 'pass');
+            } else {
+                showResult('dataManagerResults', '✗ getNextStrainID() failed', 'fail');
+            }
+        }
+        
+        function testOwnerIDGeneration() {
+            clearResults('ownerIDResults');
+            
+            const tests = [
+                { input: 'John Doe', expected: 'jod', desc: 'Two words' },
+                { input: 'ABC', expected: 'abc', desc: 'Single word (3 letters)' },
+                { input: 'John Paul Smith', expected: 'jps', desc: 'Three words' },
+                { input: 'Test Customer Name', expected: 'tcn', desc: 'Multiple words' }
+            ];
+            
+            tests.forEach(test => {
+                const result = IntakeDataManager.generateOwnerID(test.input, false);
+                if (result === test.expected) {
+                    showResult('ownerIDResults', 
+                        `✓ "${test.input}" → "${result}" (${test.desc})`, 'pass');
+                } else {
+                    showResult('ownerIDResults', 
+                        `✗ "${test.input}" → "${result}" (expected "${test.expected}")`, 'fail');
+                }
+            });
+        }
+        
+        async function testJSONLoading() {
+            clearResults('jsonLoadingResults');
+            
+            try {
+                showResult('jsonLoadingResults', 'Loading strain_owner_mapping.json...', 'info');
+                
+                const data = await IntakeDataManager.loadStrainOwnerMapping();
+                
+                if (data && data.strainOwnerMapping) {
+                    const strainCount = Object.keys(data.strainOwnerMapping).length;
+                    showResult('jsonLoadingResults', 
+                        `✓ JSON loaded successfully: ${strainCount} strains`, 'pass');
+                    
+                    if (data.strainNameMapping) {
+                        const nameCount = Object.keys(data.strainNameMapping).length;
+                        showResult('jsonLoadingResults', 
+                            `✓ Strain names loaded: ${nameCount} entries`, 'pass');
+                    }
+                    
+                    if (data.ownerCounts) {
+                        const ownerCount = Object.keys(data.ownerCounts).length;
+                        showResult('jsonLoadingResults', 
+                            `✓ Owner counts loaded: ${ownerCount} owners`, 'pass');
+                    }
+                } else {
+                    showResult('jsonLoadingResults', '✗ JSON structure invalid', 'fail');
+                }
+            } catch (error) {
+                showResult('jsonLoadingResults', `✗ Error: ${error.message}`, 'fail');
+            }
+        }
+        
+        async function testFullWorkflow() {
+            clearResults('workflowResults');
+            
+            try {
+                // Step 1: Load data
+                showResult('workflowResults', 'Step 1: Loading JSON data...', 'info');
+                await IntakeDataManager.loadStrainOwnerMapping();
+                showResult('workflowResults', '✓ Data loaded', 'pass');
+                
+                // Step 2: Generate IDs
+                showResult('workflowResults', 'Step 2: Generating IDs...', 'info');
+                const testCustomer = 'Test Customer';
+                const ownerID = IntakeDataManager.generateOwnerID(testCustomer, false);
+                const strainID = IntakeDataManager.getNextStrainID();
+                showResult('workflowResults', 
+                    `✓ Generated Owner ID: ${ownerID}, Strain ID: ${strainID}`, 'pass');
+                
+                // Step 3: Add test entry
+                showResult('workflowResults', 'Step 3: Adding test entry...', 'info');
+                IntakeDataManager.addStrainOwner(strainID, 'Test Strain', ownerID);
+                showResult('workflowResults', '✓ Test entry added to mapping', 'pass');
+                
+                // Step 4: Verify
+                const data = IntakeDataManager.getData();
+                if (data.strainOwnerMapping[strainID] === ownerID) {
+                    showResult('workflowResults', '✓ Entry verified in mapping', 'pass');
+                } else {
+                    showResult('workflowResults', '✗ Entry verification failed', 'fail');
+                }
+                
+                showResult('workflowResults', '✓ Full workflow test complete!', 'pass');
+                
+            } catch (error) {
+                showResult('workflowResults', `✗ Workflow error: ${error.message}`, 'fail');
+            }
+        }
+        
+        // Auto-run module loading test on page load
+        window.addEventListener('DOMContentLoaded', () => {
+            testModuleLoading();
+        });
+    </script>
+</body>
+</html>

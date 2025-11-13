@@ -262,9 +262,13 @@ window.InventoryTableManager = (function() {
             if (currentSort.column === 'date') {
                 aVal = new Date(aVal);
                 bVal = new Date(bVal);
-            } else if (currentSort.column === 'containerId' || currentSort.column === 'tissueCount') {
+            } else if (currentSort.column === 'containerId') {
                 aVal = parseInt(aVal) || 0;
                 bVal = parseInt(bVal) || 0;
+            } else if (currentSort.column === 'tissueCount') {
+                // Handle 'Unknown' tissue count for sorting
+                aVal = aVal === 'Unknown' ? -1 : (parseInt(aVal) || 0);
+                bVal = bVal === 'Unknown' ? -1 : (parseInt(bVal) || 0);
             } else {
                 aVal = String(aVal).toLowerCase();
                 bVal = String(bVal).toLowerCase();
@@ -346,7 +350,7 @@ window.InventoryTableManager = (function() {
             <td>${item.owner || 'Unknown'}</td>
             <td>${item.stage || 'Unknown'}</td>
             <td>${item.media || 'Unknown'}</td>
-            <td style="text-align: center; font-weight: 600;">${item.tissueCount || 1}</td>
+            <td style="text-align: center; font-weight: 600;">${typeof item.tissueCount === 'number' ? item.tissueCount : (item.tissueCount === 'Unknown' ? 'Unknown' : (item.tissueCount || 1))}</td>
             <td style="font-size: 0.85rem; color: #6c757d;">${dateDisplay}</td>
             <td>${statusDisplay}</td>
         `;

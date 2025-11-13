@@ -313,15 +313,14 @@ window.DataUtils = {
     
     // Load JSON fallback data for development/testing
     loadJSONFallbackData: function() {
-        var self = this;
         try {
             // Try to fetch the JSON file
             fetch('./strain_owner_mapping.json')
-                .then(function(response) {
+                .then(response => {
                     if (!response.ok) throw new Error('JSON file not found');
                     return response.json();
                 })
-                .then(function(data) {
+                .then(data => {
                     console.log('Loading data from JSON file:', data);
                     
                     // Load strain-owner mapping
@@ -357,12 +356,12 @@ window.DataUtils = {
                     }
                     
                     // Trigger any data loaded callbacks
-                    self.triggerDataLoadedCallbacks();
-                })
-                .catch(function(error) {
+                    this.triggerDataLoadedCallbacks();
+                }.bind(this))
+                .catch(error => {
                     console.log('JSON fallback file not available:', error.message);
                     // If JSON fails, use minimal fallback data
-                    self.loadMinimalFallbackData();
+                    this.loadMinimalFallbackData();
                 });
         } catch (error) {
             console.log('Could not load JSON fallback data:', error.message);

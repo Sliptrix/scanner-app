@@ -17,6 +17,20 @@ function initializeApp() {
     // Try to load saved Excel data first
     loadSavedExcelDataOnStartup();
     
+    // If no Excel data loaded, try JSON fallback
+    if (!window.appState.isDataLoaded) {
+        console.log('No Excel data found, trying JSON fallback...');
+        DataUtils.loadJSONFallbackData();
+        
+        // If still no data after JSON attempt, immediately load minimal fallback
+        setTimeout(() => {
+            if (!window.appState.isDataLoaded) {
+                console.log('JSON fallback not available, loading minimal data...');
+                DataUtils.loadMinimalFallbackData();
+            }
+        }, 1000); // Give JSON loading 1 second to complete
+    }
+    
     // Set initial mode
     UIUtils.switchMode('builder');
     
@@ -47,6 +61,13 @@ function initializeApp() {
     // Initialize container initiator module
     if (window.ContainerInitiator) {
         ContainerInitiator.initialize();
+    }
+    
+    // Initialize intake module
+    if (window.IntakeMain) {
+        IntakeMain.init().catch(error => {
+            console.error('Error initializing intake module:', error);
+        });
     }
     
     // Setup import data event
@@ -101,15 +122,7 @@ function setupEventListeners() {
         });
     }
     
-    // Initiator input events
-    const initiatorInput = document.getElementById('initiatorInput');
-    if (initiatorInput) {
-        initiatorInput.addEventListener('keypress', function(e) {
-            if (e.key === 'Enter') {
-                ContainerInitiator.handleInitiatorInput();
-            }
-        });
-    }
+    // Initiator input events are handled by the ContainerInitiator module itself
     
     const destInput = document.getElementById('destContainerInput');
     if (destInput) {

@@ -282,6 +282,11 @@ window.BuilderStepManager = {
         // Store the value
         StateManager.setState(`builderState.values.${stepName}`, processedValue);
         
+        // If container is being set, check if it was created via Initiate Container tool
+        if (stepName === 'container') {
+            this.checkForInitiatedContainer(processedValue);
+        }
+        
         // Store metadata if available
         switch(stepName) {
             case 'owner':
@@ -1348,6 +1353,104 @@ window.BuilderStepManager = {
                 }
             }
         });
+    },
+    
+    // Check if container was previously created via Initiate Container tool
+    checkForInitiatedContainer: function(containerId) {
+        // Find container in inventory that was created by Initiate Container tool
+        const initiatedContainer = window.appState.inventory.find(item => 
+            item.containerId === containerId && 
+            item.status === 'Initial' && // Status for initiated containers
+            item.notes && item.notes.includes('Created via Container Initiator') &&
+            // Ensure this is an initiated container (has the required IDs)
+            item.ownerId && item.strainId &&
+            // Ensure it doesn't already have complete barcode builder data
+            (!item.sampleBarcode || !item.barcode)
+        );
+        
+        if (initiatedContainer) {
+            console.log('🔍 Found Initiate Container created container:', initiatedContainer);
+            
+            // Auto-populate values from the initiated container using the ID fields
+            const initiatedValues = {
+                owner: initiatedContainer.ownerId,
+                strain: initiatedContainer.strainId,
+                media: (initiatedContainer.mediaId && initiatedContainer.mediaId !== '') 
+                    ? initiatedContainer.mediaId : null
+            };
+            
+            // Show notification about using pre-initiated data
+            let notificationMessage = `🚀 Using pre-initiated container ${containerId}:\n` +
+                `Owner: ${initiatedValues.owner}, Strain: ${initiatedValues.strain}`;
+            
+            if (initiatedValues.media) {
+                notificationMessage += `, Media: ${initiatedValues.media}`;
+            }
+            
+            NotificationSystem.success(notificationMessage);
+            
+            // Store the values in builder state
+            StateManager.setState('builderState.values.owner', initiatedValues.owner);
+            StateManager.setState('builderState.values.strain', initiatedValues.strain);
+            if (initiatedValues.media) {
+                StateManager.setState('builderState.values.media', initiatedValues.media);
+            }
+            
+            // Store metadata if available from lookup tables
+            if (window.appState.ownersTable && window.appState.ownersTable[initiatedValues.owner]) {
+                StateManager.setState('builderState.metadata.ownerName', 
+                    window.appState.ownersTable[initiatedValues.owner]);
+            }
+            
+            if (window.appState.strainsTable && window.appState.strainsTable[parseInt(initiatedValues.strain)]) {
+                StateManager.setState('builderState.metadata.strainName', 
+                    window.appState.strainsTable[parseInt(initiatedValues.strain)]);
+            }
+            
+            if (initiatedValues.media && window.appState.mediaTypesTable && 
+                window.appState.mediaTypesTable[initiatedValues.media]) {
+                StateManager.setState('builderState.metadata.mediaName', 
+                    window.appState.mediaTypesTable[initiatedValues.media]);
+            }
+            
+            // Determine which step to skip to based on what data we have
+            let nextStepIndex;
+            if (initiatedValues.media) {
+                // Has owner, strain, and media - skip to recipe step
+                nextStepIndex = window.appState.builderState.steps.indexOf('recipe');
+            } else {
+                // Has owner and strain only - skip to media step
+                nextStepIndex = window.appState.builderState.steps.indexOf('media');
+            }
+            
+            if (nextStepIndex > 0) {
+                // Mark completed steps visually
+                const completedSteps = window.appState.builderState.steps.slice(1, nextStepIndex);
+                completedSteps.forEach(stepName => {
+                    this.updateProgressStep(stepName, 'completed');
+                });
+                
+                // Set current step
+                StateManager.setState('builderState.currentStep', nextStepIndex);
+                
+                // Update UI for the new step
+                this.updateStep();
+                
+                // Show feedback about skipped steps
+                const skippedStepsText = completedSteps.join(', ');
+                NotificationSystem.info(
+                    `✅ Auto-filled ${skippedStepsText} from initiated container. ` +
+                    `Continue with ${window.appState.builderState.steps[nextStepIndex]}.`
+                );
+            }
+            
+            // Update field preview to show the populated values
+            this.updateFieldPreview();
+            
+            return true;
+        }
+        
+        return false;
     },
     
     // Fallback options when Excel data is not available

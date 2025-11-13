@@ -37,6 +37,18 @@ window.UIUtils = {
             }
             StateManager.resetTransferState();
             StateManager.resetInitiatorState();
+        } else if (mode === 'intake') {
+            console.log('📥 Entering INTAKE mode - Other functions disabled');
+            // Clear any state from other modes
+            if (window.appState.currentContainer) {
+                window.appState.currentContainer = null;
+                window.appState.currentSample = null;
+                window.appState.currentMetadata = null;
+                window.appState.currentBarcodeResult = null;
+                window.appState.currentBarcodeIsSaved = false;
+            }
+            StateManager.resetTransferState();
+            StateManager.resetInitiatorState();
         }
         
         window.appState.mode = mode;
@@ -48,19 +60,25 @@ window.UIUtils = {
         
         // Find the correct button and activate it
         const modeButtons = document.querySelectorAll('.mode-btn');
-        if (mode === 'builder' && modeButtons[0]) {
+        if (mode === 'intake' && modeButtons[0]) {
             modeButtons[0].classList.add('active');
-        } else if (mode === 'transfer' && modeButtons[1]) {
+        } else if (mode === 'initiator' && modeButtons[1]) {
             modeButtons[1].classList.add('active');
-        } else if (mode === 'initiator' && modeButtons[2]) {
+        } else if (mode === 'builder' && modeButtons[2]) {
             modeButtons[2].classList.add('active');
+        } else if (mode === 'transfer' && modeButtons[3]) {
+            modeButtons[3].classList.add('active');
         }
         
         // Show/hide sections based on mode
+        const intakeSection = document.getElementById('intakeSection');
         const builderSection = document.getElementById('builderSection');
         const transferSection = document.getElementById('transferSection');
         const initiatorSection = document.getElementById('initiatorSection');
         
+        if (intakeSection) {
+            intakeSection.classList.toggle('active', mode === 'intake');
+        }
         if (builderSection) {
             builderSection.classList.toggle('active', mode === 'builder');
         }
@@ -75,7 +93,8 @@ window.UIUtils = {
         const currentModeElement = document.getElementById('currentMode');
         if (currentModeElement) {
             let modeText = 'Builder';
-            if (mode === 'transfer') modeText = 'Transfer';
+            if (mode === 'intake') modeText = 'Intake';
+            else if (mode === 'transfer') modeText = 'Transfer';
             else if (mode === 'initiator') modeText = 'Initiator';
             currentModeElement.textContent = modeText;
         }

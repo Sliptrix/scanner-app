@@ -339,18 +339,27 @@ window.BuilderBarcodeGenerator = {
             return false;
         }
         
-        // Enhanced duplicate prevention - check for ANY entry with same container ID
+        // Check if this is an initiated container that should be updated instead of duplicated
+        let existingInitiatedContainer = null;
         const containerExists = window.appState.inventory.find(entry => 
             entry.containerId === window.appState.currentContainer
         );
         
         if (containerExists) {
-            NotificationSystem.warning(`Container ${window.appState.currentContainer} already exists in inventory. Cannot create duplicate container.`);
-            console.log('Duplicate container prevented:', {
-                attempted: window.appState.currentContainer,
-                existing: containerExists
-            });
-            return false;
+            // Check if it's an initiated container (Initial status)
+            if (containerExists.status === 'Initial' && 
+                containerExists.notes && containerExists.notes.includes('Created via Container Initiator')) {
+                existingInitiatedContainer = containerExists;
+                console.log('Found initiated container to update:', existingInitiatedContainer);
+            } else {
+                // It's a completed container - prevent duplicates
+                NotificationSystem.warning(`Container ${window.appState.currentContainer} already exists as a completed container. Cannot create duplicate.`);
+                console.log('Duplicate completed container prevented:', {
+                    attempted: window.appState.currentContainer,
+                    existing: containerExists
+                });
+                return false;
+            }
         }
         
         // Additional check for exact barcode match
@@ -385,51 +394,89 @@ window.BuilderBarcodeGenerator = {
             window.appState.builderState.metadata
         );
         
-        // Create inventory entry with complete barcode information - MUST include actual barcode
-        const inventoryEntry = {
-            timestamp: new Date(),
-            containerId: window.appState.currentContainer,
-            containerLineage: lineage.length > 0 ? lineage.join(' ← ') : null,
-            sampleBarcode: window.appState.currentSample,
-            barcode: window.appState.currentBarcodeResult.data, // CRITICAL: Include actual barcode data
-            barcodeType: window.appState.currentBarcodeResult.type || 'CODE128',
-            barcodeMetadata: window.appState.currentBarcodeResult.metadata || null,
-            strain: metadata.strain || 'Unknown',
-            strainId: metadata.strainId || '',
-            owner: metadata.owner || 'Unknown',
-            ownerId: metadata.ownerId || '',
-            stage: metadata.stage || 'Unknown',
-            stageId: metadata.stageId || '',
-            media: metadata.mediaType || metadata.mediaId || 'Unknown',
-            mediaType: metadata.mediaType || 'Unknown',
-            mediaId: metadata.mediaId || '',
-            tissueCount: metadata.tissueCount || 1,
-            date: metadata.formattedDate || new Date().toISOString().split('T')[0],
-            status: 'Complete'
-        };
+        let finalEntry;
         
-        // Final validation before adding to inventory
-        if (!inventoryEntry.barcode || !inventoryEntry.containerId) {
-            window.appState.currentBarcodeIsSaved = false; // Reset save state on error
-            NotificationSystem.error('Cannot save entry - missing critical barcode or container data');
-            console.error('Save validation failed:', {
-                hasBarcode: !!inventoryEntry.barcode,
-                hasContainer: !!inventoryEntry.containerId,
-                entry: inventoryEntry
-            });
-            return false;
+        // If this is an initiated container, update it instead of creating new entry
+        if (existingInitiatedContainer) {
+            console.log('Updating existing initiated container:', existingInitiatedContainer);
+            
+            // Update the existing initiated container with complete data
+            existingInitiatedContainer.timestamp = new Date();
+            existingInitiatedContainer.containerLineage = lineage.length > 0 ? lineage.join(' ← ') : null;
+            existingInitiatedContainer.sampleBarcode = window.appState.currentSample;
+            existingInitiatedContainer.barcode = window.appState.currentBarcodeResult.data;
+            existingInitiatedContainer.barcodeType = window.appState.currentBarcodeResult.type || 'CODE128';
+            existingInitiatedContainer.barcodeMetadata = window.appState.currentBarcodeResult.metadata || null;
+            existingInitiatedContainer.strain = metadata.strain || 'Unknown';
+            existingInitiatedContainer.owner = metadata.owner || 'Unknown';
+            existingInitiatedContainer.stage = metadata.stage || 'Unknown';
+            existingInitiatedContainer.stageId = metadata.stageId || '';
+            existingInitiatedContainer.media = metadata.mediaType || metadata.mediaId || 'Unknown';
+            existingInitiatedContainer.mediaType = metadata.mediaType || 'Unknown';
+            existingInitiatedContainer.tissueCount = metadata.tissueCount || 1;
+            existingInitiatedContainer.date = metadata.formattedDate || new Date().toISOString().split('T')[0];
+            existingInitiatedContainer.status = 'Complete'; // Update status from 'Initial' to 'Complete'
+            
+            // Final validation
+            if (!existingInitiatedContainer.barcode || !existingInitiatedContainer.containerId) {
+                window.appState.currentBarcodeIsSaved = false;
+                NotificationSystem.error('Cannot update container - missing critical barcode or container data');
+                return false;
+            }
+            
+            finalEntry = existingInitiatedContainer;
+            console.log('✅ Updated initiated container:', existingInitiatedContainer);
+        } else {
+            // Create new inventory entry with complete barcode information
+            const inventoryEntry = {
+                timestamp: new Date(),
+                containerId: window.appState.currentContainer,
+                containerLineage: lineage.length > 0 ? lineage.join(' ← ') : null,
+                sampleBarcode: window.appState.currentSample,
+                barcode: window.appState.currentBarcodeResult.data, // CRITICAL: Include actual barcode data
+                barcodeType: window.appState.currentBarcodeResult.type || 'CODE128',
+                barcodeMetadata: window.appState.currentBarcodeResult.metadata || null,
+                strain: metadata.strain || 'Unknown',
+                strainId: metadata.strainId || '',
+                owner: metadata.owner || 'Unknown',
+                ownerId: metadata.ownerId || '',
+                stage: metadata.stage || 'Unknown',
+                stageId: metadata.stageId || '',
+                media: metadata.mediaType || metadata.mediaId || 'Unknown',
+                mediaType: metadata.mediaType || 'Unknown',
+                mediaId: metadata.mediaId || '',
+                tissueCount: metadata.tissueCount || 1,
+                date: metadata.formattedDate || new Date().toISOString().split('T')[0],
+                status: 'Complete'
+            };
+            
+            // Final validation before adding to inventory
+            if (!inventoryEntry.barcode || !inventoryEntry.containerId) {
+                window.appState.currentBarcodeIsSaved = false;
+                NotificationSystem.error('Cannot save entry - missing critical barcode or container data');
+                console.error('Save validation failed:', {
+                    hasBarcode: !!inventoryEntry.barcode,
+                    hasContainer: !!inventoryEntry.containerId,
+                    entry: inventoryEntry
+                });
+                return false;
+            }
+            
+            // Add new entry to inventory
+            window.appState.inventory.unshift(inventoryEntry);
+            finalEntry = inventoryEntry;
+            console.log('✅ New entry saved to inventory:', inventoryEntry);
         }
         
-        // Add to inventory
-        window.appState.inventory.unshift(inventoryEntry);
+        // Increment session counter
         window.appState.sessionCounter++;
         
         // Update displays
         UIUtils.updateStats();
         this.updateInventoryTable();
         
-        console.log('✅ Entry saved to inventory:', inventoryEntry);
-        NotificationSystem.success(`Barcode saved to inventory: ${inventoryEntry.strain} (Container: ${inventoryEntry.containerId})`);
+        // Show success message
+        NotificationSystem.success(`Barcode saved to inventory: ${finalEntry.strain} (Container: ${finalEntry.containerId})`);
         
         // Persist to localStorage immediately to prevent data loss
         if (window.InventoryManager && typeof window.InventoryManager.saveToLocalStorage === 'function') {

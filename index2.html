@@ -362,19 +362,6 @@
             <div class="intake-section" id="intakeSection">
                 <h2 style="margin-bottom: 20px; color: #2c3e50;">📥 LoneWolf Biotech Intake</h2>
                 
-                <!-- Entry Mode Toggle -->
-                <div class="intake-mode-toggle" style="display: flex; justify-content: center; gap: 15px; margin-bottom: 25px;">
-                    <button class="mode-toggle-btn active" id="singleEntryBtn" onclick="toggleIntakeMode('single')">
-                        📝 Single Entry
-                    </button>
-                    <button class="mode-toggle-btn" id="bulkUploadBtn" onclick="toggleIntakeMode('bulk')">
-                        📄 Bulk Upload
-                    </button>
-                </div>
-                
-                <!-- Single Entry Form -->
-                <div id="singleEntrySection">
-                
                 <!-- Customer Type Selection -->
                 <div class="intake-form-group">
                     <h3 style="margin-bottom: 15px; color: #495057;">Customer Type</h3>
@@ -528,68 +515,18 @@
                     <div id="intakeSummaryContent">
                         <!-- Summary will be populated here -->
                     </div>
-                    <div style="margin-top: 20px; display: flex; gap: 10px; flex-wrap: wrap;">
-                        <button class="btn btn-success" onclick="downloadIntakePDF()">
-                            📝 Download PDF
+                    <div style="margin-top: 20px; display: flex; gap: 10px;">
+                        <button class="btn btn-success" onclick="downloadIntakeJSON()">
+                            Download JSON
                         </button>
                         <button class="btn btn-success" onclick="downloadIntakeExcel()">
-                            📊 Download Excel
-                        </button>
-                        <button class="btn btn-success" onclick="downloadIntakeJSON()">
-                            💾 Download JSON
+                            Download Excel
                         </button>
                         <button class="btn btn-primary" onclick="clearIntakeForm()">
                             New Intake
                         </button>
                     </div>
                 </div>
-                </div>
-                
-                <!-- Bulk Upload Section -->
-                <div id="bulkUploadSection" style="display: none;">
-                    <div class="intake-form-group">
-                        <h3 style="margin-bottom: 15px; color: #495057;">Upload File</h3>
-                        <p style="color: #6c757d; margin-bottom: 15px; font-size: 0.9rem;">
-                            Upload a file containing multiple strains. Supported formats: .txt, .csv, .xlsx
-                        </p>
-                        
-                        <div class="bulk-upload-area" id="bulkUploadArea" style="border: 2px dashed #667eea; border-radius: 8px; padding: 40px; text-align: center; background: #f8f9ff; cursor: pointer; transition: all 0.3s ease;">
-                            <input type="file" id="bulkFileInput" accept=".txt,.csv,.xlsx" style="display: none;">
-                            <div style="font-size: 3rem; margin-bottom: 10px;">📄</div>
-                            <h4 style="margin-bottom: 10px; color: #2c3e50;">Drop file here or click to browse</h4>
-                            <p style="color: #6c757d; font-size: 0.9rem;">Supported: .txt, .csv, .xlsx</p>
-                        </div>
-                        
-                        <div id="bulkFileInfo" style="display: none; margin-top: 15px; padding: 15px; background: #e3f2fd; border-radius: 6px; border-left: 4px solid #2196f3;">
-                            <strong>📁 File loaded:</strong> <span id="bulkFileName"></span>
-                            <button class="btn btn-secondary btn-sm" onclick="clearBulkFile()" style="margin-left: 10px;">Clear</button>
-                        </div>
-                    </div>
-                    
-                    <!-- Bulk Data Preview -->
-                    <div id="bulkPreviewSection" style="display: none;">
-                        <div class="intake-form-group">
-                            <h3 style="margin-bottom: 15px; color: #495057;">Preview Data</h3>
-                            <p style="color: #6c757d; margin-bottom: 15px; font-size: 0.9rem;">
-                                Review the parsed data below. You can edit entries before submitting.
-                            </p>
-                            
-                            <div id="bulkDataPreview" style="max-height: 400px; overflow-y: auto; border: 1px solid #e9ecef; border-radius: 6px;">
-                                <!-- Preview table will be inserted here -->
-                            </div>
-                            
-                            <div style="margin-top: 20px; display: flex; gap: 10px;">
-                                <button class="btn btn-primary" onclick="submitBulkIntake()">
-                                    Submit All Entries
-                                </button>
-                                <button class="btn btn-secondary" onclick="clearBulkFile()">
-                                    Cancel
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                
             </div>
             
             <div class="initiator-section" id="initiatorSection">
@@ -653,7 +590,6 @@
     <div id="notification" class="notification"></div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <!-- ML Enhancement Modules -->
 <script src="src/js/modules/ml/basicMLEngine.js"></script>
 <script src="src/js/modules/ml/mlIntegration.js"></script>
@@ -693,8 +629,6 @@
     <!-- Intake Module -->
     <script src="src/js/modules/intake/dataManager.js"></script>
     <script src="src/js/modules/intake/formManager.js?v=1761846678"></script>
-    <script src="src/js/modules/intake/bulkUploadParser.js"></script>
-    <script src="src/js/modules/intake/pdfGenerator.js"></script>
     <script src="src/js/modules/intake/intakeMain.js"></script>
     <!-- Main Application -->
     <script src="src/js/main.js?v=1.0"></script>
