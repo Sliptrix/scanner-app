@@ -74,7 +74,9 @@
                 <span>❌ Excel data not loaded</span>
                 <button class="btn btn-secondary" onclick="document.getElementById('fileInput').click()">Load Excel File</button>
                 <button class="btn btn-info" onclick="document.getElementById('importInput').click()" style="margin-left: 10px;">📥 Import Data</button>
+                <button class="btn btn-primary" id="cloud-sync-btn" style="margin-left: 10px;">🔄 Sync from Cloud</button>
                 <input type="file" id="importInput" accept=".json" style="display: none;">
+                <div id="cloud-sync-status" style="margin-top: 8px; font-size: 0.85rem; color: #666;">Last synced: —</div>
             </div>
         </div>
 
@@ -750,6 +752,8 @@
     <script src="src/js/modules/intake/intakeMain.js"></script>
     <!-- Authentication Module -->
     <script src="src/js/modules/auth/authManager.js"></script>
+    <!-- Cloud Sync Module -->
+    <script src="src/js/modules/cloud/oneDriveSync.js"></script>
     <!-- Email Service Module -->
     <script src="src/js/modules/email/emailService.js"></script>
     <!-- Main Application -->

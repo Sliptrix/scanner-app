@@ -442,5 +442,164 @@ window.DataUtils = {
         });
         // Clear callbacks after executing them
         this.dataLoadedCallbacks = [];
+    },
+
+    /**
+     * Load strain-owner mapping with cloud sync support
+     * Tries OneDriveSync first, then falls back to local JSON, then minimal fallback
+     * @param {Object} options - Loading options
+     * @returns {Promise<Object>} Result object with source and success status
+     */
+    loadStrainOwnerMappingWithCloud: async function(options = {}) {
+        console.log('DataUtils: Loading strain-owner mapping with cloud sync support...');
+
+        const nonBlocking = options.nonBlocking !== false; // Default to non-blocking
+
+        // Check if authenticated and OneDriveSync is available
+        if (window.AuthManager && window.AuthManager.isSignedIn() && window.OneDriveSync) {
+            console.log('DataUtils: Attempting cloud sync...');
+
+            try {
+                const result = await window.OneDriveSync.manualSync();
+
+                if (result.success) {
+                    console.log('DataUtils: Cloud sync successful');
+
+                    // Mark data as loaded
+                    window.appState.isDataLoaded = true;
+
+                    // Update UI
+                    if (window.UIUtils) {
+                        window.UIUtils.updateDataStatus(true, 'Cloud (OneDrive/SharePoint)', false);
+                    }
+
+                    // Trigger callbacks
+                    this.triggerDataLoadedCallbacks();
+
+                    return { source: 'cloud', success: true };
+                }
+            } catch (error) {
+                console.warn('DataUtils: Cloud sync failed, falling back to local JSON:', error);
+            }
+        } else {
+            console.log('DataUtils: Cloud sync not available (not authenticated or OneDriveSync not initialized)');
+        }
+
+        // Fall back to local JSON
+        console.log('DataUtils: Attempting local JSON fallback...');
+        try {
+            await this.loadJSONFallbackDataAsync();
+            return { source: 'local-json', success: true };
+        } catch (error) {
+            console.warn('DataUtils: Local JSON fallback failed, using minimal fallback:', error);
+        }
+
+        // Last resort: minimal fallback
+        console.log('DataUtils: Using minimal fallback data');
+        this.loadMinimalFallbackData();
+        return { source: 'minimal', success: true };
+    },
+
+    /**
+     * Async version of loadJSONFallbackData for use in loadStrainOwnerMappingWithCloud
+     * @returns {Promise<void>}
+     */
+    loadJSONFallbackDataAsync: function() {
+        const self = this;
+        return new Promise((resolve, reject) => {
+            fetch('./strain_owner_mapping.json')
+                .then(function(response) {
+                    if (!response.ok) throw new Error('JSON file not found');
+                    return response.json();
+                })
+                .then(function(data) {
+                    console.log('Loading data from JSON file:', data);
+
+                    // Load strain-owner mapping
+                    if (data.strainOwnerMapping) {
+                        window.appState.strainOwnerMapping = data.strainOwnerMapping;
+                        console.log('Strain-Owner mapping loaded from JSON:', Object.keys(data.strainOwnerMapping).length, 'entries');
+                    }
+
+                    // Load strain names if available
+                    if (data.strainNameMapping) {
+                        window.appState.strainsTable = data.strainNameMapping;
+                        console.log('Strain names loaded from JSON:', Object.keys(data.strainNameMapping).length, 'entries');
+                    }
+
+                    // Load owner names if available
+                    if (data.ownerNameMapping) {
+                        window.appState.ownersTable = data.ownerNameMapping;
+                        console.log('Owner names loaded from JSON:', Object.keys(data.ownerNameMapping).length, 'entries');
+                    }
+
+                    // Load media types if available
+                    if (data.mediaTypeMapping) {
+                        window.appState.mediaTypesTable = data.mediaTypeMapping;
+                        console.log('Media types loaded from JSON:', Object.keys(data.mediaTypeMapping).length, 'entries');
+                    }
+
+                    // Mark data as loaded
+                    window.appState.isDataLoaded = true;
+
+                    // Update UI to show JSON data is loaded
+                    if (window.UIUtils) {
+                        window.UIUtils.updateDataStatus(true, 'strain_owner_mapping.json (fallback)', false);
+                    }
+
+                    // Trigger any data loaded callbacks
+                    self.triggerDataLoadedCallbacks();
+
+                    resolve();
+                })
+                .catch(function(error) {
+                    console.log('JSON fallback file not available:', error.message);
+                    reject(error);
+                });
+        });
+    },
+
+    /**
+     * Enable periodic cloud refresh
+     * Starts auto-refresh when cloud sync is available
+     */
+    enablePeriodicRefresh: function() {
+        console.log('DataUtils: Enabling periodic cloud refresh...');
+
+        if (window.OneDriveSync && window.AuthManager && window.AuthManager.isSignedIn()) {
+            window.OneDriveSync.startAutoRefresh();
+            console.log('DataUtils: Periodic refresh enabled');
+        } else {
+            console.log('DataUtils: Periodic refresh not available (OneDriveSync not initialized or not authenticated)');
+        }
+    },
+
+    /**
+     * Subscribe to strain-owner mapping updates from cloud sync
+     */
+    subscribeToCloudUpdates: function() {
+        console.log('DataUtils: Subscribing to cloud updates...');
+
+        window.addEventListener('strainOwnerMapping:updated', (event) => {
+            console.log('DataUtils: Received strainOwnerMapping:updated event:', event.detail);
+
+            const { source, ts } = event.detail;
+
+            // Update UI to reflect the update
+            if (window.UIUtils && source === 'cloud') {
+                const syncDate = new Date(ts);
+                window.UIUtils.updateDataStatus(true, `Cloud (synced ${syncDate.toLocaleTimeString()})`, false);
+            }
+
+            // Trigger any dependent updates
+            this.triggerDataLoadedCallbacks();
+
+            // Show notification
+            if (window.NotificationSystem && source === 'cloud') {
+                window.NotificationSystem.info('📁 Data refreshed from cloud');
+            }
+        });
+
+        console.log('DataUtils: Subscribed to cloud updates');
     }
 };

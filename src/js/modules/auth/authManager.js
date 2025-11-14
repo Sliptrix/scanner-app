@@ -24,7 +24,7 @@ window.AuthManager = {
     
     // Microsoft Graph API scopes
     loginRequest: {
-        scopes: ['User.Read', 'Mail.Send']
+        scopes: ['User.Read', 'Mail.Send', 'Files.Read.All', 'Sites.Read.All']
     },
     
     /**

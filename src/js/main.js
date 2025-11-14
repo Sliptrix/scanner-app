@@ -76,7 +76,37 @@ function initializeApp() {
             console.error('Error initializing auth:', error);
         });
     }
-    
+
+    // Initialize OneDrive/SharePoint cloud sync
+    if (window.OneDriveSync && window.AuthManager) {
+        OneDriveSync.init(AuthManager, {
+            shareUrl: 'https://netorgft8640892-my.sharepoint.com/:x:/g/personal/pozersky_lonewolfgenetics_com/EQbEiBn3HypDjOseGRL6D2gBx9YJelvvhVio-sncoeF-8w?e=Cfwtgq',
+            refreshIntervalMs: 300000, // 5 minutes
+            statusElementId: 'cloud-sync-status',
+            buttonElementId: 'cloud-sync-btn'
+        });
+
+        // Start auto-refresh if authenticated
+        if (AuthManager.isSignedIn()) {
+            console.log('User authenticated, enabling cloud sync auto-refresh...');
+            OneDriveSync.startAutoRefresh();
+
+            // Attempt initial cloud sync (non-blocking)
+            DataUtils.loadStrainOwnerMappingWithCloud({ nonBlocking: true })
+                .then(result => {
+                    console.log(`Initial data loaded from: ${result.source}`);
+                })
+                .catch(error => {
+                    console.warn('Initial cloud sync failed:', error);
+                });
+        }
+
+        // Subscribe to cloud updates
+        if (window.DataUtils) {
+            DataUtils.subscribeToCloudUpdates();
+        }
+    }
+
     // Setup import data event
     setupImportEventListener();
 
