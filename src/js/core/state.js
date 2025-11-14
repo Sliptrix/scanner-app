@@ -33,13 +33,13 @@ window.appState = {
     // Barcode Builder state
     builderState: {
         currentStep: 0,
-        steps: ['container', 'owner', 'strain', 'media', 'recipe', 'stage', 'tissue', 'date'],
+        steps: ['container', 'owner', 'strain', 'media', 'stage', 'tissue', 'date'],
         values: {
             container: null,
             owner: null,
             strain: null,
             media: null,
-            recipe: null,
+            recipe: null,  // Recipe selected from dropdown, not a separate step
             stage: null,
             tissue: null,
             date: null

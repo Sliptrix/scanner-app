@@ -27,18 +27,12 @@ window.BuilderStepManager = {
                 options: 'strains'
             },
             media: {
-                prompt: 'Select or scan the Media Type:',
-                hint: 'Choose from the list below or scan/type the media code',
+                prompt: 'Select the Media Type and Recipe:',
+                hint: 'Choose media type and select a recipe',
                 placeholder: 'e.g., IA, MA, etc.',
                 validation: /^[A-Z]+$/i,
-                options: 'media'
-            },
-            recipe: {
-                prompt: 'Select or create a recipe for this media:',
-                hint: 'Recipe creation is mandatory for traceability',
-                placeholder: 'Recipe selection required',
-                validation: /^.+$/,
-                options: 'recipe'
+                options: 'media',
+                requiresRecipe: true  // Flag to show recipe dropdown
             },
             stage: {
                 prompt: 'Select the Propagation Stage:',
@@ -73,13 +67,7 @@ window.BuilderStepManager = {
         const stepConfig = this.getStepConfig(stepName);
         
         if (!stepConfig) return;
-        
-        // Special handling for recipe step
-        if (stepName === 'recipe') {
-            this.handleRecipeStep();
-            return;
-        }
-        
+
         // Update prompts and hints
         UIUtils.updateContent('builderPrompt', stepConfig.prompt);
         UIUtils.updateContent('builderHint', stepConfig.hint);
@@ -211,7 +199,7 @@ window.BuilderStepManager = {
         }
         
         console.log(`Generated ${options.length} options for ${stepName}:`, options);
-        
+
         // Create option buttons
         if (options.length > 0) {
             options.forEach(option => {
@@ -221,7 +209,7 @@ window.BuilderStepManager = {
                 btn.onclick = () => this.selectOption(option.value);
                 optionsDiv.appendChild(btn);
             });
-            
+
             // Show the options div
             optionsDiv.style.display = 'grid';
             console.log(`Added ${options.length} option buttons to DOM`);
@@ -229,6 +217,89 @@ window.BuilderStepManager = {
             // Hide the options div if no options
             optionsDiv.style.display = 'none';
             console.log('No options to display - hiding options div');
+        }
+
+        // Add recipe dropdown if this step requires a recipe
+        if (stepConfig.requiresRecipe) {
+            this.addRecipeDropdown(optionsDiv);
+        }
+    },
+
+    // Add recipe dropdown to the media step
+    addRecipeDropdown: function(optionsDiv) {
+        const recipeContainer = document.createElement('div');
+        recipeContainer.id = 'recipeSelectionContainer';
+        recipeContainer.style.cssText = 'margin-top: 20px; padding: 15px; background: #f8f9fa; border-radius: 6px; border: 1px solid #dee2e6;';
+        recipeContainer.innerHTML = `
+            <div style="margin-bottom: 10px;">
+                <label style="display: block; font-weight: 600; margin-bottom: 8px; color: #495057;">
+                    🧪 Select Recipe (required):
+                </label>
+                <select id="recipeDropdown" class="form-control" style="width: 100%; padding: 8px 12px; border: 1px solid #ced4da; border-radius: 4px;">
+                    <option value="">-- Select a recipe --</option>
+                </select>
+                <div style="margin-top: 8px; font-size: 12px; color: #6c757d;">
+                    💡 No recipes available? Create recipes in the <a href="#" onclick="switchMode('recipes'); return false;" style="color: #007bff; text-decoration: underline;">Recipe Manager</a>
+                </div>
+            </div>
+        `;
+        optionsDiv.appendChild(recipeContainer);
+
+        // Load available recipes
+        this.loadRecipesIntoDropdown();
+    },
+
+    // Load saved recipes into the dropdown
+    loadRecipesIntoDropdown: function() {
+        if (!window.RecipeStorage) {
+            console.error('RecipeStorage not available');
+            return;
+        }
+
+        const dropdown = document.getElementById('recipeDropdown');
+        if (!dropdown) return;
+
+        const recipes = window.RecipeStorage.getAllRecipes();
+
+        // Clear existing options except the first one
+        dropdown.innerHTML = '<option value="">-- Select a recipe --</option>';
+
+        // Add recipes to dropdown
+        recipes.forEach(recipe => {
+            const option = document.createElement('option');
+            option.value = recipe.id;
+            option.textContent = `${recipe.name} (${recipe.mediaType} ${recipe.volume})`;
+            dropdown.appendChild(option);
+        });
+
+        // Add event listener to store recipe selection (only once)
+        if (!dropdown._listenerAttached) {
+            dropdown.addEventListener('change', (e) => {
+                const recipeId = e.target.value;
+                if (recipeId) {
+                    const recipe = window.RecipeStorage.loadRecipe(recipeId);
+                    if (recipe) {
+                        window.appState.builderState.values.recipe = recipe.name;
+                        window.appState.builderState.recipeData = recipe;  // Store full recipe data
+                        console.log('Recipe selected:', recipe.name);
+                    }
+                } else {
+                    window.appState.builderState.values.recipe = null;
+                    window.appState.builderState.recipeData = null;
+                }
+            });
+            dropdown._listenerAttached = true;
+        }
+
+        console.log(`Loaded ${recipes.length} recipes into dropdown`);
+    },
+
+    // Refresh recipe dropdown (called when returning from Recipe Manager)
+    refreshRecipeDropdown: function() {
+        const dropdown = document.getElementById('recipeDropdown');
+        if (dropdown) {
+            console.log('Refreshing recipe dropdown...');
+            this.loadRecipesIntoDropdown();
         }
     },
     
@@ -393,114 +464,48 @@ window.BuilderStepManager = {
     handleNextButton: function() {
         const currentStep = window.appState.builderState.currentStep;
         const stepName = window.appState.builderState.steps[currentStep];
-        
-        // Special handling for recipe step
-        if (stepName === 'recipe') {
+
+        // Special handling for media step - check if recipe is selected
+        if (stepName === 'media') {
             if (!window.appState.builderState.values.recipe) {
-                NotificationSystem.showBuilderFeedback('Please select or create a recipe', 'error');
+                NotificationSystem.showBuilderFeedback('Please select a recipe before continuing', 'error');
                 return;
             }
-            this.nextStep();
-            return;
         }
-        
+
         // If there's input that hasn't been processed, validate it first
         const currentInput = document.getElementById('builderInput').value.trim();
-        
+
         if (currentInput && !window.appState.builderState.values[stepName]) {
             this.validateAndProceed();
             return;
         }
-        
+
         // If empty and value not set, show error
         if (!window.appState.builderState.values[stepName]) {
             NotificationSystem.showBuilderFeedback('Please complete this step', 'error');
             return;
         }
-        
+
         // Move to next step
         this.nextStep();
     },
     
-    // Handle recipe step specially
+    // DEPRECATED: Recipe step is now handled as a dropdown within the media step
+    // Keeping these functions commented for reference
+    /*
     handleRecipeStep: function() {
-        console.log('🧪 Starting recipe step...');
-        console.log('RecipeManager available:', !!window.RecipeManager);
-        
-        if (!window.RecipeManager) {
-            console.error('RecipeManager not available - waiting for initialization');
-            setTimeout(() => this.handleRecipeStep(), 100);
-            return;
-        }
-        
-        console.log('RecipeManager methods:', Object.keys(window.RecipeManager));
-        
-        // Always use the new Recipe Manager wizard
-        this.setupRecipeWizard();
-        
-        // Show the recipe step
-        window.RecipeManager.showRecipeStep();
-        
-        // Hide the builder input since we're using the recipe wizard
-        const input = document.getElementById('builderInput');
-        if (input) {
-            input.style.display = 'none';
-        }
-        
-        // Hide the options area since we're using the recipe wizard
-        const optionsDiv = document.getElementById('builderOptions');
-        if (optionsDiv) {
-            optionsDiv.style.display = 'none';
-        }
-        
-        // Update button text
-        UIUtils.updateContent('builderNextBtn', 'Continue with Recipe →');
-        
-        console.log('✅ Recipe step initialized with new Recipe Manager wizard');
+        // No longer used - recipes are selected via dropdown in media step
     },
-    
-    // Setup the recipe wizard UI
+
     setupRecipeWizard: function() {
-        // Check if RecipeManager needs to initialize its UI
-        if (!document.getElementById('recipeSection')) {
-            console.log('Setting up Recipe Manager UI...');
-            
-            // Call the setupRecipeUI function from RecipeManager
-            if (window.RecipeManager && typeof window.RecipeManager.setupRecipeUI === 'function') {
-                window.RecipeManager.setupRecipeUI();
-            } else {
-                console.warn('RecipeManager.setupRecipeUI not available');
-            }
-        }
+        // No longer used - recipe manager is standalone
     },
-    
-    // Continue from recipe step (called by RecipeManager)
+
     continueFromRecipeStep: function(recipe) {
-        // Debug logging
-        console.log('🔧 continueFromRecipeStep called with recipe:', recipe);
-        console.log('🔧 Current builder state before recipe update:', JSON.stringify(window.appState.builderState.values, null, 2));
-        
-        // Store recipe data
-        StateManager.setState('builderState.values.recipe', recipe.id);
-        StateManager.setState('builderState.metadata.recipeName', recipe.name);
-        
-        // Debug logging after update
-        console.log('🔧 Builder state after recipe update:', JSON.stringify(window.appState.builderState.values, null, 2));
-        
-        // Show success feedback
-        NotificationSystem.showBuilderFeedback(`✅ Recipe selected: ${recipe.name}`, 'success');
-        
-        // Show input again for next step
-        const input = document.getElementById('builderInput');
-        if (input) {
-            input.style.display = 'block';
-        }
-        
-        // Move to next step
-        setTimeout(() => {
-            this.nextStep();
-        }, 500);
+        // No longer used - recipe selection happens inline
     },
+    */
     
     // Show recipe options in the builder options area
     showRecipeOptions: function() {

@@ -49,15 +49,29 @@ window.UIUtils = {
             }
             StateManager.resetTransferState();
             StateManager.resetInitiatorState();
+        } else if (mode === 'recipes') {
+            console.log('🧪 Entering RECIPE MANAGER mode - Recipe creation and management');
+            // Initialize recipe manager if needed
+            if (window.RecipeManager && window.RecipeManager.initializeStandalone) {
+                window.RecipeManager.initializeStandalone();
+            }
+        } else if (mode === 'builder') {
+            console.log('🏗️ Returning to BUILDER mode - Refreshing recipe dropdown');
+            // Refresh recipe dropdown when returning from Recipe Manager
+            setTimeout(() => {
+                if (window.BuilderStepManager && window.BuilderStepManager.refreshRecipeDropdown) {
+                    window.BuilderStepManager.refreshRecipeDropdown();
+                }
+            }, 100);
         }
-        
+
         window.appState.mode = mode;
-        
+
         // Update mode buttons
         document.querySelectorAll('.mode-btn').forEach(btn => {
             btn.classList.remove('active');
         });
-        
+
         // Find the correct button and activate it
         const modeButtons = document.querySelectorAll('.mode-btn');
         if (mode === 'intake' && modeButtons[0]) {
@@ -66,16 +80,22 @@ window.UIUtils = {
             modeButtons[1].classList.add('active');
         } else if (mode === 'builder' && modeButtons[2]) {
             modeButtons[2].classList.add('active');
-        } else if (mode === 'transfer' && modeButtons[3]) {
+        } else if (mode === 'recipes' && modeButtons[3]) {
             modeButtons[3].classList.add('active');
+        } else if (mode === 'inventory' && modeButtons[4]) {
+            modeButtons[4].classList.add('active');
+        } else if (mode === 'transfer' && modeButtons[5]) {
+            modeButtons[5].classList.add('active');
         }
-        
+
         // Show/hide sections based on mode
         const intakeSection = document.getElementById('intakeSection');
         const builderSection = document.getElementById('builderSection');
         const transferSection = document.getElementById('transferSection');
         const initiatorSection = document.getElementById('initiatorSection');
-        
+        const recipeSection = document.getElementById('recipeSection');
+        const inventorySection = document.getElementById('inventorySection');
+
         if (intakeSection) {
             intakeSection.classList.toggle('active', mode === 'intake');
         }
@@ -88,7 +108,13 @@ window.UIUtils = {
         if (initiatorSection) {
             initiatorSection.classList.toggle('active', mode === 'initiator');
         }
-        
+        if (recipeSection) {
+            recipeSection.classList.toggle('active', mode === 'recipes');
+        }
+        if (inventorySection) {
+            inventorySection.classList.toggle('active', mode === 'inventory');
+        }
+
         // Update current mode display
         const currentModeElement = document.getElementById('currentMode');
         if (currentModeElement) {
@@ -96,6 +122,8 @@ window.UIUtils = {
             if (mode === 'intake') modeText = 'Intake';
             else if (mode === 'transfer') modeText = 'Transfer';
             else if (mode === 'initiator') modeText = 'Initiator';
+            else if (mode === 'recipes') modeText = 'Recipes';
+            else if (mode === 'inventory') modeText = 'Inventory';
             currentModeElement.textContent = modeText;
         }
         
