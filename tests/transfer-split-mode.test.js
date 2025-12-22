@@ -77,6 +77,10 @@ try {
 
 // Test data setup
 function setupTestData() {
+    // Ensure app is in Container Transfer mode (required by TransferProcessor guard)
+    window.appState = window.appState || {};
+    window.appState.mode = 'transfer';
+
     // Initialize state
     window.StateManager.setState('inventory', [
         { containerId: 1, strain: 'TestStrain1', owner: 'TestOwner', stage: 'Stage1', media: 'Media1', tissue: 'Tissue1', date: '2024-01-01' },
