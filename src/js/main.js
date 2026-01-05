@@ -80,10 +80,12 @@ function initializeApp() {
     // Initialize OneDrive/SharePoint cloud sync
     if (window.OneDriveSync && window.AuthManager) {
         OneDriveSync.init(AuthManager, {
-            shareUrl: 'https://netorgft8640892-my.sharepoint.com/:x:/g/personal/pozersky_lonewolfgenetics_com/EQbEiBn3HypDjOseGRL6D2gBx9YJelvvhVio-sncoeF-8w?e=Cfwtgq',
+            // Enhanced Plant Inventory System workbook (HQ source of truth)
+            shareUrl: 'https://netorgft8640892-my.sharepoint.com/:x:/r/personal/aterkonda_lonewolfgenetics_com/_layouts/15/Doc.aspx?sourcedoc=%7B4E2D4D05-505A-4790-84B7-2ECB59A4B65F%7D&file=Enhanced_Plant_Inventory_System.xlsx&action=default&mobileredirect=true&DefaultItemOpen=1&wdOrigin=WAC.EXCEL.HOME-BUTTON%2CAPPHOME-WEB.FILEBROWSER.RECENT&wdPreviousSession=1c886364-c1d1-4e1e-8692-d758a3632783&wdPreviousSessionSrc=AppHomeWeb&ct=1766427274916',
             refreshIntervalMs: 300000, // 5 minutes
             statusElementId: 'cloud-sync-status',
-            buttonElementId: 'cloud-sync-btn'
+            buttonElementId: 'cloud-sync-btn',
+            inventoryTableName: 'tblActiveInventory' // Excel table name for Active_Inventory sheet
         });
 
         // Start auto-refresh if authenticated
@@ -463,6 +465,88 @@ function nextBuilderStep() {
 
 function resetBuilder() {
     BuilderStepManager.reset();
+}
+
+// Cloud inventory sync controls
+async function syncInventoryFromCloud() {
+    try {
+        if (!window.AuthManager || !AuthManager.isSignedIn()) {
+            if (window.NotificationSystem) {
+                NotificationSystem.error('Please sign in with Microsoft 365 before syncing inventory from cloud.');
+            }
+            return;
+        }
+        if (!window.OneDriveSync) {
+            if (window.NotificationSystem) {
+                NotificationSystem.error('Cloud sync module is not initialized.');
+            }
+            return;
+        }
+
+        const result = await OneDriveSync.syncActiveInventoryToApp();
+
+        const statusEl = document.getElementById('inventory-sync-status');
+        if (statusEl) {
+            const ts = new Date().toLocaleString();
+            if (result && result.success && typeof result.count === 'number') {
+                statusEl.textContent = `Inventory sync: Pulled ${result.count} row(s) from cloud at ${ts}`;
+            } else {
+                statusEl.textContent = `Inventory sync: Cloud pull completed with 0 rows at ${ts}`;
+            }
+        }
+
+        if (!result || !result.success) {
+            if (window.NotificationSystem) {
+                NotificationSystem.warn('Cloud inventory sync completed but no rows were loaded.');
+            }
+        }
+    } catch (error) {
+        console.error('Error syncing inventory from cloud:', error);
+        if (window.NotificationSystem) {
+            NotificationSystem.error('Error syncing inventory from cloud: ' + error.message);
+        }
+    }
+}
+
+async function syncInventoryToCloud() {
+    try {
+        if (!window.AuthManager || !AuthManager.isSignedIn()) {
+            if (window.NotificationSystem) {
+                NotificationSystem.error('Please sign in with Microsoft 365 before syncing inventory to cloud.');
+            }
+            return;
+        }
+        if (!window.OneDriveSync) {
+            if (window.NotificationSystem) {
+                NotificationSystem.error('Cloud sync module is not initialized.');
+            }
+            return;
+        }
+
+        const result = await OneDriveSync.appendNewInventoryRowsToCloud();
+
+        const statusEl = document.getElementById('inventory-sync-status');
+        if (statusEl) {
+            const ts = new Date().toLocaleString();
+            const count = result && typeof result.count === 'number' ? result.count : 0;
+            if (count > 0) {
+                statusEl.textContent = `Inventory sync: Pushed ${count} new row(s) to cloud at ${ts}`;
+            } else {
+                statusEl.textContent = `Inventory sync: No new rows to push at ${ts}`;
+            }
+        }
+
+        if (!result || result.count === 0) {
+            if (window.NotificationSystem) {
+                NotificationSystem.info('No new inventory rows to sync to cloud.');
+            }
+        }
+    } catch (error) {
+        console.error('Error syncing inventory to cloud:', error);
+        if (window.NotificationSystem) {
+            NotificationSystem.error('Error syncing inventory to cloud: ' + error.message);
+        }
+    }
 }
 
 function useGeneratedBarcode() {

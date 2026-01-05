@@ -85,7 +85,8 @@ window.BarcodeBuilder = {
     // Check if builder is ready to generate barcode
     isReadyToGenerate: function() {
         const values = window.appState.builderState.values;
-        const requiredFields = ['container', 'owner', 'strain', 'media', 'recipe', 'stage', 'tissue', 'date'];
+        // Builder readiness now only depends on stage/tissue/date; container/owner/strain/media are handled at intake
+        const requiredFields = ['stage', 'tissue', 'date'];
         
         return requiredFields.every(field => values[field]);
     },

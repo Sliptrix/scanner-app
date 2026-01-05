@@ -3,6 +3,8 @@
 # Start Scanner App with Email & Authentication
 # This script starts both the frontend and backend servers
 
+set -o pipefail
+
 echo "🚀 Starting Scanner App Servers..."
 echo ""
 
@@ -14,15 +16,45 @@ BACKEND_PID=$!
 cd ..
 
 # Wait for backend to start
-sleep 2
+for i in {1..10}; do
+    if curl -sf http://localhost:3001/health >/dev/null 2>&1; then
+        break
+    fi
+    sleep 1
+done
+
+if ! curl -sf http://localhost:3001/health >/dev/null 2>&1; then
+    echo "❌ Backend health check failed (http://localhost:3001/health)"
+    kill "$BACKEND_PID" 2>/dev/null || true
+    exit 1
+fi
 
 # Start frontend server
 echo "🌐 Starting frontend server (port 8000)..."
-python server.py &
+
+if ! command -v python3 >/dev/null 2>&1; then
+    echo "❌ python3 not found on PATH"
+    kill "$BACKEND_PID" 2>/dev/null || true
+    exit 1
+fi
+
+python3 server.py &
 FRONTEND_PID=$!
 
 # Wait for frontend to start
-sleep 2
+for i in {1..10}; do
+    if curl -sf http://localhost:8000/ >/dev/null 2>&1; then
+        break
+    fi
+    sleep 1
+done
+
+if ! curl -sf http://localhost:8000/ >/dev/null 2>&1; then
+    echo "❌ Frontend did not become ready on http://localhost:8000/"
+    kill "$BACKEND_PID" 2>/dev/null || true
+    kill "$FRONTEND_PID" 2>/dev/null || true
+    exit 1
+fi
 
 echo ""
 echo "✅ Servers started successfully!"
@@ -40,8 +72,12 @@ echo ""
 cleanup() {
     echo ""
     echo "🛑 Stopping servers..."
-    kill $BACKEND_PID 2>/dev/null
-    kill $FRONTEND_PID 2>/dev/null
+    if [[ -n "${BACKEND_PID:-}" ]]; then
+        kill "$BACKEND_PID" 2>/dev/null || true
+    fi
+    if [[ -n "${FRONTEND_PID:-}" ]]; then
+        kill "$FRONTEND_PID" 2>/dev/null || true
+    fi
     echo "✅ Servers stopped"
     exit 0
 }
