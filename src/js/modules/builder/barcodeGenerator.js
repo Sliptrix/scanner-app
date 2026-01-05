@@ -57,9 +57,6 @@ window.BuilderBarcodeGenerator = {
         try {
             // Prepare fields for Code128 generator (excluding container)
             const fields = {
-                owner: values.owner,
-                strain: values.strain,
-                media: values.media,
                 stage: values.stage,
                 tissue: values.tissue,
                 date: values.date
@@ -101,37 +98,15 @@ window.BuilderBarcodeGenerator = {
         // Display container and barcode data
         UIUtils.updateContent('finalContainerId', container);
         
-        // Create enhanced barcode display
+        // Create enhanced barcode display (text-only; image/SVG generation removed)
         const barcodeDisplay = document.getElementById('barcodeDisplay');
         if (barcodeDisplay && barcodeResult.success) {
-            let displayHtml = `
+            const displayHtml = `
                 <div class="barcode-visual-container">
                     <div class="barcode-type-badge">${barcodeResult.type}</div>
                     <div class="barcode-data-display">
                         <div class="barcode-string">${barcodeResult.data}</div>
                     </div>
-            `;
-            
-            // Add visual barcode (prefer SVG over base64 for consistency)
-            if (barcodeResult.svg) {
-                displayHtml += `
-                    <div class="barcode-visual-display">
-                        <div class="barcode-svg-container">
-                            ${barcodeResult.svg}
-                        </div>
-                    </div>
-                `;
-            } else if (barcodeResult.base64) {
-                displayHtml += `
-                    <div class="barcode-visual-display">
-                        <div class="barcode-image-container">
-                            <img src="${barcodeResult.base64}" alt="Generated barcode" class="barcode-image"/>
-                        </div>
-                    </div>
-                `;
-            }
-            
-            displayHtml += `
                     <div class="barcode-metadata">
                         <small>Generated: ${new Date(barcodeResult.timestamp).toLocaleString()}</small>
                     </div>
@@ -165,18 +140,6 @@ window.BuilderBarcodeGenerator = {
             </div>
             <div class="breakdown-grid">
                 <div class="breakdown-part">
-                    <strong>Owner:</strong> ${values.owner} 
-                    <span class="metadata-name">(${metadata.ownerName || values.owner})</span>
-                </div>
-                <div class="breakdown-part">
-                    <strong>Strain:</strong> ${values.strain} 
-                    <span class="metadata-name">(${metadata.strainName || 'Unknown'})</span>
-                </div>
-                <div class="breakdown-part">
-                    <strong>Media:</strong> ${values.media} 
-                    <span class="metadata-name">(${metadata.mediaName || values.media})</span>
-                </div>
-                <div class="breakdown-part">
                     <strong>Stage:</strong> ${values.stage} 
                     <span class="metadata-name">(${metadata.stageName || `Stage ${values.stage}`})</span>
                 </div>
@@ -209,7 +172,7 @@ window.BuilderBarcodeGenerator = {
     
     // Validate all required values are present
     validateAllValues: function(values) {
-        const requiredFields = ['container', 'owner', 'strain', 'media', 'stage', 'tissue', 'date'];
+        const requiredFields = ['stage', 'tissue', 'date'];
         
         for (const field of requiredFields) {
             if (!values[field]) {
@@ -247,15 +210,6 @@ window.BuilderBarcodeGenerator = {
         
         const breakdown = `
             <div class="breakdown-part">
-                <strong>Owner:</strong> ${values.owner} (${metadata.ownerName || values.owner})
-            </div>
-            <div class="breakdown-part">
-                <strong>Strain:</strong> ${values.strain} (${metadata.strainName || 'Unknown'})
-            </div>
-            <div class="breakdown-part">
-                <strong>Media:</strong> ${values.media} (${metadata.mediaName || values.media})
-            </div>
-            <div class="breakdown-part">
                 <strong>Stage:</strong> ${values.stage} (${metadata.stageName || `Stage ${values.stage}`})
             </div>
             <div class="breakdown-part">
@@ -273,9 +227,6 @@ window.BuilderBarcodeGenerator = {
     buildMetadata: function(values, metadata) {
         return {
             // Original metadata
-            ownerName: metadata.ownerName || values.owner,
-            strainName: metadata.strainName || 'Unknown Strain',
-            mediaName: metadata.mediaName || values.media,
             stageName: metadata.stageName || `Stage ${values.stage}`,
             
             // Processed values
@@ -284,16 +235,10 @@ window.BuilderBarcodeGenerator = {
             formattedDate: DataUtils.formatDate(values.date),
             
             // For inventory compatibility
-            strain: metadata.strainName || 'Unknown Strain',
-            owner: metadata.ownerName || values.owner,
             stage: metadata.stageName || `Stage ${values.stage}`,
-            mediaType: metadata.mediaName || values.media,
             
             // IDs for reference
-            strainId: values.strain,
-            ownerId: values.owner,
-            stageId: values.stage,
-            mediaId: values.media
+            stageId: values.stage
         };
     },
     
@@ -400,21 +345,20 @@ window.BuilderBarcodeGenerator = {
         if (existingInitiatedContainer) {
             console.log('Updating existing initiated container:', existingInitiatedContainer);
             
-            // Update the existing initiated container with complete data
+            // Update the existing initiated container with complete data from the builder
+            // NOTE: owner/strain/media come from the Initiator and should NOT be changed here.
             existingInitiatedContainer.timestamp = new Date();
-            existingInitiatedContainer.containerLineage = lineage.length > 0 ? lineage.join(' ← ') : null;
+            existingInitiatedContainer.containerLineage = lineage.length > 0 ? lineage.join(' 1 ') : null;
             existingInitiatedContainer.sampleBarcode = window.appState.currentSample;
             existingInitiatedContainer.barcode = window.appState.currentBarcodeResult.data;
             existingInitiatedContainer.barcodeType = window.appState.currentBarcodeResult.type || 'CODE128';
             existingInitiatedContainer.barcodeMetadata = window.appState.currentBarcodeResult.metadata || null;
-            existingInitiatedContainer.strain = metadata.strain || 'Unknown';
-            existingInitiatedContainer.owner = metadata.owner || 'Unknown';
-            existingInitiatedContainer.stage = metadata.stage || 'Unknown';
-            existingInitiatedContainer.stageId = metadata.stageId || '';
-            existingInitiatedContainer.media = metadata.mediaType || metadata.mediaId || 'Unknown';
-            existingInitiatedContainer.mediaType = metadata.mediaType || 'Unknown';
-            existingInitiatedContainer.tissueCount = metadata.tissueCount || 1;
-            existingInitiatedContainer.date = metadata.formattedDate || new Date().toISOString().split('T')[0];
+            
+            // Preserve existing owner/strain/media from Initiator; only update stage/tissue/date
+            existingInitiatedContainer.stage = metadata.stage || existingInitiatedContainer.stage || 'Unknown';
+            existingInitiatedContainer.stageId = metadata.stageId || existingInitiatedContainer.stageId || '';
+            existingInitiatedContainer.tissueCount = metadata.tissueCount || existingInitiatedContainer.tissueCount || 1;
+            existingInitiatedContainer.date = metadata.formattedDate || existingInitiatedContainer.date || new Date().toISOString().split('T')[0];
             existingInitiatedContainer.status = 'Complete'; // Update status from 'Initial' to 'Complete'
             
             // Final validation

@@ -5,35 +5,6 @@ window.BuilderStepManager = {
     // Step configuration and prompts
     getStepConfig: function(step) {
         const configs = {
-            container: {
-                prompt: 'Enter or scan the Container ID:',
-                hint: 'Scan or type the container number',
-                placeholder: 'e.g., 1234',
-                validation: /^\d+$/,
-                options: []
-            },
-            owner: {
-                prompt: 'Select or scan the Owner ID:',
-                hint: 'Choose from the list below or scan/type the ID',
-                placeholder: 'e.g., LW, J, etc.',
-                validation: /^[A-Z]+$/i,
-                options: 'owners'
-            },
-            strain: {
-                prompt: 'Select or scan the Strain:',
-                hint: 'Choose from the list or enter the strain ID (5 digits)',
-                placeholder: 'e.g., 00001',
-                validation: /^\d{1,5}$/,
-                options: 'strains'
-            },
-            media: {
-                prompt: 'Select the Media Type and Recipe:',
-                hint: 'Choose media type and select a recipe',
-                placeholder: 'e.g., IA, MA, etc.',
-                validation: /^[A-Z]+$/i,
-                options: 'media',
-                requiresRecipe: true  // Flag to show recipe dropdown
-            },
             stage: {
                 prompt: 'Select the Propagation Stage:',
                 hint: 'Choose the current stage (1-9)',
@@ -348,42 +319,16 @@ window.BuilderStepManager = {
     
     // Store step value and associated metadata
     storeStepValue: function(stepName, input) {
-        const processedValue = stepName === 'container' ? input : input.toUpperCase();
+        // Builder now only uses stage/tissue/date and always stores uppercase values
+        const processedValue = input.toUpperCase();
         
         // Store the value
         StateManager.setState(`builderState.values.${stepName}`, processedValue);
         
-        // If container is being set, check if it was created via Initiate Container tool
-        if (stepName === 'container') {
-            this.checkForInitiatedContainer(processedValue);
-        }
-        
-        // Store metadata if available
-        switch(stepName) {
-            case 'owner':
-                StateManager.setState('builderState.metadata.ownerName', 
-                    window.appState.ownersTable[input] || input);
-                break;
-                
-            case 'strain':
-                const strainId = input.padStart(5, '0');
-                StateManager.setState('builderState.values.strain', strainId);
-                StateManager.setState('builderState.metadata.strainName', 
-                    window.appState.strainsTable[parseInt(strainId)] || 'Unknown Strain');
-                
-                // Auto-populate owner from strain-to-owner mapping
-                this.autoPopulateOwnerFromStrain(strainId);
-                break;
-                
-            case 'media':
-                StateManager.setState('builderState.metadata.mediaName', 
-                    window.appState.mediaTypesTable[input] || input);
-                break;
-                
-            case 'stage':
-                StateManager.setState('builderState.metadata.stageName', 
-                    window.appState.stagesTable[parseInt(input)] || `Stage ${input}`);
-                break;
+        // Store metadata if available (stage only for builder)
+        if (stepName === 'stage') {
+            StateManager.setState('builderState.metadata.stageName', 
+                window.appState.stagesTable[parseInt(input)] || `Stage ${input}`);
         }
         
         // Update the live preview after storing the value
@@ -1134,10 +1079,10 @@ window.BuilderStepManager = {
             compactStatus.style.display = 'block';
             compactStatus.classList.add('active');
 
-            // Update composite string in main display
+            // Update composite string in main display (builder now only uses stage/tissue/date)
             const statusComposite = document.getElementById('statusComposite');
             if (statusComposite) {
-                const barcodeFields = ['owner', 'strain', 'media', 'stage', 'tissue', 'date'];
+                const barcodeFields = ['stage', 'tissue', 'date'];
                 const compositeString = barcodeFields.map(field => values[field] || '').join('');
                 statusComposite.textContent = compositeString || 'Building...';
             }
@@ -1181,7 +1126,7 @@ window.BuilderStepManager = {
         // Create a temporary values object with current input
         const tempValues = { ...window.appState.builderState.values };
         if (input) {
-            const processedValue = stepName === 'container' ? input : input.toUpperCase();
+            const processedValue = input.toUpperCase();
             tempValues[stepName] = processedValue;
         }
         
@@ -1207,10 +1152,10 @@ window.BuilderStepManager = {
                 }
             }
 
-            // Update composite string (for barcode fields only)
+            // Update composite string (for barcode fields only - stage/tissue/date)
             const compositeElement = document.getElementById('compositeStringPreview');
             if (compositeElement) {
-                const barcodeFields = ['owner', 'strain', 'media', 'stage', 'tissue', 'date'];
+                const barcodeFields = ['stage', 'tissue', 'date'];
                 const compositeString = barcodeFields.map(field => values[field] || '').join('');
                 compositeElement.textContent = compositeString || '-';
                 compositeElement.className = compositeString ? 'composite-value building' : 'composite-value empty';
@@ -1244,8 +1189,8 @@ window.BuilderStepManager = {
             previewElement.style.display = 'none';
         }
         
-        // Reset all field values
-        const fieldNames = ['container', 'owner', 'strain', 'media', 'recipe', 'stage', 'tissue', 'date'];
+        // Reset all field values (only stage/tissue/date are used in the builder preview now)
+        const fieldNames = ['stage', 'tissue', 'date'];
         fieldNames.forEach(fieldName => {
             const valueElement = document.getElementById(`preview-${fieldName}-value`);
             if (valueElement) {
@@ -1360,103 +1305,6 @@ window.BuilderStepManager = {
         });
     },
     
-    // Check if container was previously created via Initiate Container tool
-    checkForInitiatedContainer: function(containerId) {
-        // Find container in inventory that was created by Initiate Container tool
-        const initiatedContainer = window.appState.inventory.find(item => 
-            item.containerId === containerId && 
-            item.status === 'Initial' && // Status for initiated containers
-            item.notes && item.notes.includes('Created via Container Initiator') &&
-            // Ensure this is an initiated container (has the required IDs)
-            item.ownerId && item.strainId &&
-            // Ensure it doesn't already have complete barcode builder data
-            (!item.sampleBarcode || !item.barcode)
-        );
-        
-        if (initiatedContainer) {
-            console.log('🔍 Found Initiate Container created container:', initiatedContainer);
-            
-            // Auto-populate values from the initiated container using the ID fields
-            const initiatedValues = {
-                owner: initiatedContainer.ownerId,
-                strain: initiatedContainer.strainId,
-                media: (initiatedContainer.mediaId && initiatedContainer.mediaId !== '') 
-                    ? initiatedContainer.mediaId : null
-            };
-            
-            // Show notification about using pre-initiated data
-            let notificationMessage = `🚀 Using pre-initiated container ${containerId}:\n` +
-                `Owner: ${initiatedValues.owner}, Strain: ${initiatedValues.strain}`;
-            
-            if (initiatedValues.media) {
-                notificationMessage += `, Media: ${initiatedValues.media}`;
-            }
-            
-            NotificationSystem.success(notificationMessage);
-            
-            // Store the values in builder state
-            StateManager.setState('builderState.values.owner', initiatedValues.owner);
-            StateManager.setState('builderState.values.strain', initiatedValues.strain);
-            if (initiatedValues.media) {
-                StateManager.setState('builderState.values.media', initiatedValues.media);
-            }
-            
-            // Store metadata if available from lookup tables
-            if (window.appState.ownersTable && window.appState.ownersTable[initiatedValues.owner]) {
-                StateManager.setState('builderState.metadata.ownerName', 
-                    window.appState.ownersTable[initiatedValues.owner]);
-            }
-            
-            if (window.appState.strainsTable && window.appState.strainsTable[parseInt(initiatedValues.strain)]) {
-                StateManager.setState('builderState.metadata.strainName', 
-                    window.appState.strainsTable[parseInt(initiatedValues.strain)]);
-            }
-            
-            if (initiatedValues.media && window.appState.mediaTypesTable && 
-                window.appState.mediaTypesTable[initiatedValues.media]) {
-                StateManager.setState('builderState.metadata.mediaName', 
-                    window.appState.mediaTypesTable[initiatedValues.media]);
-            }
-            
-            // Determine which step to skip to based on what data we have
-            let nextStepIndex;
-            if (initiatedValues.media) {
-                // Has owner, strain, and media - skip to recipe step
-                nextStepIndex = window.appState.builderState.steps.indexOf('recipe');
-            } else {
-                // Has owner and strain only - skip to media step
-                nextStepIndex = window.appState.builderState.steps.indexOf('media');
-            }
-            
-            if (nextStepIndex > 0) {
-                // Mark completed steps visually
-                const completedSteps = window.appState.builderState.steps.slice(1, nextStepIndex);
-                completedSteps.forEach(stepName => {
-                    this.updateProgressStep(stepName, 'completed');
-                });
-                
-                // Set current step
-                StateManager.setState('builderState.currentStep', nextStepIndex);
-                
-                // Update UI for the new step
-                this.updateStep();
-                
-                // Show feedback about skipped steps
-                const skippedStepsText = completedSteps.join(', ');
-                NotificationSystem.info(
-                    `✅ Auto-filled ${skippedStepsText} from initiated container. ` +
-                    `Continue with ${window.appState.builderState.steps[nextStepIndex]}.`
-                );
-            }
-            
-            // Update field preview to show the populated values
-            this.updateFieldPreview();
-            
-            return true;
-        }
-        
-        return false;
-    },
     
     // Fallback options when Excel data is not available
     getFallbackOwners: function() {

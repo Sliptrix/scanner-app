@@ -223,6 +223,18 @@ window.ContainerInitiator = (function() {
                 console.log('Processing media input...');
                 processMediaInput();
                 break;
+            case 'stage':
+                console.log('Processing stage input...');
+                processStageInput();
+                break;
+            case 'tissue':
+                console.log('Processing tissue input...');
+                processTissueInput();
+                break;
+            case 'date':
+                console.log('Processing date input...');
+                processDateInput();
+                break;
             default:
                 console.log('Invalid step, resetting initiator');
                 // Reset to first step if invalid state
@@ -320,7 +332,75 @@ window.ContainerInitiator = (function() {
         // Store the media (or empty string if none)
         StateManager.setState('initiatorState.media', input ? input.toUpperCase() : '');
         
-        // Generate the container
+        // Move to next step (stage)
+        moveToStep('stage');
+        updateInitiatorUI();
+        showFeedback(`Media set to: ${input || 'None'}`, 'success');
+    }
+    
+    /**
+     * Process stage input
+     */
+    function processStageInput() {
+        const input = document.getElementById('initiatorInput').value.trim();
+        
+        if (!input) {
+            showFeedback('Please enter a valid stage (1-9)', 'error');
+            return;
+        }
+        
+        if (!input.match(/^[1-9]$/)) {
+            showFeedback('Stage must be a single digit between 1 and 9', 'error');
+            return;
+        }
+        
+        StateManager.setState('initiatorState.stage', input.toUpperCase());
+        moveToStep('tissue');
+        updateInitiatorUI();
+        showFeedback(`Stage set to: ${input}`, 'success');
+    }
+    
+    /**
+     * Process tissue input
+     */
+    function processTissueInput() {
+        const input = document.getElementById('initiatorInput').value.trim();
+        
+        if (!input) {
+            showFeedback('Please enter a valid tissue count', 'error');
+            return;
+        }
+        
+        if (!input.match(/^\d{1,2}$/) || parseInt(input) <= 0 || parseInt(input) > 99) {
+            showFeedback('Tissue count must be between 1 and 99', 'error');
+            return;
+        }
+        
+        StateManager.setState('initiatorState.tissue', input);
+        moveToStep('date');
+        updateInitiatorUI();
+        showFeedback(`Tissue count set to: ${input}`, 'success');
+    }
+    
+    /**
+     * Process date input
+     */
+    function processDateInput() {
+        const input = document.getElementById('initiatorInput').value.trim();
+        
+        if (!input) {
+            showFeedback('Please enter a valid date', 'error');
+            return;
+        }
+        
+        if (!input.match(/^\d{8}$/)) {
+            showFeedback('Date must be in YYYYMMDD format', 'error');
+            return;
+        }
+        
+        StateManager.setState('initiatorState.date', input);
+        
+        // All fields collected - generate container and complete inventory entry
         generateContainer();
     }
     
@@ -389,28 +469,60 @@ window.ContainerInitiator = (function() {
             }
         }
         
-        // Create container entry with resolved names for display
+        // Get additional fields from initiator state
+        const stage = StateManager.getState('initiatorState.stage');
+        const tissue = StateManager.getState('initiatorState.tissue');
+        const dateRaw = StateManager.getState('initiatorState.date');
+        
+        if (!stage || !tissue || !dateRaw) {
+            showFeedback('Missing required information (stage, tissue, date)', 'error');
+            return;
+        }
+        
+        // Resolve stage name from reference data
+        let stageName = `Stage ${stage}`;
+        if (window.appState.isDataLoaded && window.appState.stagesTable) {
+            const stageData = window.appState.stagesTable[parseInt(stage)];
+            if (stageData) {
+                stageName = stageData;
+            }
+        }
+        
+        // Format date if helper is available
+        const formattedDate = (window.DataUtils && typeof DataUtils.formatDate === 'function')
+            ? DataUtils.formatDate(dateRaw)
+            : dateRaw;
+        
+        // Build the barcode string (owner + strain + media + stage + tissue + date)
+        const barcodeString = 
+            owner +
+            strain +
+            (media || '') +
+            stage +
+            tissue +
+            dateRaw;
+        
+        // Create container entry with resolved names for display (always Complete)
         const newContainer = {
             timestamp: new Date(),
             containerId: currentContainerId,
-            containerLineage: null, // No lineage for initiated containers
-            sampleBarcode: null, // No barcode yet - will be created by Barcode Builder
-            barcode: null, // No barcode yet
-            barcodeType: null,
+            containerLineage: null,
+            sampleBarcode: barcodeString,
+            barcode: barcodeString,
+            barcodeType: 'CODE128',
             barcodeMetadata: null,
-            strain: strainName, // Display name for strain
-            strainId: strain, // Store the actual strain ID from initiation
-            owner: ownerName, // Display name for owner
-            ownerId: owner, // Store the actual owner ID from initiation
-            stage: 'Unknown', // Default stage for initiated containers
-            stageId: null, // No stage data
-            media: mediaName || 'Unknown', // Display name for media or 'Unknown'
-            mediaType: mediaName || 'Unknown', // Display name for media or 'Unknown'
-            mediaId: media || null, // Store the actual media ID if provided, otherwise null
-            tissueCount: 'Unknown', // Will be set by Barcode Builder - show as Unknown for initiated containers
-            date: dateString, // Keep the initiation date
-            status: 'Initial', // Status indicating initiated container
-            notes: 'Created via Container Initiator' // Marker for identification
+            strain: strainName,
+            strainId: strain,
+            owner: ownerName,
+            ownerId: owner,
+            stage: stageName,
+            stageId: stage,
+            media: mediaName || 'Unknown',
+            mediaType: mediaName || 'Unknown',
+            mediaId: media || null,
+            tissueCount: tissue,
+            date: formattedDate,
+            status: 'Complete'
         };
         
         // Add to inventory using StateManager to ensure proper tracking
@@ -430,8 +542,11 @@ window.ContainerInitiator = (function() {
         // Update stats
         UIUtils.updateStats();
         
-        // Update inventory table display
-        if (window.BuilderBarcodeGenerator && typeof window.BuilderBarcodeGenerator.updateInventoryTable === 'function') {
+        // Update inventory table display (builder now removed; use InventoryTableManager if available)
+        if (window.InventoryTableManager && typeof window.InventoryTableManager.rebuildTable === 'function') {
+            window.InventoryTableManager.rebuildTable();
+        } else if (window.BuilderBarcodeGenerator && typeof window.BuilderBarcodeGenerator.updateInventoryTable === 'function') {
+            // Fallback for legacy support
             window.BuilderBarcodeGenerator.updateInventoryTable();
         }
         
@@ -514,11 +629,17 @@ window.ContainerInitiator = (function() {
         const owner = StateManager.getState('initiatorState.owner') || '-';
         const strain = StateManager.getState('initiatorState.strain') || '-';
         const media = StateManager.getState('initiatorState.media') || '-';
+        const stage = StateManager.getState('initiatorState.stage') || '-';
+        const tissue = StateManager.getState('initiatorState.tissue') || '-';
+        const date = StateManager.getState('initiatorState.date') || '-';
         
         summaryElement.innerHTML = `
             <div class="status-item">👤 Owner: <strong>${owner}</strong></div>
             <div class="status-item">🧬 Strain: <strong>${strain}</strong></div>
             <div class="status-item">🧪 Media: <strong>${media}</strong></div>
+            <div class="status-item">🌱 Stage: <strong>${stage}</strong></div>
+            <div class="status-item">🔢 Tissue: <strong>${tissue}</strong></div>
+            <div class="status-item">📅 Date: <strong>${date}</strong></div>
             <div class="status-item">📦 Next ID: <strong>${currentContainerId || '-'}</strong></div>
         `;
     }
@@ -606,7 +727,10 @@ window.ContainerInitiator = (function() {
             currentStep: 'owner',
             owner: null,
             strain: null,
-            media: null
+            media: null,
+            stage: null,
+            tissue: null,
+            date: null
         });
         
         // Hide confirmation

@@ -49,22 +49,19 @@
         </div>
 
         <div class="mode-selector">
-            <button class="mode-btn" onclick="switchMode('intake')">
+            <button class="mode-btn" data-mode="intake" onclick="switchMode('intake')">
                 📥 Intake
             </button>
-            <button class="mode-btn" onclick="switchMode('initiator')">
+            <button class="mode-btn active" data-mode="initiator" onclick="switchMode('initiator')">
                 ✨ Initiate Container
             </button>
-            <button class="mode-btn active" onclick="switchMode('builder')">
-                🏗️ Barcode Builder
-            </button>
-            <button class="mode-btn" onclick="switchMode('recipes')">
+            <button class="mode-btn" data-mode="recipes" onclick="switchMode('recipes')">
                 🧪 Recipe Manager
             </button>
-            <button class="mode-btn" onclick="switchMode('inventory')">
+            <button class="mode-btn" data-mode="inventory" onclick="switchMode('inventory')">
                 📦 Inventory
             </button>
-            <button class="mode-btn" onclick="switchMode('transfer')">
+            <button class="mode-btn" data-mode="transfer" onclick="switchMode('transfer')">
                 🔄 Container Transfer
             </button>
         </div>
@@ -80,9 +77,12 @@
                 <span>❌ Excel data not loaded</span>
                 <button class="btn btn-secondary" onclick="document.getElementById('fileInput').click()">Load Excel File</button>
                 <button class="btn btn-info" onclick="document.getElementById('importInput').click()" style="margin-left: 10px;">📥 Import Data</button>
-                <button class="btn btn-primary" id="cloud-sync-btn" style="margin-left: 10px;">🔄 Sync from Cloud</button>
+                <button class="btn btn-primary" id="cloud-sync-btn" style="margin-left: 10px;">🔄 Sync Owners (Cloud)</button>
+                <button class="btn btn-secondary" id="inventory-sync-from-cloud-btn" onclick="syncInventoryFromCloud()" style="margin-left: 10px;">📥 Sync Inventory From Cloud</button>
+                <button class="btn btn-secondary" id="inventory-sync-to-cloud-btn" onclick="syncInventoryToCloud()" style="margin-left: 10px;">📤 Sync Inventory To Cloud</button>
                 <input type="file" id="importInput" accept=".json" style="display: none;">
                 <div id="cloud-sync-status" style="margin-top: 8px; font-size: 0.85rem; color: #666;">Last synced: —</div>
+                <div id="inventory-sync-status" style="margin-top: 4px; font-size: 0.8rem; color: #666;">Inventory sync: —</div>
             </div>
         </div>
 
@@ -113,32 +113,16 @@
                 <h2 style="margin-bottom: 20px; color: #2c3e50;">🏗️ Barcode Builder</h2>
                 
                 <div class="builder-progress">
-                    <div class="progress-step active clickable" id="step-container" onclick="BuilderStepManager.goToStep(0)">
+                    <div class="progress-step active clickable" id="step-stage" onclick="BuilderStepManager.goToStep(0)">
                         <div class="progress-circle">1</div>
-                        <div class="progress-label">Container</div>
-                    </div>
-                    <div class="progress-step clickable" id="step-owner" onclick="BuilderStepManager.goToStep(1)">
-                        <div class="progress-circle">2</div>
-                        <div class="progress-label">Owner</div>
-                    </div>
-                    <div class="progress-step clickable" id="step-strain" onclick="BuilderStepManager.goToStep(2)">
-                        <div class="progress-circle">3</div>
-                        <div class="progress-label">Strain</div>
-                    </div>
-                    <div class="progress-step clickable" id="step-media" onclick="BuilderStepManager.goToStep(3)">
-                        <div class="progress-circle">4</div>
-                        <div class="progress-label">Media</div>
-                    </div>
-                    <div class="progress-step clickable" id="step-stage" onclick="BuilderStepManager.goToStep(4)">
-                        <div class="progress-circle">5</div>
                         <div class="progress-label">Stage</div>
                     </div>
-                    <div class="progress-step clickable" id="step-tissue" onclick="BuilderStepManager.goToStep(5)">
-                        <div class="progress-circle">6</div>
+                    <div class="progress-step clickable" id="step-tissue" onclick="BuilderStepManager.goToStep(1)">
+                        <div class="progress-circle">2</div>
                         <div class="progress-label">Tissue</div>
                     </div>
-                    <div class="progress-step clickable" id="step-date" onclick="BuilderStepManager.goToStep(6)">
-                        <div class="progress-circle">7</div>
+                    <div class="progress-step clickable" id="step-date" onclick="BuilderStepManager.goToStep(2)">
+                        <div class="progress-circle">3</div>
                         <div class="progress-label">Date</div>
                     </div>
                 </div>
@@ -160,7 +144,7 @@
                         <!-- Options will be populated dynamically -->
                     </div>
 
-                    <!-- Compact Barcode Status -->
+                    <!-- Compact Barcode Status (Stage/Tissue/Date only) -->
                     <div class="barcode-status-compact" id="barcodeStatusCompact" style="display: none;">
                         <div class="status-header">
                             <span class="status-icon">📊</span>
@@ -172,16 +156,9 @@
                         </div>
                         <div class="status-details" id="statusDetails" style="display: none;">
                             <div class="detail-row">
-                                <span class="detail-item">📦 <span id="detail-container">-</span></span>
-                                <span class="detail-item">👤 <span id="detail-owner">-</span></span>
-                                <span class="detail-item">🧬 <span id="detail-strain">-</span></span>
-                                <span class="detail-item">🧪 <span id="detail-media">-</span></span>
-                            </div>
-                            <div class="detail-row">
-                                <span class="detail-item">📋 <span id="detail-recipe">-</span></span>
-                                <span class="detail-item">🌱 <span id="detail-stage">-</span></span>
-                                <span class="detail-item">🔢 <span id="detail-tissue">-</span></span>
-                                <span class="detail-item">📅 <span id="detail-date">-</span></span>
+                                <span class="detail-item">🌱 Stage: <span id="detail-stage">-</span></span>
+                                <span class="detail-item">🔢 Tissue: <span id="detail-tissue">-</span></span>
+                                <span class="detail-item">📅 Date: <span id="detail-date">-</span></span>
                             </div>
                         </div>
                     </div>
@@ -676,10 +653,10 @@
 
                 <div class="recipe-mode-selector" style="margin-bottom: 20px;">
                     <div style="display: flex; gap: 10px; margin-bottom: 15px;">
-                        <button id="newRecipeBtn" class="mode-btn active" onclick="RecipeManager.setRecipeMode('new')">
+                        <button id="newRecipeBtn" class="recipe-mode-btn active" onclick="RecipeManager.setRecipeMode('new')">
                             ➕ Create New Recipe
                         </button>
-                        <button id="existingRecipeBtn" class="mode-btn" onclick="RecipeManager.setRecipeMode('existing')">
+                        <button id="existingRecipeBtn" class="recipe-mode-btn" onclick="RecipeManager.setRecipeMode('existing')">
                             📋 Browse Recipes
                         </button>
                     </div>
@@ -875,6 +852,7 @@
     <script src="src/js/utils/dataUtils.js?v=1.0"></script>
     <script src="src/js/utils/uiUtils.js"></script>
     <script src="src/js/utils/systemReset.js"></script>
+    <script src="src/js/utils/testDataLoader.js"></script>
     <!-- Enhanced Barcode Modules -->
     <script src="src/js/modules/barcode/code128Generator.js"></script>
     <script src="src/js/modules/barcode/barcodeScanner.js"></script>

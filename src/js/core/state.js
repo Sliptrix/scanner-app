@@ -33,7 +33,7 @@ window.appState = {
     // Barcode Builder state
     builderState: {
         currentStep: 0,
-        steps: ['container', 'owner', 'strain', 'media', 'stage', 'tissue', 'date'],
+        steps: ['stage', 'tissue', 'date'],
         values: {
             container: null,
             owner: null,
@@ -61,12 +61,16 @@ window.appState = {
         destContainer: null
     },
     
-    // Container Initiator state
+    // Container Initiator state (now full container+barcode wizard)
     initiatorState: {
+        // Steps: owner -> strain -> media -> stage -> tissue -> date
         currentStep: 'owner',
         owner: null,
         strain: null,
-        media: null
+        media: null,
+        stage: null,
+        tissue: null,
+        date: null
     }
 };
 
@@ -102,7 +106,7 @@ window.StateManager = {
     resetBuilderState: function() {
         window.appState.builderState = {
             currentStep: 0,
-            steps: ['container', 'owner', 'strain', 'media', 'recipe', 'stage', 'tissue', 'date'],
+            steps: ['stage', 'tissue', 'date'],
             values: {
                 container: null,
                 owner: null,

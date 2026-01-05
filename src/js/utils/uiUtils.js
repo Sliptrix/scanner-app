@@ -67,26 +67,15 @@ window.UIUtils = {
 
         window.appState.mode = mode;
 
-        // Update mode buttons
-        document.querySelectorAll('.mode-btn').forEach(btn => {
-            btn.classList.remove('active');
+        // Update top-level mode buttons - scope to .mode-selector to avoid recipe/internal buttons
+        document.querySelectorAll('.mode-selector .mode-btn').forEach(btn => {
+            const btnMode = btn.getAttribute('data-mode');
+            if (btnMode === mode) {
+                btn.classList.add('active');
+            } else {
+                btn.classList.remove('active');
+            }
         });
-
-        // Find the correct button and activate it
-        const modeButtons = document.querySelectorAll('.mode-btn');
-        if (mode === 'intake' && modeButtons[0]) {
-            modeButtons[0].classList.add('active');
-        } else if (mode === 'initiator' && modeButtons[1]) {
-            modeButtons[1].classList.add('active');
-        } else if (mode === 'builder' && modeButtons[2]) {
-            modeButtons[2].classList.add('active');
-        } else if (mode === 'recipes' && modeButtons[3]) {
-            modeButtons[3].classList.add('active');
-        } else if (mode === 'inventory' && modeButtons[4]) {
-            modeButtons[4].classList.add('active');
-        } else if (mode === 'transfer' && modeButtons[5]) {
-            modeButtons[5].classList.add('active');
-        }
 
         // Show/hide sections based on mode
         const intakeSection = document.getElementById('intakeSection');
