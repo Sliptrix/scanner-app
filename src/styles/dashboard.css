@@ -530,10 +530,17 @@ body {
 .reference-section {
     padding: 32px 40px;
     display: none;
+    background: #f5f7fa;
 }
 
 .reference-section.active {
     display: block;
+}
+
+.reference-section h2 {
+    color: #1e293b;
+    font-weight: 700;
+    margin-bottom: 24px;
 }
 
 .section-content {
@@ -635,6 +642,7 @@ body {
 .inventory-section {
     padding: 32px 40px;
     display: none;
+    background: #f5f7fa;
 }
 
 .inventory-section.active {
@@ -644,6 +652,7 @@ body {
 .inventory-section h2 {
     margin-bottom: 24px;
     color: #1e293b;
+    font-weight: 700;
 }
 
 .inventory-table {
@@ -690,6 +699,7 @@ body {
 .recipe-section {
     padding: 32px 40px;
     display: none;
+    background: #f5f7fa;
 }
 
 .intake-section.active,
@@ -708,4 +718,58 @@ body {
 .recipe-section h2 {
     color: #1e293b;
     margin-bottom: 24px;
+    font-weight: 700;
+}
+
+/* Style existing form elements to match new design */
+.btn, .btn-primary, .btn-secondary, .btn-success, .btn-info, .btn-danger {
+    border-radius: 8px;
+    font-weight: 600;
+    transition: all 0.2s ease;
+    border: none;
+    cursor: pointer;
+}
+
+.btn-primary {
+    background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+    color: white;
+}
+
+.btn-primary:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
+}
+
+.btn-secondary {
+    background: #64748b;
+    color: white;
+}
+
+.btn-secondary:hover {
+    background: #475569;
+}
+
+.btn-success {
+    background: #10b981;
+    color: white;
+}
+
+.btn-danger {
+    background: #ef4444;
+    color: white;
+}
+
+/* Form inputs consistency */
+.form-input, .form-control, .barcode-input {
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    padding: 10px 14px;
+    font-size: 0.95rem;
+    transition: all 0.2s ease;
+}
+
+.form-input:focus, .form-control:focus, .barcode-input:focus {
+    outline: none;
+    border-color: #10b981;
+    box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.1);
 }
