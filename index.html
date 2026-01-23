@@ -3,8 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Lab Barcode Builder & Transfer System</title>
+    <title>LoneWolf Biotech - Lab Tracker System</title>
     <link rel="stylesheet" href="src/styles/main-consolidated.css">
+    <link rel="stylesheet" href="src/styles/dashboard.css">
 </head>
 <body>
     <!-- Login Page (shown when not authenticated) -->
@@ -22,92 +23,171 @@
     </div>
     
     <!-- Main App Content (shown when authenticated) -->
-    <div id="appContent" style="display: none;">
-    <div class="container">
-        <div class="header" style="position: relative;">
-            <h1>🧪 Lab Barcode Builder & Transfer System</h1>
-            <p>Create barcodes and manage container transfers with tissue splitting</p>
-            
-            <!-- Authentication Controls -->
-            <div class="auth-controls" style="position: absolute; top: 20px; right: 20px; display: flex; align-items: center; gap: 8px;">
-                <div id="userInfo" style="display: none; background: rgba(102, 126, 234, 0.1); padding: 6px 12px; border-radius: 16px; border: 1.5px solid #667eea;">
-                    <div style="display: flex; align-items: center; gap: 6px;">
-                        <span style="font-size: 1rem;">👤</span>
-                        <div style="display: flex; flex-direction: column; align-items: flex-start;">
-                            <span id="userName" style="font-weight: 600; color: #667eea; font-size: 0.8rem; line-height: 1.1;"></span>
-                            <span id="userEmail" style="color: #667eea; font-size: 0.7rem; line-height: 1.1;"></span>
+    <div id="appContent" class="app-wrapper" style="display: none;">
+        <!-- Sidebar Navigation -->
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <div class="logo-icon">🐺</div>
+                <div class="logo-text">
+                    <div class="logo-title">LONEWOLF<span style="color: #10b981;">BIO</span></div>
+                    <div class="logo-subtitle">LAB TRACKER V2.1</div>
+                </div>
+            </div>
+
+            <nav class="sidebar-nav">
+                <button class="nav-item active" data-mode="dashboard" onclick="switchMode('dashboard')">
+                    <span class="nav-icon">📊</span>
+                    <span class="nav-label">Dashboard</span>
+                </button>
+                <button class="nav-item" data-mode="inventory" onclick="switchMode('inventory')">
+                    <span class="nav-icon">🌱</span>
+                    <span class="nav-label">Active Inventory</span>
+                </button>
+                <button class="nav-item" data-mode="recipes" onclick="switchMode('recipes')">
+                    <span class="nav-icon">⚗️</span>
+                    <span class="nav-label">Media Lab</span>
+                </button>
+                <button class="nav-item" data-mode="reference" onclick="switchMode('reference')">
+                    <span class="nav-icon">📋</span>
+                    <span class="nav-label">Reference Data</span>
+                </button>
+            </nav>
+
+            <div class="sidebar-footer">
+                <div class="user-profile">
+                    <div class="user-avatar">LW</div>
+                    <div class="user-info">
+                        <div class="user-name">LoneWolf Bio</div>
+                        <div class="user-role">Admin Access</div>
+                    </div>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Main Content Area -->
+        <main class="main-container">
+            <!-- Top Header -->
+            <header class="top-header">
+                <h1 class="page-title">Dashboard</h1>
+                <div class="header-actions">
+                    <button class="btn-export" onclick="exportInventory()">
+                        <span>📊</span> Excel Export
+                    </button>
+                    <div class="search-box">
+                        <span class="search-icon">🔍</span>
+                        <input type="text" placeholder="Global Search..." class="search-input">
+                    </div>
+                </div>
+            </header>
+
+            <!-- Dashboard Section (Default View) -->
+            <div class="dashboard-section active" id="dashboardSection">
+                <!-- Hero Banner -->
+                <div class="hero-banner">
+                    <div class="hero-content">
+                        <h2 class="hero-title">Welcome to LoneWolf Biotech Lab</h2>
+                        <p class="hero-message">
+                            System functional. All environmental controls are nominal. You have
+                            <span class="highlight-text">2 batches</span> requiring attention today.
+                        </p>
+                        <button class="btn-intake" onclick="switchMode('intake')">
+                            <span>➕</span> New Intake
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Metrics Cards -->
+                <div class="metrics-grid">
+                    <div class="metric-card">
+                        <div class="metric-icon metric-green">🌱</div>
+                        <div class="metric-content">
+                            <div class="metric-label">ACTIVE PLANTS</div>
+                            <div class="metric-value" id="activePlants">0</div>
+                            <div class="metric-progress">
+                                <div class="progress-bar" style="width: 70%;"></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="metric-card">
+                        <div class="metric-icon metric-blue">⭕</div>
+                        <div class="metric-content">
+                            <div class="metric-label">UNIQUE STRAINS</div>
+                            <div class="metric-value" id="uniqueStrains">0</div>
+                        </div>
+                    </div>
+
+                    <div class="metric-card">
+                        <div class="metric-icon metric-blue">💧</div>
+                        <div class="metric-content">
+                            <div class="metric-label">MEDIA BATCHES</div>
+                            <div class="metric-value" id="mediaBatches">0</div>
+                        </div>
+                    </div>
+
+                    <div class="metric-card">
+                        <div class="metric-icon metric-orange">📈</div>
+                        <div class="metric-content">
+                            <div class="metric-label">EFFICIENCY</div>
+                            <div class="metric-value" id="efficiency">94%</div>
                         </div>
                     </div>
                 </div>
-                <button id="loginBtn" class="btn btn-primary btn-sm" onclick="signIn()" style="padding: 6px 14px; font-size: 0.85rem;">
-                    🔐 Sign In
-                </button>
-                <button id="logoutBtn" class="btn btn-secondary btn-sm" onclick="signOut()" style="display: none; padding: 6px 14px; font-size: 0.85rem;">
-                    Sign Out
-                </button>
-            </div>
-        </div>
 
-        <div class="mode-selector">
-            <button class="mode-btn" data-mode="intake" onclick="switchMode('intake')">
-                📥 Intake
-            </button>
-            <button class="mode-btn active" data-mode="initiator" onclick="switchMode('initiator')">
-                ✨ Initiate Container
-            </button>
-            <button class="mode-btn" data-mode="recipes" onclick="switchMode('recipes')">
-                🧪 Recipe Manager
-            </button>
-            <button class="mode-btn" data-mode="inventory" onclick="switchMode('inventory')">
-                📦 Inventory
-            </button>
-            <button class="mode-btn" data-mode="transfer" onclick="switchMode('transfer')">
-                🔄 Container Transfer
-            </button>
-        </div>
+                <!-- Recent Intake Table -->
+                <div class="recent-intake">
+                    <div class="section-header">
+                        <h3>Recent Intake</h3>
+                        <a href="#" class="view-all-link" onclick="switchMode('intake')">View All</a>
+                    </div>
+                    <div class="intake-table-wrapper">
+                        <table class="intake-table">
+                            <thead>
+                                <tr>
+                                    <th>ID</th>
+                                    <th>Strain</th>
+                                    <th>Stage</th>
+                                    <th>Date</th>
+                                    <th>Qty</th>
+                                </tr>
+                            </thead>
+                            <tbody id="recentIntakeBody">
+                                <!-- Recent intake data will be populated here -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
 
-        <div class="file-upload-section">
-            <div class="upload-area" onclick="document.getElementById('fileInput').click()">
-                <input type="file" id="fileInput" accept=".xlsx,.xls" style="display: none;">
-                <h3>📄 Load Your Excel Data File</h3>
-                <p>Click here or drag your "barcode test.xlsx" file to load all reference tables</p>
+                <!-- Hidden file upload section - kept for functionality -->
+                <div style="display: none;">
+                    <input type="file" id="fileInput" accept=".xlsx,.xls">
+                    <input type="file" id="importInput" accept=".json">
+                </div>
             </div>
-            
-            <div class="data-status" id="dataStatus">
-                <span>❌ Excel data not loaded</span>
-                <button class="btn btn-secondary" onclick="document.getElementById('fileInput').click()">Load Excel File</button>
-                <button class="btn btn-info" onclick="document.getElementById('importInput').click()" style="margin-left: 10px;">📥 Import Data</button>
-                <button class="btn btn-primary" id="cloud-sync-btn" style="margin-left: 10px;">🔄 Sync Owners (Cloud)</button>
-                <button class="btn btn-secondary" id="inventory-sync-from-cloud-btn" onclick="syncInventoryFromCloud()" style="margin-left: 10px;">📥 Sync Inventory From Cloud</button>
-                <button class="btn btn-secondary" id="inventory-sync-to-cloud-btn" onclick="syncInventoryToCloud()" style="margin-left: 10px;">📤 Sync Inventory To Cloud</button>
-                <input type="file" id="importInput" accept=".json" style="display: none;">
-                <div id="cloud-sync-status" style="margin-top: 8px; font-size: 0.85rem; color: #666;">Last synced: —</div>
-                <div id="inventory-sync-status" style="margin-top: 4px; font-size: 0.8rem; color: #666;">Inventory sync: —</div>
-            </div>
-        </div>
 
-        <div class="stats-grid">
-            <div class="stat-card">
-                <div style="font-size: 1.5rem; font-weight: 700;" id="totalProcessed">0</div>
-                <div style="font-size: 0.8rem;">Processed</div>
-            </div>
-            <div class="stat-card">
-                <div style="font-size: 1.5rem; font-weight: 700;" id="uniqueStrains">0</div>
-                <div style="font-size: 0.8rem;">Strains</div>
-            </div>
-            <div class="stat-card">
-                <div style="font-size: 1.5rem; font-weight: 700;" id="sessionCount">0</div>
-                <div style="font-size: 0.8rem;">This Session</div>
-            </div>
-            <div class="stat-card">
-                <div style="font-size: 1.5rem; font-weight: 700;" id="currentMode">Builder</div>
-                <div style="font-size: 0.8rem;">Current Mode</div>
-            </div>
-        </div>
+            <!-- Reference Data Section -->
+            <div class="reference-section" id="referenceSection" style="display: none;">
+                <div class="section-content">
+                    <h2>Reference Data Management</h2>
+                    <div class="upload-area" onclick="document.getElementById('fileInput').click()">
+                        <h3>📄 Load Your Excel Data File</h3>
+                        <p>Click here or drag your "barcode test.xlsx" file to load all reference tables</p>
+                    </div>
 
-        </div>
+                    <div class="data-status" id="dataStatus">
+                        <span>❌ Excel data not loaded</span>
+                        <button class="btn btn-secondary" onclick="document.getElementById('fileInput').click()">Load Excel File</button>
+                        <button class="btn btn-info" onclick="document.getElementById('importInput').click()" style="margin-left: 10px;">📥 Import Data</button>
+                        <button class="btn btn-primary" id="cloud-sync-btn" style="margin-left: 10px;">🔄 Sync Owners (Cloud)</button>
+                        <button class="btn btn-secondary" id="inventory-sync-from-cloud-btn" onclick="syncInventoryFromCloud()" style="margin-left: 10px;">📥 Sync Inventory From Cloud</button>
+                        <button class="btn btn-secondary" id="inventory-sync-to-cloud-btn" onclick="syncInventoryToCloud()" style="margin-left: 10px;">📤 Sync Inventory To Cloud</button>
+                        <div id="cloud-sync-status" style="margin-top: 8px; font-size: 0.85rem; color: #666;">Last synced: —</div>
+                        <div id="inventory-sync-status" style="margin-top: 4px; font-size: 0.8rem; color: #666;">Inventory sync: —</div>
+                    </div>
+                </div>
+            </div>
 
-        <div class="main-content">
+        <div class="main-content" style="display: none;">
             <!-- Barcode Builder Section -->
             <div class="builder-section active" id="builderSection">
                 <h2 style="margin-bottom: 20px; color: #2c3e50;">🏗️ Barcode Builder</h2>
@@ -830,7 +910,7 @@
                 </div>
             </div>
         </div>
-    </div>
+        </main>
     </div> <!-- End appContent -->
 
     <div id="notification" class="notification"></div>
@@ -888,6 +968,8 @@
     <script src="src/js/modules/cloud/oneDriveSync.js"></script>
     <!-- Email Service Module -->
     <script src="src/js/modules/email/emailService.js"></script>
+    <!-- Dashboard Module -->
+    <script src="src/js/modules/dashboard/dashboardMain.js"></script>
     <!-- Main Application -->
     <script src="src/js/main.js?v=1.0"></script>
 </body>

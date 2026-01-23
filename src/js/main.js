@@ -31,8 +31,8 @@ function initializeApp() {
         }, 1000); // Give JSON loading 1 second to complete
     }
     
-    // Set initial mode to intake
-    UIUtils.switchMode('intake');
+    // Set initial mode to dashboard
+    UIUtils.switchMode('dashboard');
     
     // Setup event listeners
     setupEventListeners();

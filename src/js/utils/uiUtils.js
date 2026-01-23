@@ -55,6 +55,14 @@ window.UIUtils = {
             if (window.RecipeManager && window.RecipeManager.initializeStandalone) {
                 window.RecipeManager.initializeStandalone();
             }
+        } else if (mode === 'dashboard') {
+            console.log('📊 Entering DASHBOARD mode - Overview display');
+            // Update dashboard metrics
+            if (window.DashboardManager) {
+                window.DashboardManager.updateDashboard();
+            }
+        } else if (mode === 'reference') {
+            console.log('📋 Entering REFERENCE DATA mode - Data management');
         } else if (mode === 'builder') {
             console.log('🏗️ Returning to BUILDER mode - Refreshing recipe dropdown');
             // Refresh recipe dropdown when returning from Recipe Manager
@@ -78,13 +86,18 @@ window.UIUtils = {
         });
 
         // Show/hide sections based on mode
+        const dashboardSection = document.getElementById('dashboardSection');
         const intakeSection = document.getElementById('intakeSection');
         const builderSection = document.getElementById('builderSection');
         const transferSection = document.getElementById('transferSection');
         const initiatorSection = document.getElementById('initiatorSection');
         const recipeSection = document.getElementById('recipeSection');
         const inventorySection = document.getElementById('inventorySection');
+        const referenceSection = document.getElementById('referenceSection');
 
+        if (dashboardSection) {
+            dashboardSection.classList.toggle('active', mode === 'dashboard');
+        }
         if (intakeSection) {
             intakeSection.classList.toggle('active', mode === 'intake');
         }
@@ -103,16 +116,45 @@ window.UIUtils = {
         if (inventorySection) {
             inventorySection.classList.toggle('active', mode === 'inventory');
         }
+        if (referenceSection) {
+            referenceSection.classList.toggle('active', mode === 'reference');
+        }
 
-        // Update current mode display
+        // Update sidebar nav items
+        document.querySelectorAll('.sidebar-nav .nav-item').forEach(btn => {
+            const btnMode = btn.getAttribute('data-mode');
+            if (btnMode === mode) {
+                btn.classList.add('active');
+            } else {
+                btn.classList.remove('active');
+            }
+        });
+
+        // Update page title
+        const pageTitle = document.querySelector('.page-title');
+        if (pageTitle) {
+            let titleText = 'Dashboard';
+            if (mode === 'intake') titleText = 'Lab Intake';
+            else if (mode === 'transfer') titleText = 'Container Transfer';
+            else if (mode === 'initiator') titleText = 'Initiate Container';
+            else if (mode === 'recipes') titleText = 'Media Lab';
+            else if (mode === 'inventory') titleText = 'Active Inventory';
+            else if (mode === 'reference') titleText = 'Reference Data';
+            else if (mode === 'builder') titleText = 'Barcode Builder';
+            pageTitle.textContent = titleText;
+        }
+
+        // Update current mode display (legacy)
         const currentModeElement = document.getElementById('currentMode');
         if (currentModeElement) {
             let modeText = 'Builder';
-            if (mode === 'intake') modeText = 'Intake';
+            if (mode === 'dashboard') modeText = 'Dashboard';
+            else if (mode === 'intake') modeText = 'Intake';
             else if (mode === 'transfer') modeText = 'Transfer';
             else if (mode === 'initiator') modeText = 'Initiator';
             else if (mode === 'recipes') modeText = 'Recipes';
             else if (mode === 'inventory') modeText = 'Inventory';
+            else if (mode === 'reference') modeText = 'Reference';
             currentModeElement.textContent = modeText;
         }
         
