@@ -18,9 +18,15 @@ window.ContainerInitiator = (function() {
      * Initialize the container initiator
      */
     function initialize() {
+        // Prevent re-initialization (which would add duplicate event listeners)
+        if (initialized) {
+            console.log('✅ ContainerInitiator already initialized, skipping...');
+            return;
+        }
+
         try {
             console.log('🚀 ContainerInitiator module initializing...');
-            
+
             // Check if StateManager is available
             if (!window.StateManager) {
                 console.error('❌ StateManager not available!');

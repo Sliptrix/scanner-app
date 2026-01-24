@@ -752,21 +752,43 @@
                 <div class="input-group">
                     <input type="text" id="initiatorInput" class="barcode-input" placeholder="Enter value..." autocomplete="off">
                 </div>
+
+                <!-- Date shortcut buttons (shown only on date step) -->
+                <div id="initiatorDateShortcuts" style="display: none; gap: 10px; margin-bottom: 15px;">
+                    <button type="button" id="initiatorDateYesterdayBtn" class="btn" onclick="ContainerInitiator.selectQuickDate(-1)" style="background: #6b7280; color: white; flex: 1;">Yesterday</button>
+                    <button type="button" id="initiatorDateTodayBtn" class="btn btn-primary" onclick="ContainerInitiator.selectQuickDate(0)" style="flex: 1;">Today</button>
+                    <button type="button" id="initiatorDateTomorrowBtn" class="btn" onclick="ContainerInitiator.selectQuickDate(1)" style="background: #6b7280; color: white; flex: 1;">Tomorrow</button>
+                </div>
+
                 <div class="scan-feedback" id="initiatorFeedback">Ready to initiate a new container</div>
-                <button class="btn btn-primary" id="initiateBtn">Next Step</button>
+
+                <!-- Action buttons -->
+                <div style="display: flex; gap: 10px; margin-bottom: 20px;">
+                    <button class="btn" id="initiatorBackBtn" style="background: #6b7280; color: white;">← Back</button>
+                    <button class="btn btn-primary" id="initiateBtn" style="flex: 1;">Next Step</button>
+                </div>
+
                 <div class="initiator-summary" id="initiatorSummary">
                     <div class="status-item">👤 Owner: <strong>-</strong></div>
                     <div class="status-item">🧬 Strain: <strong>-</strong></div>
                     <div class="status-item">🧪 Media: <strong>-</strong></div>
+                    <div class="status-item">🌱 Stage: <strong>-</strong></div>
+                    <div class="status-item">🔢 Tissue: <strong>-</strong></div>
+                    <div class="status-item">📅 Date: <strong>-</strong></div>
                     <div class="status-item">📦 Next ID: <strong>-</strong></div>
                 </div>
-                <div class="initiator-confirmation" id="initiatorConfirmation" style="display: none;">
-                    <h4>Container Created Successfully!</h4>
-                    <p><strong>Container ID:</strong> <span id="confirmContainerId"></span></p>
-                    <p><strong>Owner:</strong> <span id="confirmOwner"></span></p>
-                    <p><strong>Strain:</strong> <span id="confirmStrain"></span></p>
-                    <p><strong>Media:</strong> <span id="confirmMedia"></span></p>
-                    <p><strong>Date:</strong> <span id="confirmDate"></span></p>
+
+                <div class="initiator-confirmation" id="initiatorConfirmation" style="display: none; margin-top: 20px; padding: 20px; background: #f0fdf4; border: 2px solid #10b981; border-radius: 8px;">
+                    <h4 style="color: #059669; margin-bottom: 15px;">✅ Container Created Successfully!</h4>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 15px;">
+                        <p><strong>Container ID:</strong> <span id="confirmContainerId"></span></p>
+                        <p><strong>Owner:</strong> <span id="confirmOwner"></span></p>
+                        <p><strong>Strain:</strong> <span id="confirmStrain"></span></p>
+                        <p><strong>Media:</strong> <span id="confirmMedia"></span></p>
+                        <p><strong>Date:</strong> <span id="confirmDate"></span></p>
+                        <p><strong>Barcode:</strong> <span id="confirmBarcode" style="font-family: monospace; font-size: 0.9em;"></span></p>
+                    </div>
+                    <div id="confirmQrCode" style="text-align: center; margin-top: 15px;"></div>
                 </div>
             </div>
 
