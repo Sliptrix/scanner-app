@@ -5,14 +5,11 @@
  */
 
 window.ContainerInitiator = (function() {
-'use strict';
+    'use strict';
 
     // Private state
     let currentContainerId = null;
     let initialized = false;
-    
-    // Ordered list of initiator steps for navigation
-    const STEPS = ['owner', 'strain', 'media', 'stage', 'tissue', 'date'];
     
     /**
      * Initialize the container initiator
@@ -63,12 +60,7 @@ window.ContainerInitiator = (function() {
                 currentStep: 'owner',
                 owner: null,
                 strain: null,
-                media: null,
-                stage: null,
-                tissue: null,
-                date: null,
-                // Marks whether the current container has been fully created
-                completed: false
+                media: null
             };
             
             try {
@@ -173,17 +165,6 @@ window.ContainerInitiator = (function() {
         } else {
             console.error('❌ initiateBtn element not found!');
         }
-
-        const backBtn = document.getElementById('initiatorBackBtn');
-        if (backBtn) {
-            console.log('✅ Found initiatorBackBtn element, adding click listener');
-            backBtn.addEventListener('click', function() {
-                console.log('🔵 Back button clicked, going to previous step');
-                goToPreviousStep();
-            });
-        } else {
-            console.warn('⚠️ initiatorBackBtn element not found; back navigation disabled');
-        }
         
         console.log('🔧 Container Initiator event listeners setup complete');
     }
@@ -223,21 +204,11 @@ window.ContainerInitiator = (function() {
         console.log('🔵 handleInitiatorInput called');
         
         const currentStep = StateManager.getState('initiatorState.currentStep');
-        const isCompleted = StateManager.getState('initiatorState.completed');
         const inputValue = document.getElementById('initiatorInput')?.value?.trim();
         
         console.log('Current step:', currentStep);
         console.log('Input value:', inputValue);
         console.log('Current state:', StateManager.getState('initiatorState'));
-        
-        // If the current container flow has already completed, treat "Next" as
-        // an explicit request to start a brand new container instead of
-        // generating another entry with the same metadata.
-        if (isCompleted) {
-            console.log('✅ Initiator flow already completed; resetting for next container.');
-            resetInitiator();
-            return;
-        }
         
         switch (currentStep) {
             case 'owner':
@@ -339,40 +310,32 @@ window.ContainerInitiator = (function() {
      * Process media input
      */
     function processMediaInput() {
-        const rawInput = document.getElementById('initiatorInput').value.trim();
-        const upperInput = rawInput.toUpperCase();
+        const input = document.getElementById('initiatorInput').value.trim();
         
-        // Treat empty, NA, N/A, NONE as "no media" selections
-        const isNoMedia = !rawInput || upperInput === 'NA' || upperInput === 'N/A' || upperInput === 'NONE';
-        
-        if (isNoMedia) {
-            // Explicitly store N/A so the user can see that no media is present
-            StateManager.setState('initiatorState.media', 'N/A');
-            moveToStep('stage');
-            updateInitiatorUI();
-            showFeedback('Media set to: N/A (no media present)', 'success');
+        if (!input && input !== '') {
+            showFeedback('Invalid media type', 'error');
             return;
         }
         
         // Media is optional, check if it exists but don't require it
-        if (window.appState.isDataLoaded) {
+        if (input && window.appState.isDataLoaded) {
             const mediaTypesTable = window.appState.mediaTypesTable;
             const mediaExists = Object.keys(mediaTypesTable).some(key => 
-                key.toLowerCase() === upperInput.toLowerCase());
+                key.toLowerCase() === input.toLowerCase());
             
             if (!mediaExists) {
-                showFeedback(`Media "${rawInput}" not found in reference data`, 'warning');
+                showFeedback(`Media "${input}" not found in reference data`, 'warning');
                 // Continue anyway since we can create new media types
             }
         }
         
-        // Store the media code
-        StateManager.setState('initiatorState.media', upperInput);
+        // Store the media (or empty string if none)
+        StateManager.setState('initiatorState.media', input ? input.toUpperCase() : '');
         
         // Move to next step (stage)
         moveToStep('stage');
         updateInitiatorUI();
-        showFeedback(`Media set to: ${rawInput}`, 'success');
+        showFeedback(`Media set to: ${input || 'None'}`, 'success');
     }
     
     /**
@@ -445,21 +408,10 @@ window.ContainerInitiator = (function() {
      * Generate a new container with the provided information
      */
     function generateContainer() {
-        // Defensive guard: if this initiator flow has already completed,
-        // do not generate another container with the same metadata.
-        const alreadyCompleted = StateManager.getState('initiatorState.completed');
-        if (alreadyCompleted) {
-            console.warn('generateContainer() called after initiator completion; ignoring to prevent duplicate entry');
-            showFeedback('Current container already created. Press "Start New Container" to begin a new initiation.', 'info');
-            return;
-        }
-
         // Get the owner, strain, and media from state
         const owner = StateManager.getState('initiatorState.owner');
         const strain = StateManager.getState('initiatorState.strain');
-        const mediaRaw = StateManager.getState('initiatorState.media');
-        const mediaUpper = mediaRaw ? mediaRaw.toUpperCase() : null;
-        const hasNoMedia = !mediaUpper || mediaUpper === 'N/A';
+        const media = StateManager.getState('initiatorState.media');
         
         if (!owner || !strain) {
             showFeedback('Missing required information (owner and strain)', 'error');
@@ -476,8 +428,7 @@ window.ContainerInitiator = (function() {
         // Resolve owner and strain names from reference data
         let ownerName = owner;
         let strainName = 'Unknown Strain';
-        // For no-media containers, display N/A explicitly
-        let mediaName = hasNoMedia ? 'N/A' : null;
+        let mediaName = media || null;
         
         // Look up owner name from reference data
         if (window.appState.isDataLoaded && window.appState.ownersTable) {
@@ -505,10 +456,10 @@ window.ContainerInitiator = (function() {
             }
         }
         
-        // Look up media name from reference data when media is present
-        if (!hasNoMedia && mediaUpper && window.appState.isDataLoaded && window.appState.mediaTypesTable) {
+        // Look up media name from reference data
+        if (media && window.appState.isDataLoaded && window.appState.mediaTypesTable) {
             // Handle both Excel format {id: name} and object format {id: {name: "name"}}
-            const mediaData = window.appState.mediaTypesTable[mediaUpper];
+            const mediaData = window.appState.mediaTypesTable[media];
             if (typeof mediaData === 'string') {
                 // Excel format: {"MS": "MS Media"}
                 mediaName = mediaData;
@@ -542,36 +493,14 @@ window.ContainerInitiator = (function() {
             ? DataUtils.formatDate(dateRaw)
             : dateRaw;
         
-        // Build barcode using the shared Code128BarcodeGenerator so format is consistent
-        let barcodeResult = null;
-        let barcodeString = null;
-
-        // Map media for barcode encoding: use a safe code when no media is present
-        const mediaCodeForBarcode = hasNoMedia ? 'NM' : mediaUpper; // "NM" = No Media
-
-        if (window.Code128BarcodeGenerator) {
-            try {
-                barcodeResult = Code128BarcodeGenerator.generateCode128Barcode({
-                    owner: owner,
-                    strain: strain,
-                    media: mediaCodeForBarcode,
-                    stage: stage,
-                    tissue: tissue,
-                    date: dateRaw
-                });
-
-                if (barcodeResult && barcodeResult.success && barcodeResult.data) {
-                    barcodeString = barcodeResult.data;
-                }
-            } catch (e) {
-                console.warn('Code128BarcodeGenerator failed in ContainerInitiator, falling back:', e);
-            }
-        }
-
-        // Fallback: simple concatenation if enhanced generator is unavailable
-        if (!barcodeString) {
-            barcodeString = owner + strain + (mediaUpper || '') + stage + tissue + dateRaw;
-        }
+        // Build the barcode string (owner + strain + media + stage + tissue + date)
+        const barcodeString = 
+            owner +
+            strain +
+            (media || '') +
+            stage +
+            tissue +
+            dateRaw;
         
         // Create container entry with resolved names for display (always Complete)
         const newContainer = {
@@ -581,7 +510,7 @@ window.ContainerInitiator = (function() {
             sampleBarcode: barcodeString,
             barcode: barcodeString,
             barcodeType: 'CODE128',
-            barcodeMetadata: barcodeResult && barcodeResult.success ? (barcodeResult.metadata || null) : null,
+            barcodeMetadata: null,
             strain: strainName,
             strainId: strain,
             owner: ownerName,
@@ -590,7 +519,7 @@ window.ContainerInitiator = (function() {
             stageId: stage,
             media: mediaName || 'Unknown',
             mediaType: mediaName || 'Unknown',
-            mediaId: hasNoMedia ? null : mediaUpper,
+            mediaId: media || null,
             tissueCount: tissue,
             date: formattedDate,
             status: 'Complete'
@@ -626,63 +555,13 @@ window.ContainerInitiator = (function() {
             window.InventoryManager.saveToLocalStorage();
         }
         
-        // If we have a successful barcodeResult and QR service, kick off QR generation
-        if (barcodeResult && barcodeResult.success && window.QRCodeService) {
-            QRCodeService.createForBarcode(barcodeResult, currentContainerId)
-                .then(qrMeta => {
-                    try {
-                        // Attach QR metadata to container entry and update confirmation UI
-                        newContainer.barcodeMetadata = newContainer.barcodeMetadata || {};
-                        newContainer.barcodeMetadata.qrCode = {
-                            dataUrl: qrMeta.dataUrl,
-                            destinationUrl: qrMeta.destinationUrl,
-                            imageFormat: qrMeta.imageFormat
-                        };
-
-                        // Also persist a top-level QR destination URL for easier export/sync
-                        if (qrMeta.destinationUrl) {
-                            newContainer.qrDestinationUrl = qrMeta.destinationUrl;
-                        }
-
-                        // Update the corresponding inventory entry (it was just unshifted to index 0)
-                        const latest = window.appState.inventory[0];
-                        if (latest && latest.containerId === newContainer.containerId) {
-                            latest.barcodeMetadata = newContainer.barcodeMetadata;
-                            if (newContainer.qrDestinationUrl) {
-                                latest.qrDestinationUrl = newContainer.qrDestinationUrl;
-                            }
-                        }
-
-                        // Update confirmation QR preview
-                        const qrEl = document.getElementById('confirmQrCode');
-                        if (qrEl && qrMeta.dataUrl) {
-                            qrEl.innerHTML = `<img src="${qrMeta.dataUrl}" alt="QR Code" style="max-width: 120px; height: auto;" />`;
-                        }
-                    } catch (err) {
-                        console.warn('Failed to attach QR metadata for initiated container:', err);
-                    }
-                })
-                .catch(err => {
-                    console.warn('QR code generation failed for initiated container:', err);
-                });
-        }
-        
         // Show success message
         showFeedback(`Container ${currentContainerId} created successfully!`, 'success');
         
-        // Mark this initiator run as completed so additional "Next" presses
-        // don't create more containers with the same metadata. The next
-        // invocation of handleInitiatorInput() will reset the initiator to
-        // start a fresh container.
-        try {
-            StateManager.setState('initiatorState.completed', true);
-        } catch (e) {
-            console.warn('Failed to mark initiator state as completed:', e);
-        }
-        
-        // NOTE: Do not immediately reset the initiator so the user can see the QR/confirmation.
-        // The user can start a new initiation explicitly when ready (pressing
-        // Next again will reset for a new container instead of duplicating).
+        // Reset initiator for next use
+        setTimeout(() => {
+            resetInitiator();
+        }, 3000);
     }
     
     /**
@@ -701,13 +580,6 @@ window.ContainerInitiator = (function() {
         document.getElementById('confirmStrain').textContent = container.strainId; // Use strainId
         document.getElementById('confirmMedia').textContent = container.mediaId || 'Not specified'; // Use mediaId
         document.getElementById('confirmDate').textContent = container.date;
-        document.getElementById('confirmBarcode').textContent = container.barcode || container.sampleBarcode || '';
-
-        // Clear any previous QR image; it will be filled when QR generation completes
-        const qrEl = document.getElementById('confirmQrCode');
-        if (qrEl) {
-            qrEl.innerHTML = '';
-        }
     }
     
     /**
@@ -715,54 +587,14 @@ window.ContainerInitiator = (function() {
      */
     function updateInitiatorUI() {
         const currentStep = StateManager.getState('initiatorState.currentStep');
-        const isCompleted = StateManager.getState('initiatorState.completed');
         const input = document.getElementById('initiatorInput');
         const prompt = document.getElementById('initiatorPrompt');
         const hint = document.getElementById('initiatorHint');
-        const backBtn = document.getElementById('initiatorBackBtn');
-        const dateShortcuts = document.getElementById('initiatorDateShortcuts');
-        const yesterdayBtn = document.getElementById('initiatorDateYesterdayBtn');
-        const todayBtn = document.getElementById('initiatorDateTodayBtn');
-        const tomorrowBtn = document.getElementById('initiatorDateTomorrowBtn');
-        const nextBtn = document.getElementById('initiateBtn');
         
         if (!input || !prompt || !hint) return;
         
-        // Clear input field unless we've already completed the flow
-        if (!isCompleted) {
-            input.value = '';
-        }
-        
-        // Enable/disable back button based on current step
-        if (backBtn) {
-            backBtn.disabled = (currentStep === 'owner' || isCompleted);
-        }
-        
-        // Update primary button label based on completion state
-        if (nextBtn) {
-            nextBtn.textContent = isCompleted ? 'Start New Container' : 'Next Step';
-        }
-        
-        // Show quick date buttons only on the date step
-        if (dateShortcuts) {
-            const isDateStep = currentStep === 'date';
-            dateShortcuts.style.display = isDateStep ? 'flex' : 'none';
-
-            // When entering date step, update button labels to numeric dates
-            if (isDateStep && yesterdayBtn && todayBtn && tomorrowBtn) {
-                const today = new Date();
-
-                const todayDate = new Date(today);
-                const yesterdayDate = new Date(today);
-                const tomorrowDate = new Date(today);
-                yesterdayDate.setDate(todayDate.getDate() - 1);
-                tomorrowDate.setDate(todayDate.getDate() + 1);
-
-                yesterdayBtn.textContent = formatDateYYYYMMDD(yesterdayDate);
-                todayBtn.textContent = formatDateYYYYMMDD(todayDate);
-                tomorrowBtn.textContent = formatDateYYYYMMDD(tomorrowDate);
-            }
-        }
+        // Clear input field
+        input.value = '';
         
         // Update prompt and hint based on step
         switch (currentStep) {
@@ -776,30 +608,88 @@ window.ContainerInitiator = (function() {
                 break;
             case 'media':
                 prompt.textContent = 'Enter Media Type (optional):';
-                hint.textContent = 'Type the media code, "N/A" if no media, or leave blank';
+                hint.textContent = 'Type the media code or leave blank';
                 break;
             case 'stage':
-                prompt.textContent = 'Enter Stage (1-9):';
-                hint.textContent = 'Type a single digit between 1 and 9 for growth stage';
+                prompt.textContent = 'Enter Stage:';
+                hint.textContent = 'Type the stage number (1-9)';
                 break;
             case 'tissue':
                 prompt.textContent = 'Enter Tissue Count:';
                 hint.textContent = 'Type the number of tissue samples (1-99)';
                 break;
             case 'date':
-                prompt.textContent = 'Enter Date (YYYYMMDD):';
-                hint.textContent = 'Type the date in YYYYMMDD format, e.g., 20250106';
+                prompt.textContent = 'Enter Date:';
+                hint.textContent = 'Type the date in YYYYMMDD format or click a suggestion below';
+                // Show date recommendations
+                showDateRecommendations();
                 break;
-            default:
-                prompt.textContent = 'Enter value:';
-                hint.textContent = 'Type the required value and press Enter';
         }
-        
+
         // Focus on input
         input.focus();
-        
+
         // Update status summary
         updateStatusSummary();
+    }
+
+    /**
+     * Show recommended date options
+     */
+    function showDateRecommendations() {
+        const hint = document.getElementById('initiatorHint');
+        if (!hint) return;
+
+        const today = new Date();
+        const tomorrow = new Date(today);
+        tomorrow.setDate(tomorrow.getDate() + 1);
+
+        const formatDate = (date) => {
+            const year = date.getFullYear();
+            const month = String(date.getMonth() + 1).padStart(2, '0');
+            const day = String(date.getDate()).padStart(2, '0');
+            return `${year}${month}${day}`;
+        };
+
+        const todayStr = formatDate(today);
+        const tomorrowStr = formatDate(tomorrow);
+
+        // Create clickable date suggestions
+        const suggestionsHTML = `
+            <div style="margin-top: 12px; padding: 12px; background: #f0fdf4; border-radius: 8px; border: 1px solid #bbf7d0;">
+                <div style="font-size: 0.85rem; color: #166534; margin-bottom: 8px; font-weight: 600;">Quick Select:</div>
+                <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+                    <button class="btn btn-sm btn-success" onclick="ContainerInitiator.selectDate('${todayStr}')" style="padding: 6px 12px; font-size: 0.85rem;">
+                        📅 Today (${todayStr})
+                    </button>
+                    <button class="btn btn-sm btn-secondary" onclick="ContainerInitiator.selectDate('${tomorrowStr}')" style="padding: 6px 12px; font-size: 0.85rem;">
+                        📅 Tomorrow (${tomorrowStr})
+                    </button>
+                </div>
+            </div>
+        `;
+
+        // Insert after hint
+        const existingSuggestions = document.getElementById('dateRecommendations');
+        if (existingSuggestions) {
+            existingSuggestions.innerHTML = suggestionsHTML;
+        } else {
+            const newDiv = document.createElement('div');
+            newDiv.id = 'dateRecommendations';
+            newDiv.innerHTML = suggestionsHTML;
+            hint.parentNode.insertBefore(newDiv, hint.nextSibling);
+        }
+    }
+
+    /**
+     * Select a recommended date
+     */
+    function selectDate(dateString) {
+        const input = document.getElementById('initiatorInput');
+        if (input) {
+            input.value = dateString;
+            input.focus();
+        }
     }
     
     /**
@@ -832,104 +722,6 @@ window.ContainerInitiator = (function() {
      */
     function moveToStep(step) {
         StateManager.setState('initiatorState.currentStep', step);
-    }
-    
-    /**
-     * Helper: format Date -> YYYYMMDD
-     */
-    function formatDateYYYYMMDD(date) {
-        const year = date.getFullYear();
-        const month = String(date.getMonth() + 1).padStart(2, '0');
-        const day = String(date.getDate()).padStart(2, '0');
-        return `${year}${month}${day}`;
-    }
-    
-    /**
-     * Quick-select date for date step: -1 = yesterday, 0 = today, 1 = tomorrow
-     * Fills the input and state, but still requires the user to press Next/Enter
-     * so behavior is consistent whether the date is typed or clicked.
-     */
-    function selectQuickDate(offsetDays) {
-        try {
-            const currentStep = StateManager.getState('initiatorState.currentStep');
-            if (currentStep !== 'date') {
-                // If somehow clicked on another step, force to date step first
-                moveToStep('date');
-                updateInitiatorUI();
-            }
-            
-            const base = new Date();
-            base.setDate(base.getDate() + offsetDays);
-            const formatted = formatDateYYYYMMDD(base);
-            
-            const input = document.getElementById('initiatorInput');
-            if (input) {
-                input.value = formatted;
-            }
-            
-            // Store in state so the summary reflects the selection
-            StateManager.setState('initiatorState.date', formatted);
-            updateStatusSummary();
-            showFeedback(`Date set to: ${formatted}. Press Next to create the container.`, 'info');
-        } catch (error) {
-            console.error('❌ Error selecting quick date:', error);
-        }
-    }
-    
-    /**
-     * Navigate to the previous step, allowing corrections
-     */
-    function goToPreviousStep() {
-        try {
-            const currentStep = StateManager.getState('initiatorState.currentStep');
-            const currentIndex = STEPS.indexOf(currentStep);
-
-            if (currentIndex <= 0) {
-                showFeedback('Already at the first step (Owner).', 'info');
-                return;
-            }
-
-            const previousStep = STEPS[currentIndex - 1];
-            StateManager.setState('initiatorState.currentStep', previousStep);
-
-            // Refresh prompts and summary
-            updateInitiatorUI();
-
-            const input = document.getElementById('initiatorInput');
-            if (!input) return;
-
-            // Pre-fill input with existing value for that step, if any
-            let previousValue = null;
-            switch (previousStep) {
-                case 'owner':
-                    previousValue = StateManager.getState('initiatorState.owner');
-                    break;
-                case 'strain':
-                    previousValue = StateManager.getState('initiatorState.strain');
-                    break;
-                case 'media':
-                    previousValue = StateManager.getState('initiatorState.media');
-                    break;
-                case 'stage':
-                    previousValue = StateManager.getState('initiatorState.stage');
-                    break;
-                case 'tissue':
-                    previousValue = StateManager.getState('initiatorState.tissue');
-                    break;
-                case 'date':
-                    previousValue = StateManager.getState('initiatorState.date');
-                    break;
-            }
-
-            if (previousValue !== null && previousValue !== undefined) {
-                input.value = previousValue;
-            }
-
-            input.focus();
-            showFeedback(`Moved back to ${previousStep} step. Update the value and press Enter to continue.`, 'info');
-        } catch (error) {
-            console.error('❌ Error navigating to previous step:', error);
-        }
     }
     
     /**
@@ -1011,8 +803,7 @@ window.ContainerInitiator = (function() {
             media: null,
             stage: null,
             tissue: null,
-            date: null,
-            completed: false
+            date: null
         });
         
         // Hide confirmation
@@ -1037,7 +828,6 @@ window.ContainerInitiator = (function() {
         resetInitiator: resetInitiator,
         updateNextAvailableId: updateNextAvailableId,
         handleInitiatorInput: handleInitiatorInput,
-        goToPreviousStep: goToPreviousStep,
-        selectQuickDate: selectQuickDate
+        selectDate: selectDate
     };
 })();

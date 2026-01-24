@@ -12,9 +12,7 @@ window.OneDriveSync = {
     statusElementId: null,
     buttonElementId: null,
     allowInteractiveAuth: true,
-    // Excel table names (configurable via init options)
-    inventoryTableName: 'tblActiveInventory',      // Active_Inventory table
-    strainMappingTableName: 'tblStrainMapping',    // Reference strain/owner table
+    inventoryTableName: 'tblActiveInventory', // Excel table name for Active_Inventory
 
     // State
     refreshInterval: null,
@@ -22,9 +20,6 @@ window.OneDriveSync = {
     lastSync: null,
     lastError: null,
     fromCloud: false,
-    // Safety flag: full workbook overwrite via uploadFile is disabled
-    // unless this is explicitly set to true in a controlled context.
-    allowFullWorkbookOverwrite: false,
     hasShownErrorThisSession: false,
     driveId: null,
     itemId: null,
@@ -52,9 +47,6 @@ window.OneDriveSync = {
         this.allowInteractiveAuth = options.allowInteractiveAuth !== false;
         if (options.inventoryTableName) {
             this.inventoryTableName = options.inventoryTableName;
-        }
-        if (options.strainMappingTableName) {
-            this.strainMappingTableName = options.strainMappingTableName;
         }
 
         if (!this.shareUrl) {
@@ -197,7 +189,7 @@ window.OneDriveSync = {
 
             // Show error notification (once per session)
             if (window.NotificationSystem && !this.hasShownErrorThisSession) {
-                window.NotificationSystem.warning(`Cloud sync failed: ${error.message}. Using local data.`);
+                window.NotificationSystem.warn(`Cloud sync failed: ${error.message}. Using local data.`);
                 this.hasShownErrorThisSession = true;
             }
 
@@ -257,20 +249,6 @@ window.OneDriveSync = {
     },
 
     /**
-     * Backwards‑compat helper used by older modules
-     * Some callers (e.g. EnhancedDataLayerBridge.startAutoSync) expect
-     * OneDriveSync.isAuthenticated() to exist.
-     */
-    isAuthenticated() {
-        try {
-            return !!(this.authManager && typeof this.authManager.isSignedIn === 'function' && this.authManager.isSignedIn());
-        } catch (e) {
-            console.warn('OneDriveSync.isAuthenticated check failed:', e);
-            return false;
-        }
-    },
-
-    /**
      * Acquire access token for Microsoft Graph API
      * @returns {Promise<string>} Access token
      */
@@ -279,39 +257,25 @@ window.OneDriveSync = {
             throw new Error('AuthManager not initialized');
         }
 
-        // Prefer AuthManager.getAccessToken so we reuse the active account and scopes
-        if (typeof this.authManager.getAccessToken === 'function') {
-            try {
-                const token = await this.authManager.getAccessToken();
-                if (token) {
-                    return token;
-                }
-            } catch (error) {
-                console.warn('AuthManager.getAccessToken failed, falling back to direct MSAL token acquisition:', error);
-            }
-        }
-
         try {
-            // Fallback: try silent token acquisition using MSAL directly
-            const tokenResponse = await this.authManager.msalInstance.acquireTokenSilent({
-                scopes: this.authManager.loginRequest.scopes,
-                account: this.authManager.currentUser || (this.authManager.msalInstance.getAllAccounts()[0] || undefined)
-            });
+            // Try silent token acquisition first
+            const tokenResponse = await this.authManager.msalInstance.acquireTokenSilent(
+                this.authManager.loginRequest
+            );
             return tokenResponse.accessToken;
 
         } catch (error) {
-            console.warn('Silent token acquisition failed in OneDriveSync.acquireToken:', error);
+            console.warn('Silent token acquisition failed:', error);
 
-            // Fall back to interactive popup if allowed
+            // Fall back to interactive if allowed
             if (this.allowInteractiveAuth) {
                 try {
-                    const tokenResponse = await this.authManager.msalInstance.acquireTokenPopup({
-                        scopes: this.authManager.loginRequest.scopes,
-                        account: this.authManager.currentUser || (this.authManager.msalInstance.getAllAccounts()[0] || undefined)
-                    });
+                    const tokenResponse = await this.authManager.msalInstance.acquireTokenPopup(
+                        this.authManager.loginRequest
+                    );
                     return tokenResponse.accessToken;
                 } catch (interactiveError) {
-                    console.error('Interactive token acquisition failed in OneDriveSync.acquireToken:', interactiveError);
+                    console.error('Interactive token acquisition failed:', interactiveError);
                     throw new Error('Failed to acquire access token');
                 }
             } else {
@@ -499,10 +463,8 @@ window.OneDriveSync = {
         const workbook = XLSX.read(new Uint8Array(arrayBuffer), { type: 'array' });
 
         // Locate Active_Inventory sheet (case-insensitive)
-        // Accept both "Active_Inventory" and "Active Inventory" to match common naming patterns
-        const preferredSheetNames = ['active_inventory', 'active inventory'];
         let targetSheetName = workbook.SheetNames.find(name =>
-            preferredSheetNames.includes(name.toLowerCase())
+            name.toLowerCase() === 'active_inventory'
         );
 
         if (!targetSheetName) {
@@ -514,55 +476,11 @@ window.OneDriveSync = {
             throw new Error(`Sheet "${targetSheetName}" not found in workbook`);
         }
 
-        // Use header:1 to get an array-of-arrays so we can handle templates
-        // where the first row is a title and the second row contains actual headers.
-        const aoa = XLSX.utils.sheet_to_json(sheet, { header: 1, blankrows: false });
-        if (!aoa.length) {
+        // Header row is row 2, data starts row 3 → use range: 1 (0-based index)
+        const rows = XLSX.utils.sheet_to_json(sheet, { range: 1 });
+        if (rows.length === 0) {
             console.warn('OneDriveSync: Active_Inventory sheet is empty');
             return [];
-        }
-
-        // Find the header row by looking for a cell that equals "Container_ID" (case-insensitive)
-        let headerRowIndex = 0;
-        for (let i = 0; i < Math.min(aoa.length, 10); i++) {
-            const rowArr = aoa[i];
-            if (!Array.isArray(rowArr)) continue;
-            const hasContainerId = rowArr.some(cell =>
-                cell && String(cell).toLowerCase().trim() === 'container_id'
-            );
-            if (hasContainerId) {
-                headerRowIndex = i;
-                break;
-            }
-        }
-
-        const headerRow = aoa[headerRowIndex] || [];
-        const dataRows = aoa.slice(headerRowIndex + 1);
-
-        if (!dataRows.length) {
-            console.warn('OneDriveSync: Active_Inventory has header row but no data rows');
-            return [];
-        }
-
-        // Build row objects keyed by the header row values
-        const rows = dataRows.map(rowArr => {
-            const obj = {};
-            headerRow.forEach((headerCell, colIdx) => {
-                if (!headerCell) return;
-                const key = String(headerCell).trim();
-                if (!key) return;
-                obj[key] = rowArr[colIdx];
-            });
-            return obj;
-        }).filter(row => Object.keys(row).length > 0);
-
-        // Debug: log the header row and keys from the first data row
-        try {
-            console.log('OneDriveSync: Active_Inventory header row values:', headerRow);
-            const sampleKeys = Object.keys(rows[0] || {});
-            console.log('OneDriveSync: Active_Inventory sample data keys:', sampleKeys);
-        } catch (e) {
-            console.warn('OneDriveSync: Unable to log Active_Inventory debug info:', e);
         }
 
         // Normalize header keys and map to app inventory objects
@@ -579,38 +497,25 @@ window.OneDriveSync = {
         };
 
         rows.forEach(row => {
-            // Prefer explicit Container_ID / Raw_ID / BarcodeValue if present
-            const containerIdValue = getField(row, ['container_id', 'containerid', 'container id']);
+            // Prefer explicit Raw_ID / BarcodeValue if present
             const rawIdValue = getField(row, ['raw_id', 'rawid', 'raw id']);
             const barcodeValue = getField(row, ['barcodevalue', 'barcode_value', 'barcode value']);
             const batchIdValue = getField(row, ['batch_id', 'batchid', 'batch id']);
-            const qrUrlValue = getField(row, [
-                'qr_url', 'qr link', 'qr', 'qr_destination',
-                'qr code url', 'qr code link', 'qr_url_link',
-                // HQ Workbook: QRContainerID column should be treated as the QR destination URL
-                'qrcontainerid', 'qr_container_id', 'qr container id'
-            ]);
 
             let prefix = null;
             let rawIdNumeric = null;
 
-            // If Container_ID exists, prefer it first. It may be a pure number or a code like "LWG120021".
-            if (containerIdValue !== undefined && containerIdValue !== null && containerIdValue !== '') {
-                const asString = String(containerIdValue).trim();
-                let num = parseInt(asString, 10);
-                if (!isNaN(num)) {
-                    rawIdNumeric = num;
-                } else {
-                    const parsedFromContainer = this.parseBatchId(asString);
-                    if (parsedFromContainer) {
-                        prefix = parsedFromContainer.prefix;
-                        rawIdNumeric = parsedFromContainer.rawIdNumeric;
-                    }
+            // Try to parse from Batch_ID if needed
+            if (!rawIdValue && batchIdValue) {
+                const parsed = this.parseBatchId(String(batchIdValue));
+                if (parsed) {
+                    prefix = parsed.prefix;
+                    rawIdNumeric = parsed.rawIdNumeric;
                 }
             }
 
-            // If Raw_ID exists, prefer it (after Container_ID)
-            if (!rawIdNumeric && rawIdValue !== undefined && rawIdValue !== null && rawIdValue !== '') {
+            // If Raw_ID exists, prefer it
+            if (rawIdValue !== undefined && rawIdValue !== null && rawIdValue !== '') {
                 const num = parseInt(rawIdValue, 10);
                 if (!isNaN(num)) {
                     rawIdNumeric = num;
@@ -625,18 +530,9 @@ window.OneDriveSync = {
                 }
             }
 
-            // Last resort: try to parse from Batch_ID if needed
-            if (!rawIdNumeric && batchIdValue) {
-                const parsed = this.parseBatchId(String(batchIdValue));
-                if (parsed) {
-                    prefix = parsed.prefix;
-                    rawIdNumeric = parsed.rawIdNumeric;
-                }
-            }
-
             if (!rawIdNumeric) {
                 // If we can't derive a numeric ID, skip this row to avoid corrupt state
-                console.warn('OneDriveSync: Skipping row with no numeric Container_ID / Raw_ID / BarcodeValue / Batch_ID:', row);
+                console.warn('OneDriveSync: Skipping row with no numeric Raw_ID / BarcodeValue:', row);
                 return;
             }
 
@@ -669,11 +565,6 @@ window.OneDriveSync = {
             }
             if (prefix) {
                 invEntry.containerPrefix = prefix;
-            }
-
-            // If the workbook has an explicit QR URL column, treat that as source of truth
-            if (qrUrlValue) {
-                invEntry.qrDestinationUrl = String(qrUrlValue);
             }
 
             inventory.push(invEntry);
@@ -799,85 +690,6 @@ window.OneDriveSync = {
     },
 
     /**
-     * Upload a workbook blob to the configured cloud Excel file.
-     * This is a thin wrapper used by newer modules (e.g., DataLayerBridge.syncToCloud)
-     * that expect OneDriveSync.uploadFile(fileName, blob).
-     * It overwrites the existing workbook content referenced by shareUrl.
-     * @param {string} fileName - Logical file name (for logging only)
-     * @param {Blob} blob - Excel workbook blob
-     * @returns {Promise<{success: boolean}>}
-     */
-    async uploadFile(fileName, blob) {
-        console.log(`OneDriveSync: uploadFile called for ${fileName}`);
-
-        // SAFETY GUARD: prevent accidental overwrites of the primary workbook.
-        // This must be explicitly enabled by setting allowFullWorkbookOverwrite = true
-        // in a controlled context pointing at a non-production/export workbook.
-        if (!this.allowFullWorkbookOverwrite) {
-            console.warn('OneDriveSync.uploadFile blocked: allowFullWorkbookOverwrite is false.');
-            throw new Error('Full workbook overwrite is disabled to protect the primary inventory workbook.');
-        }
-
-        if (!this.shareUrl) {
-            throw new Error('OneDriveSync: No shareUrl configured for uploadFile');
-        }
-
-        // Ensure drive/item IDs
-        if (!this.driveId || !this.itemId) {
-            await this.resolveDriveItemFromShareUrl(this.shareUrl);
-        }
-
-        const token = await this.acquireToken();
-        const uploadUrl = `https://graph.microsoft.com/v1.0/drives/${this.driveId}/items/${this.itemId}/content`;
-
-        // Convert blob to ArrayBuffer for fetch body
-        const arrayBuffer = await blob.arrayBuffer();
-
-        const response = await fetch(uploadUrl, {
-            method: 'PUT',
-            headers: {
-                'Authorization': `Bearer ${token}`
-            },
-            body: arrayBuffer
-        });
-
-        if (!response.ok) {
-            const text = await response.text();
-            throw new Error(`Failed to upload Excel workbook: ${response.status} ${text}`);
-        }
-
-        this.lastSync = new Date().toISOString();
-        this.lastError = null;
-        localStorage.setItem(this.CACHE_KEYS.LAST_SYNC, this.lastSync);
-        localStorage.removeItem(this.CACHE_KEYS.LAST_ERROR);
-
-        this.updateStatusUI();
-        console.log('OneDriveSync: Workbook uploaded successfully via uploadFile');
-        return { success: true };
-    },
-
-    /**
-     * Download the configured cloud Excel file as an ArrayBuffer.
-     * Wrapper used by newer modules expecting OneDriveSync.downloadFile(fileName).
-     * @param {string} fileName - Logical file name (ignored, kept for API compatibility)
-     * @returns {Promise<ArrayBuffer>}
-     */
-    async downloadFile(fileName) {
-        console.log(`OneDriveSync: downloadFile called for ${fileName}`);
-
-        if (!this.shareUrl) {
-            throw new Error('OneDriveSync: No shareUrl configured for downloadFile');
-        }
-
-        // Ensure drive/item IDs
-        if (!this.driveId || !this.itemId) {
-            await this.resolveDriveItemFromShareUrl(this.shareUrl);
-        }
-
-        return await this.downloadExcelArrayBuffer(this.driveId, this.itemId);
-    },
-
-    /**
      * Append new inventory rows from app state to the cloud Active_Inventory table
      * This is append-only: existing rows (by Raw_ID) are never modified.
      * Requires the Active_Inventory range to be an Excel table (e.g., tblActiveInventory).
@@ -924,14 +736,10 @@ window.OneDriveSync = {
 
         const rawIdIndex = columns.findIndex(col => {
             const n = normalize(col.name);
-            return [
-                'raw_id', 'rawid', 'raw id',
-                'container_id', 'containerid', 'container id',
-                'barcodevalue', 'barcode_value', 'barcode value'
-            ].includes(n);
+            return ['raw_id', 'rawid', 'raw id', 'barcodevalue', 'barcode_value', 'barcode value'].includes(n);
         });
         if (rawIdIndex === -1) {
-            throw new Error('OneDriveSync: Could not locate Raw_ID/Container_ID/BarcodeValue column in inventory table');
+            throw new Error('OneDriveSync: Could not locate Raw_ID/BarcodeValue column in inventory table');
         }
 
         const batchIdIndex = columns.findIndex(col => {
@@ -956,22 +764,14 @@ window.OneDriveSync = {
             if (!Array.isArray(valuesArray)) return;
             if (rawIdIndex >= 0 && rawIdIndex < valuesArray.length) {
                 const v = valuesArray[rawIdIndex];
-                if (v === null || v === undefined || v === '') return;
-                const asString = String(v).trim();
-                let num = parseInt(asString, 10);
-                if (isNaN(num)) {
-                    const parsed = this.parseBatchId(asString);
-                    if (parsed) {
-                        num = parsed.rawIdNumeric;
-                    }
-                }
+                const num = parseInt(v, 10);
                 if (!isNaN(num)) {
                     existingRawIds.add(String(num));
                 }
             }
         });
 
-        console.log(`OneDriveSync: Found ${existingRawIds.size} existing inventory IDs in cloud inventory table`);
+        console.log(`OneDriveSync: Found ${existingRawIds.size} existing Raw_IDs in cloud inventory table`);
 
         // 3) Determine new rows from app inventory
         let inventory = [];
@@ -1004,24 +804,14 @@ window.OneDriveSync = {
             const rowValues = columns.map(col => {
                 const nameNorm = normalize(col.name);
 
-                // ID column: may be Raw_ID, Container_ID, or BarcodeValue
-                if (['raw_id', 'rawid', 'raw id'].includes(nameNorm)) {
-                    return rawNum;
-                }
-
-                if (['container_id', 'containerid', 'container id'].includes(nameNorm)) {
-                    // Write numeric-only Container_ID (zero-padded) instead of prefixed codes like "LWG120022".
-                    return String(rawNum).padStart(6, '0');
-                }
-
-                if (['barcodevalue', 'barcode_value', 'barcode value'].includes(nameNorm)) {
+                if (['raw_id', 'rawid', 'raw id', 'barcodevalue', 'barcode_value', 'barcode value'].includes(nameNorm)) {
                     return rawNum;
                 }
 
                 if (['batch_id', 'batchid', 'batch id'].includes(nameNorm)) {
-                    // If an explicit batchId is present, preserve it; otherwise use numeric-only ID.
                     if (item.batchId) return item.batchId;
-                    return String(rawNum).padStart(6, '0');
+                    const prefix = item.containerPrefix || 'LWG';
+                    return `${prefix}${String(rawNum).padStart(6, '0')}`;
                 }
 
                 if (['strain_name', 'strain', 'strain id'].includes(nameNorm)) {
@@ -1054,22 +844,6 @@ window.OneDriveSync = {
 
                 if (['notes', 'comment', 'comments'].includes(nameNorm)) {
                     return item.notes || '';
-                }
-
-                // QR URL column (optional): store explicit QR destination URL if available,
-                // otherwise derive it from barcode/sampleBarcode/containerId using current scheme.
-                if ([
-                    'qr_url', 'qr link', 'qr', 'qr_destination',
-                    'qr code url', 'qr code link', 'qr_url_link',
-                    // HQ Workbook: QRContainerID column should receive the generated QR destination URL
-                    'qrcontainerid', 'qr_container_id', 'qr container id'
-                ].includes(nameNorm)) {
-                    if (item.qrDestinationUrl) {
-                        return item.qrDestinationUrl;
-                    }
-                    const code = item.barcode || item.sampleBarcode || item.containerId;
-                    if (!code) return '';
-                    return `https://scanner.lonewolfbiotech.com/container?code=${encodeURIComponent(code)}`;
                 }
 
                 // Default: empty cell
@@ -1105,82 +879,6 @@ window.OneDriveSync = {
         }
 
         return { success: true, count: rowsToAdd.length };
-    },
-
-    /**
-     * Append a strain/owner reference row to the tblStrainMapping table based on intake form data.
-     * Part of the hybrid Option C workflow: keep reference data in Excel while intake also drives inventory.
-     * @param {Object} intakeData - object from IntakeFormManager.collectFormData()
-     * @returns {Promise<{success: boolean, error?: string}>}
-     */
-    async appendStrainReferenceRow(intakeData) {
-        try {
-            if (!intakeData) {
-                throw new Error('No intake data provided');
-            }
-
-            if (!this.shareUrl) {
-                throw new Error('No shareUrl configured for OneDriveSync');
-            }
-
-            if (!this.strainMappingTableName) {
-                throw new Error('OneDriveSync: strainMappingTableName not configured');
-            }
-
-            // Ensure drive/item IDs are resolved
-            if (!this.driveId || !this.itemId) {
-                await this.resolveDriveItemFromShareUrl(this.shareUrl);
-            }
-
-            const token = await this.acquireToken();
-            const baseUrl = `https://graph.microsoft.com/v1.0/drives/${this.driveId}/items/${this.itemId}/workbook`;
-
-            const servicesText = Array.isArray(intakeData.services)
-                ? intakeData.services.join(', ')
-                : (intakeData.services || '');
-
-            const onboardedDate = intakeData.timestamp
-                ? new Date(intakeData.timestamp).toLocaleDateString()
-                : new Date().toLocaleDateString();
-
-            // Matches Excel headers: Strain Name, Owner, Genetics, Date Onboarded, Notes
-            const rowPayload = {
-                values: [[
-                    intakeData.strainName || 'Unknown',
-                    intakeData.customerName || intakeData.ownerID || 'Unknown',
-                    intakeData.genetics || '',
-                    onboardedDate,
-                    servicesText ? `Intake Services: ${servicesText}` : ''
-                ]]
-            };
-
-            const resp = await fetch(`${baseUrl}/tables('${this.strainMappingTableName}')/rows/add`, {
-                method: 'POST',
-                headers: {
-                    'Authorization': `Bearer ${token}`,
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify(rowPayload)
-            });
-
-            if (!resp.ok) {
-                const text = await resp.text();
-                throw new Error(`Failed to append strain reference row: ${resp.status} ${text}`);
-            }
-
-            console.log('OneDriveSync: Appended strain reference row to tblStrainMapping');
-            if (window.NotificationSystem) {
-                window.NotificationSystem.success('📚 Synced intake strain/owner reference to cloud');
-            }
-
-            return { success: true };
-        } catch (error) {
-            console.error('OneDriveSync: Failed to append strain reference row:', error);
-            if (window.NotificationSystem) {
-                window.NotificationSystem.warning('Intake saved locally but failed to sync reference data to cloud.');
-            }
-            return { success: false, error: error.message };
-        }
     },
 
     /**
@@ -1284,29 +982,5 @@ window.OneDriveSync = {
         } catch (error) {
             console.error('OneDriveSync: Minimal fallback failed:', error);
         }
-    },
-
-    /**
-     * Get workbook identity (driveId + itemId) for the configured shareUrl.
-     * Ensures they are resolved and cached.
-     * @returns {Promise<{driveId: string, itemId: string}>}
-     */
-    async getWorkbookIdentity() {
-        if (!this.shareUrl) {
-            throw new Error('OneDriveSync: No shareUrl configured for getWorkbookIdentity');
-        }
-
-        if (!this.driveId || !this.itemId) {
-            await this.resolveDriveItemFromShareUrl(this.shareUrl);
-        }
-
-        if (!this.driveId || !this.itemId) {
-            throw new Error('OneDriveSync: Failed to resolve driveId/itemId from shareUrl');
-        }
-
-        return {
-            driveId: this.driveId,
-            itemId: this.itemId
-        };
     }
 };

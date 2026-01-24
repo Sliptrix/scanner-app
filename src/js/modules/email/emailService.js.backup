@@ -194,8 +194,8 @@ window.EmailService = {
             if (!response.ok) {
                 // Return fallback if backend is not available
                 return {
-                    default: ['pozersky@lonewolfgenetics.com', 'aterkonda@lonewolfgenetics.com'],
-                    suggestions: ['pozersky@lonewolfgenetics.com', 'aterkonda@lonewolfgenetics.com']
+                    default: ['pozersky@lonewolfgenetics.com'],
+                    suggestions: ['pozersky@lonewolfgenetics.com']
                 };
             }
             
@@ -205,121 +205,9 @@ window.EmailService = {
             console.error('Error fetching recipients:', error);
             // Return fallback
             return {
-                default: ['pozersky@lonewolfgenetics.com', 'aterkonda@lonewolfgenetics.com'],
-                suggestions: ['pozersky@lonewolfgenetics.com', 'aterkonda@lonewolfgenetics.com']
+                default: ['pozersky@lonewolfgenetics.com'],
+                suggestions: ['pozersky@lonewolfgenetics.com']
             };
-        }
-    },
-
-    /**
-     * Send an inventory update CSV (Container_ID, QRContainerID) via email
-     * This replaces direct HQ workbook writes for QR code updates.
-     * @param {Array} inventory - Inventory entries (defaults to StateManager/appState if omitted)
-     * @param {Array} recipients - Optional list of email addresses
-     * @returns {Promise<Object>} - Response from backend
-     */
-    async sendInventoryUpdate(inventory, recipients) {
-        try {
-            // Resolve inventory from state if not provided
-            let inv = inventory;
-            if (!Array.isArray(inv)) {
-                if (window.StateManager && typeof StateManager.getState === 'function') {
-                    inv = StateManager.getState('inventory') || [];
-                } else {
-                    inv = (window.appState && window.appState.inventory) || [];
-                }
-            }
-
-            // Filter to rows that actually have a QR destination URL
-            const rowsWithQr = inv.filter(entry => entry && entry.containerId && entry.qrDestinationUrl);
-            if (rowsWithQr.length === 0) {
-                throw new Error('No inventory entries with QR codes to include in update');
-            }
-
-            // Build CSV: Container_ID,QRContainerID (matching HQ workbook expectations)
-            const header = ['Container_ID', 'QRContainerID'];
-            const csvRows = [header.join(',')];
-
-            const escapeCsv = (value) => {
-                if (value == null) return '';
-                const str = String(value);
-                if (str.includes('"') || str.includes(',') || str.includes('\n')) {
-                    return '"' + str.replace(/"/g, '""') + '"';
-                }
-                return str;
-            };
-
-            rowsWithQr.forEach(entry => {
-                csvRows.push([
-                    escapeCsv(entry.containerId),
-                    escapeCsv(entry.qrDestinationUrl)
-                ].join(','));
-            });
-
-            const csvData = csvRows.join('\n');
-
-            // Encode CSV as base64
-            const utf8Bytes = new TextEncoder().encode(csvData);
-            let binary = '';
-            utf8Bytes.forEach(b => { binary += String.fromCharCode(b); });
-            const base64Data = btoa(binary);
-
-            // Ensure user is authenticated (Graph token required)
-            if (!AuthManager.isSignedIn()) {
-                throw new Error('You must be signed in to send inventory update emails');
-            }
-
-            const accessToken = await AuthManager.getAccessToken();
-
-            // Determine recipients
-            let targetRecipients = recipients;
-            if (!Array.isArray(targetRecipients) || targetRecipients.length === 0) {
-                const defaults = await this.getDefaultRecipients();
-                targetRecipients = defaults.default || ['pozersky@lonewolfgenetics.com'];
-            }
-
-            const subject = `LoneWolf Scanner - HQ Workbook QR Update (${rowsWithQr.length} containers)`;
-            const body = `
-                <p>Attached is a CSV file containing updated QR destinations for containers created in the Scanner app.</p>
-                <p>The file has two columns: <code>Container_ID</code> and <code>QRContainerID</code>, matching the HQ workbook schema.</p>
-                <p>Please copy or import these values into the HQ workbook rather than editing it directly from the app.</p>
-            `;
-
-            const today = new Date();
-            const dateStr = today.toISOString().split('T')[0];
-            const filename = `HQ_QR_Updates_${dateStr}.csv`;
-
-            const response = await fetch(`${this.backendUrl}/api/email/send`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({
-                    accessToken,
-                    recipients: targetRecipients,
-                    subject,
-                    body,
-                    attachments: [
-                        {
-                            filename,
-                            contentType: 'text/csv',
-                            data: base64Data
-                        }
-                    ]
-                })
-            });
-
-            if (!response.ok) {
-                const error = await response.json().catch(() => null);
-                throw new Error((error && error.message) || 'Failed to send inventory update email');
-            }
-
-            const result = await response.json();
-            console.log('Inventory update email sent successfully:', result);
-            return result;
-        } catch (error) {
-            console.error('Error sending inventory update email:', error);
-            throw error;
         }
     }
 };

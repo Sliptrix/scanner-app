@@ -70,7 +70,9 @@ window.appState = {
         media: null,
         stage: null,
         tissue: null,
-        date: null
+        date: null,
+        // Marks whether the current initiator flow has created a container
+        completed: false
     }
 };
 
@@ -143,7 +145,11 @@ window.StateManager = {
             currentStep: 'owner',
             owner: null,
             strain: null,
-            media: null
+            media: null,
+            stage: null,
+            tissue: null,
+            date: null,
+            completed: false
         };
         console.log('Initiator state reset');
     },

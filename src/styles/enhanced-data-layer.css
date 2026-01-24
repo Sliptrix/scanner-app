@@ -1,0 +1,376 @@
+/**
+ * LONE WOLF BIOTECH - ENHANCED DATA LAYER STYLES
+ * Styles for edit modal, status badges, and enhanced inventory display
+ */
+
+/* =========================================================================
+   EDIT MODAL
+   ========================================================================= */
+
+.edit-modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 10000;
+    animation: fadeIn 0.2s ease;
+}
+
+.edit-modal {
+    background: white;
+    border-radius: 12px;
+    padding: 30px;
+    width: 90%;
+    max-width: 500px;
+    max-height: 90vh;
+    overflow-y: auto;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+    animation: slideUp 0.3s ease;
+}
+
+.edit-modal h3 {
+    margin: 0 0 20px 0;
+    color: #2c3e50;
+    font-size: 1.5rem;
+    border-bottom: 2px solid #667eea;
+    padding-bottom: 10px;
+}
+
+.edit-modal .form-group {
+    margin-bottom: 15px;
+}
+
+.edit-modal .form-group label {
+    display: block;
+    margin-bottom: 5px;
+    font-weight: 600;
+    color: #495057;
+    font-size: 0.9rem;
+}
+
+.edit-modal .form-group input,
+.edit-modal .form-group select,
+.edit-modal .form-group textarea {
+    width: 100%;
+    padding: 10px 12px;
+    border: 1.5px solid #e9ecef;
+    border-radius: 6px;
+    font-size: 1rem;
+    transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.edit-modal .form-group input:focus,
+.edit-modal .form-group select:focus,
+.edit-modal .form-group textarea:focus {
+    outline: none;
+    border-color: #667eea;
+    box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+}
+
+.edit-modal .form-group input[readonly] {
+    background: #f8f9fa;
+    color: #6c757d;
+    cursor: not-allowed;
+}
+
+.edit-modal .form-group textarea {
+    min-height: 80px;
+    resize: vertical;
+}
+
+.modal-actions {
+    display: flex;
+    gap: 10px;
+    margin-top: 25px;
+    padding-top: 20px;
+    border-top: 1px solid #e9ecef;
+}
+
+.modal-actions .btn-danger {
+    margin-left: auto;
+}
+
+/* =========================================================================
+   STATUS BADGES
+   ========================================================================= */
+
+.status-badge {
+    display: inline-block;
+    padding: 4px 12px;
+    border-radius: 20px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.status-badge.status-active {
+    background: linear-gradient(135deg, #d4edda, #c3e6cb);
+    color: #155724;
+    border: 1px solid #28a745;
+}
+
+.status-badge.status-transferred {
+    background: linear-gradient(135deg, #cce5ff, #b8daff);
+    color: #004085;
+    border: 1px solid #007bff;
+}
+
+.status-badge.status-inactive,
+.status-badge.status-archived {
+    background: linear-gradient(135deg, #f8f9fa, #e9ecef);
+    color: #6c757d;
+    border: 1px solid #adb5bd;
+}
+
+/* =========================================================================
+   ENHANCED INVENTORY TABLE
+   ========================================================================= */
+
+.inventory-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.9rem;
+}
+
+.inventory-table thead {
+    background: linear-gradient(135deg, #667eea, #764ba2);
+    color: white;
+    position: sticky;
+    top: 0;
+    z-index: 10;
+}
+
+.inventory-table th {
+    padding: 12px 15px;
+    text-align: left;
+    font-weight: 600;
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    /* Ensure header text is visible by letting the thead gradient show through */
+    background: transparent;
+    color: inherit;
+}
+
+.inventory-table td {
+    padding: 10px 15px;
+    border-bottom: 1px solid #e9ecef;
+    vertical-align: middle;
+}
+
+.inventory-table tbody tr {
+    transition: background-color 0.2s;
+    cursor: pointer;
+}
+
+.inventory-table tbody tr:hover {
+    background: #f8f9ff;
+}
+
+.inventory-table tbody tr:nth-child(even) {
+    background: #fafafa;
+}
+
+.inventory-table tbody tr:nth-child(even):hover {
+    background: #f0f4ff;
+}
+
+.inventory-table code {
+    background: #f1f3f4;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-family: 'Monaco', 'Menlo', monospace;
+    font-size: 0.85em;
+    color: #667eea;
+}
+
+/* =========================================================================
+   DATA STATUS BAR
+   ========================================================================= */
+
+.data-status {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    padding: 12px 20px;
+    background: #f8f9fa;
+    border-radius: 8px;
+    margin: 15px 0;
+    flex-wrap: wrap;
+}
+
+.data-status span {
+    font-weight: 500;
+}
+
+.data-status .btn {
+    padding: 6px 14px;
+    font-size: 0.85rem;
+}
+
+/* =========================================================================
+   SYNC STATUS
+   ========================================================================= */
+
+#cloud-sync-status,
+#inventory-sync-status {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.85rem;
+    color: #6c757d;
+}
+
+#cloud-sync-status::before {
+    content: '☁️';
+}
+
+#inventory-sync-status::before {
+    content: '📦';
+}
+
+/* =========================================================================
+   BUTTON VARIANTS
+   ========================================================================= */
+
+.btn-danger {
+    background: linear-gradient(135deg, #dc3545, #c82333);
+    color: white;
+    border: none;
+}
+
+.btn-danger:hover {
+    background: linear-gradient(135deg, #c82333, #bd2130);
+    transform: translateY(-1px);
+}
+
+.btn-info {
+    background: linear-gradient(135deg, #17a2b8, #138496);
+    color: white;
+    border: none;
+}
+
+.btn-info:hover {
+    background: linear-gradient(135deg, #138496, #117a8b);
+}
+
+/* =========================================================================
+   ANIMATIONS
+   ========================================================================= */
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+    }
+    to {
+        opacity: 1;
+    }
+}
+
+@keyframes slideUp {
+    from {
+        opacity: 0;
+        transform: translateY(30px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* =========================================================================
+   RESPONSIVE ADJUSTMENTS
+   ========================================================================= */
+
+@media (max-width: 768px) {
+    .edit-modal {
+        width: 95%;
+        padding: 20px;
+    }
+    
+    .modal-actions {
+        flex-direction: column;
+    }
+    
+    .modal-actions .btn-danger {
+        margin-left: 0;
+        margin-top: 10px;
+    }
+    
+    .data-status {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+    
+    .inventory-table {
+        font-size: 0.8rem;
+    }
+    
+    .inventory-table th,
+    .inventory-table td {
+        padding: 8px 10px;
+    }
+}
+
+/* =========================================================================
+   LOADING STATES
+   ========================================================================= */
+
+.loading-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(255, 255, 255, 0.9);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 100;
+}
+
+.loading-spinner {
+    width: 40px;
+    height: 40px;
+    border: 4px solid #e9ecef;
+    border-top-color: #667eea;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+/* =========================================================================
+   EMPTY STATE
+   ========================================================================= */
+
+.empty-state {
+    text-align: center;
+    padding: 60px 20px;
+    color: #6c757d;
+}
+
+.empty-state-icon {
+    font-size: 4rem;
+    margin-bottom: 20px;
+    opacity: 0.5;
+}
+
+.empty-state h3 {
+    margin: 0 0 10px 0;
+    color: #495057;
+}
+
+.empty-state p {
+    margin: 0 0 20px 0;
+}
