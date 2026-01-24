@@ -122,7 +122,10 @@ function initializeApp() {
     
     // Show initial status
     NotificationSystem.info('Lab system ready! Load Excel data to begin.');
-    
+
+    // Check for QR code scan (URL parameter ?c=shortCode)
+    handleQRCodeScan();
+
     console.log('Lab Scanner System initialized successfully');
 }
 
@@ -812,30 +815,140 @@ async function emailIntakeForm() {
         NotificationSystem.error('No intake data to email');
         return;
     }
-    
+
     if (!AuthManager.isSignedIn()) {
         NotificationSystem.error('Please sign in to send emails');
         return;
     }
-    
+
     const recipientsInput = document.getElementById('emailRecipients');
     const recipientsText = recipientsInput ? recipientsInput.value : 'pozersky@lonewolfgenetics.com';
     const recipients = recipientsText.split(',').map(e => e.trim()).filter(e => e);
-    
+
     if (recipients.length === 0) {
         NotificationSystem.error('Please enter at least one email address');
         return;
     }
-    
+
     try {
         NotificationSystem.info('Sending email...');
-        
+
         const result = await EmailService.sendIntakeForm(formData, recipients);
-        
+
         NotificationSystem.success(`Email sent successfully to ${result.recipientCount} recipient(s)!`);
     } catch (error) {
         console.error('Error sending email:', error);
         NotificationSystem.error('Failed to send email: ' + error.message);
+    }
+}
+
+/**
+ * Handle QR code scan from URL parameter
+ * Detects ?c=shortCode in URL, looks up the container, and highlights it in inventory
+ */
+async function handleQRCodeScan() {
+    try {
+        // Check if there's a container short code in the URL (?c=shortCode)
+        const urlParams = new URLSearchParams(window.location.search);
+        const shortCode = urlParams.get('c');
+
+        if (!shortCode) {
+            return; // No QR scan parameter present
+        }
+
+        console.log(`📱 QR code scanned! Short code: ${shortCode}`);
+
+        // Lookup the short code to get container information
+        if (!window.QRCodeService) {
+            console.error('QRCodeService not available');
+            NotificationSystem.warning('QR code service not initialized');
+            return;
+        }
+
+        const containerInfo = await QRCodeService.lookupShortCode(shortCode);
+
+        if (!containerInfo) {
+            console.error(`Short code ${shortCode} not found`);
+            NotificationSystem.error(`Container not found for code: ${shortCode}`);
+            // Clean URL
+            window.history.replaceState({}, document.title, window.location.pathname);
+            return;
+        }
+
+        console.log(`✅ Container found:`, containerInfo);
+
+        // Switch to inventory view
+        UIUtils.switchMode('inventory');
+
+        // Wait a moment for the table to render
+        setTimeout(() => {
+            // Find the container in the inventory table and highlight it
+            highlightContainerInTable(containerInfo.barcodeData, containerInfo.containerId);
+
+            // Show success notification
+            NotificationSystem.success(`Container ${containerInfo.containerId} highlighted in inventory!`);
+
+            // Clean the URL (remove the ?c=shortCode parameter)
+            window.history.replaceState({}, document.title, window.location.pathname);
+        }, 500);
+
+    } catch (error) {
+        console.error('Error handling QR code scan:', error);
+        NotificationSystem.error('Error processing QR code scan');
+        // Clean URL even on error
+        window.history.replaceState({}, document.title, window.location.pathname);
+    }
+}
+
+/**
+ * Highlight a specific container row in the inventory table
+ * @param {string} barcodeData - The barcode data to search for
+ * @param {string} containerId - The container ID to search for
+ */
+function highlightContainerInTable(barcodeData, containerId) {
+    const inventoryTable = document.getElementById('inventoryTable');
+    if (!inventoryTable) {
+        console.error('Inventory table not found');
+        return;
+    }
+
+    // Find the row with matching barcode or container ID
+    const rows = inventoryTable.querySelectorAll('tbody tr');
+    let foundRow = null;
+
+    for (const row of rows) {
+        const cells = row.cells;
+        if (!cells || cells.length === 0) continue;
+
+        // Check if barcode or container ID matches
+        const rowBarcode = cells[3]?.textContent || ''; // Assuming barcode is in column 3
+        const rowContainerId = cells[0]?.textContent || ''; // Assuming ID is in column 0
+
+        if (rowBarcode.includes(barcodeData) || rowContainerId === containerId) {
+            foundRow = row;
+            break;
+        }
+    }
+
+    if (foundRow) {
+        // Remove any existing highlights
+        rows.forEach(r => r.classList.remove('qr-highlighted'));
+
+        // Add highlight class to found row
+        foundRow.classList.add('qr-highlighted');
+
+        // Scroll the row into view
+        foundRow.scrollIntoView({ behavior: 'smooth', block: 'center' });
+
+        console.log(`✅ Container row highlighted for ID: ${containerId}`);
+
+        // Remove highlight after 5 seconds
+        setTimeout(() => {
+            foundRow.classList.remove('qr-highlighted');
+        }, 5000);
+    } else {
+        console.warn(`Container not found in table: ${containerId}`);
+        NotificationSystem.warning(`Container ${containerId} not currently visible in inventory`);
     }
 }
 

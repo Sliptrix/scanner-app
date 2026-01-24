@@ -636,18 +636,27 @@ window.ContainerInitiator = (function() {
         if (barcodeResult && barcodeResult.success && window.QRCodeService) {
             QRCodeService.createForBarcode(barcodeResult, currentContainerId)
                 .then(qrMeta => {
+                    if (!qrMeta) {
+                        console.warn('QR code generation returned null - backend may not be running');
+                        return;
+                    }
+
                     try {
                         // Attach QR metadata to container entry and update confirmation UI
                         newContainer.barcodeMetadata = newContainer.barcodeMetadata || {};
                         newContainer.barcodeMetadata.qrCode = {
                             dataUrl: qrMeta.dataUrl,
                             destinationUrl: qrMeta.destinationUrl,
+                            shortCode: qrMeta.shortCode,
                             imageFormat: qrMeta.imageFormat
                         };
 
-                        // Also persist a top-level QR destination URL for easier export/sync
+                        // Also persist top-level QR fields for easier export/sync
                         if (qrMeta.destinationUrl) {
                             newContainer.qrDestinationUrl = qrMeta.destinationUrl;
+                        }
+                        if (qrMeta.shortCode) {
+                            newContainer.qrShortCode = qrMeta.shortCode;
                         }
 
                         // Update the corresponding inventory entry (it was just unshifted to index 0)
@@ -657,12 +666,20 @@ window.ContainerInitiator = (function() {
                             if (newContainer.qrDestinationUrl) {
                                 latest.qrDestinationUrl = newContainer.qrDestinationUrl;
                             }
+                            if (newContainer.qrShortCode) {
+                                latest.qrShortCode = newContainer.qrShortCode;
+                            }
                         }
 
                         // Update confirmation QR preview
                         const qrEl = document.getElementById('confirmQrCode');
                         if (qrEl && qrMeta.dataUrl) {
-                            qrEl.innerHTML = `<img src="${qrMeta.dataUrl}" alt="QR Code" style="max-width: 120px; height: auto;" />`;
+                            qrEl.innerHTML = `<img src="${qrMeta.dataUrl}" alt="QR Code" style="max-width: 120px; height: auto;" /><p style="margin-top: 8px; font-size: 0.85rem; color: #6b7280;">Scan to view: ${qrMeta.shortCode}</p>`;
+                        }
+
+                        // Persist updated container with QR metadata
+                        if (window.InventoryManager && typeof window.InventoryManager.saveToLocalStorage === 'function') {
+                            window.InventoryManager.saveToLocalStorage();
                         }
                     } catch (err) {
                         console.warn('Failed to attach QR metadata for initiated container:', err);

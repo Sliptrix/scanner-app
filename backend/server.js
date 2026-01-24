@@ -7,10 +7,15 @@ const express = require('express');
 const cors = require('cors');
 const multer = require('multer');
 const { Client } = require('@microsoft/microsoft-graph-client');
+const QRCode = require('qrcode');
 require('isomorphic-fetch');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
+
+// In-memory storage for QR code mappings (short code -> barcode data)
+// In production, this should be a database
+const qrMappings = new Map();
 
 // Middleware
 app.use(cors());
@@ -25,6 +30,128 @@ const upload = multer({ storage: storage });
  */
 app.get('/health', (req, res) => {
     res.json({ status: 'ok', message: 'Scanner backend is running' });
+});
+
+/**
+ * Generate a short code (6 characters, alphanumeric, similar to qrco.de style)
+ */
+function generateShortCode() {
+    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+    let code = '';
+    for (let i = 0; i < 6; i++) {
+        code += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    // Check if code already exists, regenerate if it does
+    if (qrMappings.has(code)) {
+        return generateShortCode();
+    }
+    return code;
+}
+
+/**
+ * Generate QR code for a container
+ * POST /api/qrcodes
+ *
+ * Body:
+ * - containerId: Container ID
+ * - barcodeData: Barcode data to encode
+ * - appUrl: Optional app URL (defaults to http://localhost:8000)
+ *
+ * Returns:
+ * - dataUrl: Data URL of the QR code image (PNG base64)
+ * - destinationUrl: The URL the QR code points to
+ * - shortCode: The short code used
+ * - imageFormat: Image format (PNG)
+ */
+app.post('/api/qrcodes', async (req, res) => {
+    try {
+        const { containerId, barcodeData, appUrl = 'http://localhost:8000' } = req.body;
+
+        if (!containerId || !barcodeData) {
+            return res.status(400).json({
+                error: 'Missing required fields',
+                required: ['containerId', 'barcodeData']
+            });
+        }
+
+        // Generate a short code
+        const shortCode = generateShortCode();
+
+        // Store the mapping
+        qrMappings.set(shortCode, {
+            containerId,
+            barcodeData,
+            createdAt: new Date().toISOString()
+        });
+
+        // Create the destination URL (qrco.de style: appUrl/?c=shortCode)
+        const destinationUrl = `${appUrl}?c=${shortCode}`;
+
+        // Generate QR code as data URL
+        const qrDataUrl = await QRCode.toDataURL(destinationUrl, {
+            errorCorrectionLevel: 'M',
+            type: 'image/png',
+            width: 300,
+            margin: 1,
+            color: {
+                dark: '#000000',
+                light: '#FFFFFF'
+            }
+        });
+
+        res.json({
+            success: true,
+            dataUrl: qrDataUrl,
+            destinationUrl: destinationUrl,
+            shortCode: shortCode,
+            imageFormat: 'PNG'
+        });
+
+    } catch (error) {
+        console.error('Error generating QR code:', error);
+        res.status(500).json({
+            error: 'Failed to generate QR code',
+            message: error.message
+        });
+    }
+});
+
+/**
+ * Lookup a short code to get container information
+ * GET /api/qrcodes/:shortCode
+ */
+app.get('/api/qrcodes/:shortCode', (req, res) => {
+    const { shortCode } = req.params;
+
+    if (!qrMappings.has(shortCode)) {
+        return res.status(404).json({
+            error: 'Short code not found',
+            shortCode
+        });
+    }
+
+    const data = qrMappings.get(shortCode);
+    res.json({
+        success: true,
+        containerId: data.containerId,
+        barcodeData: data.barcodeData,
+        createdAt: data.createdAt
+    });
+});
+
+/**
+ * Get all QR code mappings (for debugging)
+ * GET /api/qrcodes
+ */
+app.get('/api/qrcodes', (req, res) => {
+    const mappings = Array.from(qrMappings.entries()).map(([shortCode, data]) => ({
+        shortCode,
+        ...data
+    }));
+    res.json({
+        count: mappings.length,
+        mappings
+    });
 });
 
 /**
@@ -147,6 +274,7 @@ app.use((err, req, res, next) => {
 app.listen(PORT, () => {
     console.log(`🚀 Scanner Backend running on http://localhost:${PORT}`);
     console.log(`📧 Email API available at http://localhost:${PORT}/api/email/send`);
+    console.log(`📱 QR Code API available at http://localhost:${PORT}/api/qrcodes`);
     console.log(`💚 Health check at http://localhost:${PORT}/health`);
 });
 

@@ -820,3 +820,23 @@ body {
     border-color: #10b981;
     box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.1);
 }
+
+/* QR Code Scan Highlight */
+.qr-highlighted {
+    background: linear-gradient(135deg, #fef3c7 0%, #fde047 100%) !important;
+    animation: qr-pulse 1.5s ease-in-out 3;
+    box-shadow: 0 0 0 4px rgba(250, 204, 21, 0.3);
+    border-left: 4px solid #eab308 !important;
+    transition: all 0.3s ease;
+}
+
+@keyframes qr-pulse {
+    0%, 100% {
+        transform: scale(1);
+        box-shadow: 0 0 0 4px rgba(250, 204, 21, 0.3);
+    }
+    50% {
+        transform: scale(1.02);
+        box-shadow: 0 0 0 8px rgba(250, 204, 21, 0.2);
+    }
+}
