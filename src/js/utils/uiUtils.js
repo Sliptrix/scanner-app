@@ -183,31 +183,53 @@ window.UIUtils = {
     
     // File upload UI management
     updateDataStatus: function(loaded = false, filename = null, fromCache = false) {
-        const dataStatus = document.getElementById('dataStatus');
-        if (!dataStatus) return;
-        
+        // Update data loading banner
+        const banner = document.getElementById('dataLoadingBanner');
+        if (banner) {
+            banner.style.display = loaded ? 'none' : 'block';
+        }
+
+        // Update data stats
         if (loaded) {
-            dataStatus.classList.add('loaded');
-            
-            const cacheIndicator = fromCache ? '📁 ' : '📊 ';
-            const cacheText = fromCache ? ' (cached)' : '';
-            
-            dataStatus.innerHTML = `
-                <span>${cacheIndicator}Excel data loaded: ${Object.keys(window.appState.strainsTable).length} strains, ${Object.keys(window.appState.ownersTable).length} owners${cacheText}</span>
-                ${filename ? `<span style="font-size: 0.8rem;">File: ${filename}</span>` : ''}
-                <div style="margin-top: 8px; display: flex; gap: 10px;">
-                    <button class="btn btn-secondary btn-sm" onclick="document.getElementById('fileInput').click()">
-                        🔄 Load New File
-                    </button>
-                    ${fromCache ? '<button class="btn btn-secondary btn-sm" onclick="DataUtils.clearSavedExcelData(); location.reload();">🗑️ Clear Cache</button>' : ''}
-                </div>
-            `;
+            const strainsCount = Object.keys(window.appState.strainsTable || {}).length;
+            const ownersCount = Object.keys(window.appState.ownersTable || {}).length;
+            const mediaCount = Object.keys(window.appState.mediaTypesTable || {}).length;
+
+            const dataStatsEl = document.getElementById('dataStats');
+            const dataStatusText = document.getElementById('dataStatusText');
+
+            if (dataStatusText) {
+                const cacheIndicator = fromCache ? '📁' : '✅';
+                const sourceText = fromCache ? ' (from cache)' : filename ? ` (${filename})` : '';
+                dataStatusText.textContent = `${cacheIndicator} Data loaded${sourceText}`;
+                dataStatusText.style.color = '#10b981';
+            }
+
+            if (dataStatsEl) {
+                dataStatsEl.style.display = 'inline';
+                const strainsCountEl = document.getElementById('strainsCount');
+                const ownersCountEl = document.getElementById('ownersCount');
+                const mediaCountEl = document.getElementById('mediaCount');
+
+                if (strainsCountEl) strainsCountEl.textContent = strainsCount;
+                if (ownersCountEl) ownersCountEl.textContent = ownersCount;
+                if (mediaCountEl) mediaCountEl.textContent = mediaCount;
+            }
+
+            // Notify other modules that data is available
+            console.log('✅ Reference data loaded:', { strainsCount, ownersCount, mediaCount });
         } else {
-            dataStatus.classList.remove('loaded');
-            dataStatus.innerHTML = `
-                <span>❌ Excel data not loaded</span>
-                <button class="btn btn-secondary" onclick="document.getElementById('fileInput').click()">Load Excel File</button>
-            `;
+            const dataStatusText = document.getElementById('dataStatusText');
+            const dataStatsEl = document.getElementById('dataStats');
+
+            if (dataStatusText) {
+                dataStatusText.textContent = '❌ Excel data not loaded';
+                dataStatusText.style.color = '#ef4444';
+            }
+
+            if (dataStatsEl) {
+                dataStatsEl.style.display = 'none';
+            }
         }
     },
     

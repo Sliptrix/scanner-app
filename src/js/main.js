@@ -549,6 +549,36 @@ async function syncInventoryToCloud() {
     }
 }
 
+// Quick cloud sync for easy access
+async function quickCloudSync() {
+    if (!window.AuthManager || !AuthManager.isSignedIn()) {
+        if (window.NotificationSystem) {
+            NotificationSystem.error('Please sign in with Microsoft 365 to sync from cloud.');
+        }
+        return;
+    }
+
+    if (!window.OneDriveSync) {
+        if (window.NotificationSystem) {
+            NotificationSystem.error('Cloud sync module is not initialized.');
+        }
+        return;
+    }
+
+    if (window.NotificationSystem) {
+        NotificationSystem.info('Syncing data from cloud...');
+    }
+
+    try {
+        await OneDriveSync.manualSync();
+    } catch (error) {
+        console.error('Quick cloud sync error:', error);
+        if (window.NotificationSystem) {
+            NotificationSystem.error('Cloud sync failed: ' + error.message);
+        }
+    }
+}
+
 function useGeneratedBarcode() {
     // Early validation - check if we have the necessary components
     if (!window.appState.currentContainer || !window.appState.currentSample) {

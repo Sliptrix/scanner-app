@@ -620,15 +620,76 @@ window.ContainerInitiator = (function() {
                 break;
             case 'date':
                 prompt.textContent = 'Enter Date:';
-                hint.textContent = 'Type the date in YYYYMMDD format';
+                hint.textContent = 'Type the date in YYYYMMDD format or click a suggestion below';
+                // Show date recommendations
+                showDateRecommendations();
                 break;
         }
-        
+
         // Focus on input
         input.focus();
-        
+
         // Update status summary
         updateStatusSummary();
+    }
+
+    /**
+     * Show recommended date options
+     */
+    function showDateRecommendations() {
+        const hint = document.getElementById('initiatorHint');
+        if (!hint) return;
+
+        const today = new Date();
+        const tomorrow = new Date(today);
+        tomorrow.setDate(tomorrow.getDate() + 1);
+
+        const formatDate = (date) => {
+            const year = date.getFullYear();
+            const month = String(date.getMonth() + 1).padStart(2, '0');
+            const day = String(date.getDate()).padStart(2, '0');
+            return `${year}${month}${day}`;
+        };
+
+        const todayStr = formatDate(today);
+        const tomorrowStr = formatDate(tomorrow);
+
+        // Create clickable date suggestions
+        const suggestionsHTML = `
+            <div style="margin-top: 12px; padding: 12px; background: #f0fdf4; border-radius: 8px; border: 1px solid #bbf7d0;">
+                <div style="font-size: 0.85rem; color: #166534; margin-bottom: 8px; font-weight: 600;">Quick Select:</div>
+                <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+                    <button class="btn btn-sm btn-success" onclick="ContainerInitiator.selectDate('${todayStr}')" style="padding: 6px 12px; font-size: 0.85rem;">
+                        📅 Today (${todayStr})
+                    </button>
+                    <button class="btn btn-sm btn-secondary" onclick="ContainerInitiator.selectDate('${tomorrowStr}')" style="padding: 6px 12px; font-size: 0.85rem;">
+                        📅 Tomorrow (${tomorrowStr})
+                    </button>
+                </div>
+            </div>
+        `;
+
+        // Insert after hint
+        const existingSuggestions = document.getElementById('dateRecommendations');
+        if (existingSuggestions) {
+            existingSuggestions.innerHTML = suggestionsHTML;
+        } else {
+            const newDiv = document.createElement('div');
+            newDiv.id = 'dateRecommendations';
+            newDiv.innerHTML = suggestionsHTML;
+            hint.parentNode.insertBefore(newDiv, hint.nextSibling);
+        }
+    }
+
+    /**
+     * Select a recommended date
+     */
+    function selectDate(dateString) {
+        const input = document.getElementById('initiatorInput');
+        if (input) {
+            input.value = dateString;
+            input.focus();
+        }
     }
     
     /**
@@ -766,6 +827,7 @@ window.ContainerInitiator = (function() {
         initialize: initialize,
         resetInitiator: resetInitiator,
         updateNextAvailableId: updateNextAvailableId,
-        handleInitiatorInput: handleInitiatorInput
+        handleInitiatorInput: handleInitiatorInput,
+        selectDate: selectDate
     };
 })();

@@ -181,20 +181,51 @@
             <div class="reference-section" id="referenceSection">
                 <div class="section-content">
                     <h2>Reference Data Management</h2>
+
+                    <!-- Data Loading Status Banner -->
+                    <div class="data-loading-banner" id="dataLoadingBanner" style="background: #fef3c7; border: 2px solid #f59e0b; border-radius: 12px; padding: 20px; margin-bottom: 24px; display: none;">
+                        <div style="display: flex; align-items: start; gap: 16px;">
+                            <div style="font-size: 2rem;">⚠️</div>
+                            <div style="flex: 1;">
+                                <h3 style="margin: 0 0 8px 0; color: #92400e; font-size: 1.1rem;">No Reference Data Loaded</h3>
+                                <p style="margin: 0 0 12px 0; color: #78350f;">You need to load reference data before using most features. Choose one of the options below:</p>
+                                <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+                                    <button class="btn btn-primary" onclick="document.getElementById('fileInput').click()">📄 Load Excel File</button>
+                                    <button class="btn btn-primary" id="cloud-sync-quick-btn" onclick="quickCloudSync()">☁️ Sync from Cloud</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
                     <div class="upload-area" onclick="document.getElementById('fileInput').click()">
                         <h3>📄 Load Your Excel Data File</h3>
                         <p>Click here or drag your "barcode test.xlsx" file to load all reference tables</p>
                     </div>
 
                     <div class="data-status" id="dataStatus">
-                        <span>❌ Excel data not loaded</span>
-                        <button class="btn btn-secondary" onclick="document.getElementById('fileInput').click()">Load Excel File</button>
-                        <button class="btn btn-info" onclick="document.getElementById('importInput').click()" style="margin-left: 10px;">📥 Import Data</button>
-                        <button class="btn btn-primary" id="cloud-sync-btn" style="margin-left: 10px;">🔄 Sync Owners (Cloud)</button>
-                        <button class="btn btn-secondary" id="inventory-sync-from-cloud-btn" onclick="syncInventoryFromCloud()" style="margin-left: 10px;">📥 Sync Inventory From Cloud</button>
-                        <button class="btn btn-secondary" id="inventory-sync-to-cloud-btn" onclick="syncInventoryToCloud()" style="margin-left: 10px;">📤 Sync Inventory To Cloud</button>
-                        <div id="cloud-sync-status" style="margin-top: 8px; font-size: 0.85rem; color: #666;">Last synced: —</div>
-                        <div id="inventory-sync-status" style="margin-top: 4px; font-size: 0.8rem; color: #666;">Inventory sync: —</div>
+                        <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 16px;">
+                            <span id="dataStatusText">❌ Excel data not loaded</span>
+                            <div id="dataStats" style="display: none; font-size: 0.85rem; color: #10b981; font-weight: 600;">
+                                <span id="strainsCount">0</span> strains •
+                                <span id="ownersCount">0</span> owners •
+                                <span id="mediaCount">0</span> media types
+                            </div>
+                        </div>
+
+                        <div style="margin-bottom: 20px;">
+                            <h4 style="margin: 0 0 10px 0; font-size: 0.95rem; color: #475569;">Local File Options</h4>
+                            <button class="btn btn-secondary" onclick="document.getElementById('fileInput').click()">Load Excel File</button>
+                            <button class="btn btn-info" onclick="document.getElementById('importInput').click()" style="margin-left: 10px;">📥 Import Data</button>
+                        </div>
+
+                        <div>
+                            <h4 style="margin: 0 0 10px 0; font-size: 0.95rem; color: #475569;">Cloud Sync Options</h4>
+                            <button class="btn btn-primary" id="cloud-sync-btn" style="margin-bottom: 10px;">🔄 Sync Owners & Strains (Cloud)</button>
+                            <button class="btn btn-secondary" id="inventory-sync-from-cloud-btn" onclick="syncInventoryFromCloud()" style="margin-bottom: 10px;">📥 Pull Inventory From Cloud</button>
+                            <button class="btn btn-secondary" id="inventory-sync-to-cloud-btn" onclick="syncInventoryToCloud()">📤 Push Inventory To Cloud</button>
+                            <div id="cloud-sync-status" style="margin-top: 12px; padding-top: 12px; border-top: 1px solid #e2e8f0; font-size: 0.85rem; color: #666;">☁️ Cloud sync: Not synced</div>
+                            <div id="inventory-sync-status" style="margin-top: 8px; font-size: 0.85rem; color: #666;">📦 Inventory sync: —</div>
+                        </div>
                     </div>
                 </div>
             </div>
