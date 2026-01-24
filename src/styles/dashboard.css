@@ -548,6 +548,7 @@ body {
     border-radius: 12px;
     padding: 32px;
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+    border: 1px solid #e2e8f0;
 }
 
 .upload-area {
@@ -570,11 +571,40 @@ body {
     font-size: 1.25rem;
     margin-bottom: 12px;
     color: #1e293b;
+    font-weight: 600;
 }
 
 .upload-area p {
     color: #64748b;
     font-size: 0.95rem;
+}
+
+/* Data Status Section */
+.data-status {
+    margin-top: 24px;
+    padding: 24px;
+    background: #f8fafc;
+    border-radius: 12px;
+    border: 1px solid #e2e8f0;
+}
+
+.data-status span {
+    display: inline-block;
+    margin-bottom: 16px;
+    font-weight: 600;
+    color: #64748b;
+}
+
+.data-status button {
+    margin-right: 10px;
+    margin-bottom: 10px;
+    padding: 10px 20px;
+}
+
+.data-status > div {
+    margin-top: 12px;
+    padding-top: 12px;
+    border-top: 1px solid #e2e8f0;
 }
 
 /* Responsive Design */
@@ -754,9 +784,26 @@ body {
     color: white;
 }
 
+.btn-success:hover {
+    background: #059669;
+}
+
+.btn-info {
+    background: #3b82f6;
+    color: white;
+}
+
+.btn-info:hover {
+    background: #2563eb;
+}
+
 .btn-danger {
     background: #ef4444;
     color: white;
+}
+
+.btn-danger:hover {
+    background: #dc2626;
 }
 
 /* Form inputs consistency */
