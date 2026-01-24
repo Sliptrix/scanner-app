@@ -610,6 +610,18 @@ window.ContainerInitiator = (function() {
                 prompt.textContent = 'Enter Media Type (optional):';
                 hint.textContent = 'Type the media code or leave blank';
                 break;
+            case 'stage':
+                prompt.textContent = 'Enter Stage:';
+                hint.textContent = 'Type the stage number (1-9)';
+                break;
+            case 'tissue':
+                prompt.textContent = 'Enter Tissue Count:';
+                hint.textContent = 'Type the number of tissue samples (1-99)';
+                break;
+            case 'date':
+                prompt.textContent = 'Enter Date:';
+                hint.textContent = 'Type the date in YYYYMMDD format';
+                break;
         }
         
         // Focus on input
