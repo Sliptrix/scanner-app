@@ -714,10 +714,10 @@ window.ContainerInitiator = (function() {
     function updateContainerConfirmation(container) {
         const confirmationElement = document.getElementById('initiatorConfirmation');
         if (!confirmationElement) return;
-        
+
         // Show the confirmation
         confirmationElement.style.display = 'block';
-        
+
         // Update confirmation details using the ID fields since display fields are null
         document.getElementById('confirmContainerId').textContent = container.containerId;
         document.getElementById('confirmOwner').textContent = container.ownerId; // Use ownerId
@@ -726,10 +726,19 @@ window.ContainerInitiator = (function() {
         document.getElementById('confirmDate').textContent = container.date;
         document.getElementById('confirmBarcode').textContent = container.barcode || container.sampleBarcode || '';
 
-        // Clear any previous QR image; it will be filled when QR generation completes
+        // Show QR code generation instructions
         const qrEl = document.getElementById('confirmQrCode');
         if (qrEl) {
-            qrEl.innerHTML = '';
+            const qrUrl = `${window.location.origin}?c=${container.containerId}`;
+            qrEl.innerHTML = `
+                <div style="background: #fef3c7; border: 2px solid #fbbf24; border-radius: 8px; padding: 12px; margin-top: 10px;">
+                    <p style="margin: 0 0 8px 0; font-weight: 600; color: #92400e;">📱 Create QR Code:</p>
+                    <p style="margin: 0 0 8px 0; font-size: 0.85rem; color: #78350f;">Visit <a href="https://app.qr-code-generator.com" target="_blank" style="color: #059669; text-decoration: underline;">qr-code-generator.com</a></p>
+                    <p style="margin: 0 0 8px 0; font-size: 0.85rem; color: #78350f;">Use this URL:</p>
+                    <input type="text" value="${qrUrl}" readonly onclick="this.select()" style="width: 100%; padding: 6px; font-size: 0.8rem; font-family: monospace; border: 1px solid #d97706; border-radius: 4px; background: white;">
+                    <p style="margin: 8px 0 0 0; font-size: 0.75rem; color: #78350f; font-style: italic;">Click the URL to copy. When scanned, the QR code will show this container's details.</p>
+                </div>
+            `;
         }
     }
     

@@ -843,54 +843,67 @@ async function emailIntakeForm() {
 }
 
 /**
- * Handle QR code scan from URL parameter
- * Detects ?c=shortCode in URL, looks up the container, and highlights it in inventory
+ * Handle QR code scan from URL parameters
+ * Supports multiple formats:
+ * - ?c=containerId (from qr-code-generator.com short links)
+ * - ?container=containerId
+ * - ?barcode=barcodeData
  */
 async function handleQRCodeScan() {
     try {
-        // Check if there's a container short code in the URL (?c=shortCode)
         const urlParams = new URLSearchParams(window.location.search);
-        const shortCode = urlParams.get('c');
 
-        if (!shortCode) {
+        // Check for container parameter (multiple formats)
+        const containerParam = urlParams.get('c') || urlParams.get('container');
+        const barcodeParam = urlParams.get('barcode');
+
+        if (!containerParam && !barcodeParam) {
             return; // No QR scan parameter present
         }
 
-        console.log(`📱 QR code scanned! Short code: ${shortCode}`);
+        console.log(`📱 QR code scanned! Container:`, containerParam, 'Barcode:', barcodeParam);
 
-        // Lookup the short code to get container information
-        if (!window.QRCodeService) {
-            console.error('QRCodeService not available');
-            NotificationSystem.warning('QR code service not initialized');
-            return;
+        // Wait for data to be loaded
+        let waitCount = 0;
+        while (!window.appState.isDataLoaded && waitCount < 20) {
+            await new Promise(resolve => setTimeout(resolve, 500));
+            waitCount++;
         }
 
-        const containerInfo = await QRCodeService.lookupShortCode(shortCode);
+        // Find the container in inventory
+        let container = null;
 
-        if (!containerInfo) {
-            console.error(`Short code ${shortCode} not found`);
-            NotificationSystem.error(`Container not found for code: ${shortCode}`);
+        if (containerParam) {
+            // Search by container ID
+            container = window.appState.inventory.find(item =>
+                item.containerId === containerParam ||
+                item.containerId === parseInt(containerParam)
+            );
+        }
+
+        if (!container && barcodeParam) {
+            // Search by barcode
+            container = window.appState.inventory.find(item =>
+                item.barcode === barcodeParam ||
+                item.sampleBarcode === barcodeParam
+            );
+        }
+
+        if (!container) {
+            console.warn(`Container not found for QR scan. Container: ${containerParam}, Barcode: ${barcodeParam}`);
+            NotificationSystem.warning(`Container not found in inventory. It may not be loaded yet.`);
             // Clean URL
             window.history.replaceState({}, document.title, window.location.pathname);
             return;
         }
 
-        console.log(`✅ Container found:`, containerInfo);
+        console.log(`✅ Container found:`, container);
 
-        // Switch to inventory view
-        UIUtils.switchMode('inventory');
+        // Show container detail modal
+        showContainerDetail(container);
 
-        // Wait a moment for the table to render
-        setTimeout(() => {
-            // Find the container in the inventory table and highlight it
-            highlightContainerInTable(containerInfo.barcodeData, containerInfo.containerId);
-
-            // Show success notification
-            NotificationSystem.success(`Container ${containerInfo.containerId} highlighted in inventory!`);
-
-            // Clean the URL (remove the ?c=shortCode parameter)
-            window.history.replaceState({}, document.title, window.location.pathname);
-        }, 500);
+        // Clean the URL (remove QR parameters)
+        window.history.replaceState({}, document.title, window.location.pathname);
 
     } catch (error) {
         console.error('Error handling QR code scan:', error);
@@ -952,6 +965,212 @@ function highlightContainerInTable(barcodeData, containerId) {
     }
 }
 
+/**
+ * Show container detail modal with metadata
+ * @param {Object} container - Container object from inventory
+ */
+function showContainerDetail(container) {
+    const modal = document.getElementById('containerDetailModal');
+    const content = document.getElementById('containerDetailContent');
+
+    if (!modal || !content) {
+        console.error('Container detail modal elements not found');
+        return;
+    }
+
+    // Store current container for editing
+    window.currentEditingContainer = container;
+
+    // Build detail view HTML
+    const html = `
+        <div class="container-detail-grid">
+            <div class="container-detail-field">
+                <label>Container ID</label>
+                <div class="value" data-field="containerId">${container.containerId || 'N/A'}</div>
+            </div>
+            <div class="container-detail-field">
+                <label>Status</label>
+                <div class="value" data-field="status">${container.status || 'N/A'}</div>
+            </div>
+            <div class="container-detail-field">
+                <label>Owner</label>
+                <div class="value" data-field="owner">${container.owner || 'N/A'}</div>
+            </div>
+            <div class="container-detail-field">
+                <label>Owner ID</label>
+                <div class="value" data-field="ownerId">${container.ownerId || 'N/A'}</div>
+            </div>
+            <div class="container-detail-field">
+                <label>Strain</label>
+                <div class="value" data-field="strain">${container.strain || 'N/A'}</div>
+            </div>
+            <div class="container-detail-field">
+                <label>Strain ID</label>
+                <div class="value" data-field="strainId">${container.strainId || 'N/A'}</div>
+            </div>
+            <div class="container-detail-field">
+                <label>Media Type</label>
+                <div class="value" data-field="mediaType">${container.mediaType || container.media || 'N/A'}</div>
+            </div>
+            <div class="container-detail-field">
+                <label>Media ID</label>
+                <div class="value" data-field="mediaId">${container.mediaId || 'N/A'}</div>
+            </div>
+            <div class="container-detail-field">
+                <label>Stage</label>
+                <div class="value" data-field="stage">${container.stage || 'N/A'}</div>
+            </div>
+            <div class="container-detail-field">
+                <label>Stage ID</label>
+                <div class="value" data-field="stageId">${container.stageId || 'N/A'}</div>
+            </div>
+            <div class="container-detail-field">
+                <label>Tissue Count</label>
+                <div class="value" data-field="tissueCount">${container.tissueCount || 'N/A'}</div>
+            </div>
+            <div class="container-detail-field">
+                <label>Date</label>
+                <div class="value" data-field="date">${container.date || 'N/A'}</div>
+            </div>
+            <div class="container-detail-field full-width">
+                <label>Barcode</label>
+                <div class="value" data-field="barcode" style="font-family: monospace; font-size: 0.95rem;">${container.barcode || container.sampleBarcode || 'N/A'}</div>
+            </div>
+            ${container.containerLineage ? `
+            <div class="container-detail-field full-width">
+                <label>Container Lineage</label>
+                <div class="value" data-field="containerLineage">${container.containerLineage}</div>
+            </div>
+            ` : ''}
+        </div>
+
+        <div class="qr-code-instructions">
+            <h4>📱 QR Code Instructions</h4>
+            <p><strong>To create a QR code for this container on qr-code-generator.com:</strong></p>
+            <p>1. Visit <a href="https://app.qr-code-generator.com" target="_blank">app.qr-code-generator.com</a></p>
+            <p>2. Select "URL" as the QR code type</p>
+            <p>3. Enter this URL: <code>${window.location.origin}?c=${container.containerId}</code></p>
+            <p>4. Click "Create QR Code" and customize as needed</p>
+            <p>5. Download and print your QR code</p>
+            <p><strong>When scanned:</strong> The QR code will open this app and show this container's details.</p>
+        </div>
+    `;
+
+    content.innerHTML = html;
+    modal.style.display = 'flex';
+
+    // Reset edit mode
+    document.getElementById('editContainerBtn').style.display = 'inline-block';
+    document.getElementById('saveContainerBtn').style.display = 'none';
+    document.getElementById('cancelEditBtn').style.display = 'none';
+
+    NotificationSystem.success(`Container ${container.containerId} details loaded`);
+}
+
+/**
+ * Close container detail modal
+ */
+function closeContainerDetail() {
+    const modal = document.getElementById('containerDetailModal');
+    if (modal) {
+        modal.style.display = 'none';
+    }
+    window.currentEditingContainer = null;
+}
+
+/**
+ * Toggle container edit mode
+ */
+function toggleContainerEdit() {
+    const container = window.currentEditingContainer;
+    if (!container) return;
+
+    const fields = document.querySelectorAll('.container-detail-field .value');
+    const editableFields = ['owner', 'strain', 'mediaType', 'stage', 'tissueCount', 'date', 'status'];
+
+    fields.forEach(field => {
+        const fieldName = field.getAttribute('data-field');
+        if (!editableFields.includes(fieldName)) return;
+
+        const currentValue = container[fieldName] || '';
+
+        if (fieldName === 'status') {
+            // Status dropdown
+            field.innerHTML = `
+                <select data-field="${fieldName}" style="width: 100%;">
+                    <option value="Complete" ${currentValue === 'Complete' ? 'selected' : ''}>Complete</option>
+                    <option value="In Progress" ${currentValue === 'In Progress' ? 'selected' : ''}>In Progress</option>
+                    <option value="Pending" ${currentValue === 'Pending' ? 'selected' : ''}>Pending</option>
+                    <option value="Archived" ${currentValue === 'Archived' ? 'selected' : ''}>Archived</option>
+                </select>
+            `;
+        } else {
+            // Text input
+            field.innerHTML = `<input type="text" data-field="${fieldName}" value="${currentValue}" />`;
+        }
+    });
+
+    // Update buttons
+    document.getElementById('editContainerBtn').style.display = 'none';
+    document.getElementById('saveContainerBtn').style.display = 'inline-block';
+    document.getElementById('cancelEditBtn').style.display = 'inline-block';
+
+    NotificationSystem.info('Edit mode enabled. Modify fields and click Save Changes.');
+}
+
+/**
+ * Cancel container edit
+ */
+function cancelContainerEdit() {
+    const container = window.currentEditingContainer;
+    if (container) {
+        showContainerDetail(container); // Reload original data
+    }
+}
+
+/**
+ * Save container changes
+ */
+function saveContainerChanges() {
+    const container = window.currentEditingContainer;
+    if (!container) return;
+
+    // Collect updated values from input fields
+    const inputs = document.querySelectorAll('.container-detail-field input, .container-detail-field select');
+    const updates = {};
+
+    inputs.forEach(input => {
+        const fieldName = input.getAttribute('data-field');
+        if (fieldName) {
+            updates[fieldName] = input.value;
+        }
+    });
+
+    // Update the container object
+    Object.assign(container, updates);
+
+    // Find and update in inventory array
+    const index = window.appState.inventory.findIndex(item => item.containerId === container.containerId);
+    if (index !== -1) {
+        window.appState.inventory[index] = container;
+    }
+
+    // Save to localStorage
+    if (window.InventoryManager && typeof window.InventoryManager.saveToLocalStorage === 'function') {
+        window.InventoryManager.saveToLocalStorage();
+    }
+
+    // Refresh inventory table if visible
+    if (window.InventoryTableManager && typeof window.InventoryTableManager.rebuildTable === 'function') {
+        window.InventoryTableManager.rebuildTable();
+    }
+
+    // Reload detail view
+    showContainerDetail(container);
+
+    NotificationSystem.success(`Container ${container.containerId} updated successfully!`);
+}
+
 // Legacy compatibility for global function references
 window.switchMode = switchMode;
 window.nextBuilderStep = nextBuilderStep;
@@ -965,4 +1184,9 @@ window.exportInventory = exportInventory;
 window.clearInventory = clearInventory;
 window.toggleBarcodeDetails = toggleBarcodeDetails;
 window.emailIntakeForm = emailIntakeForm;
+window.showContainerDetail = showContainerDetail;
+window.closeContainerDetail = closeContainerDetail;
+window.toggleContainerEdit = toggleContainerEdit;
+window.cancelContainerEdit = cancelContainerEdit;
+window.saveContainerChanges = saveContainerChanges;
 

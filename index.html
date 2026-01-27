@@ -977,6 +977,27 @@
         </main>
     </div> <!-- End appContent -->
 
+    <!-- Container Detail Modal (shown when QR code is scanned) -->
+    <div id="containerDetailModal" class="modal" style="display: none;">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>📦 Container Details</h2>
+                <button class="modal-close" onclick="closeContainerDetail()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div id="containerDetailContent">
+                    <!-- Will be populated dynamically -->
+                </div>
+                <div class="container-detail-actions" style="margin-top: 20px; display: flex; gap: 10px;">
+                    <button class="btn btn-primary" id="editContainerBtn" onclick="toggleContainerEdit()">✏️ Edit</button>
+                    <button class="btn btn-success" id="saveContainerBtn" onclick="saveContainerChanges()" style="display: none;">💾 Save Changes</button>
+                    <button class="btn btn-secondary" id="cancelEditBtn" onclick="cancelContainerEdit()" style="display: none;">❌ Cancel</button>
+                    <button class="btn" onclick="closeContainerDetail()">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <div id="notification" class="notification"></div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
