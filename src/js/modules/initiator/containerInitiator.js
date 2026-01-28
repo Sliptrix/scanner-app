@@ -12,7 +12,7 @@ window.ContainerInitiator = (function() {
     let initialized = false;
     
     // Ordered list of initiator steps for navigation
-    const STEPS = ['owner', 'strain', 'media', 'stage', 'tissue', 'date'];
+    const STEPS = ['qr', 'owner', 'strain', 'media', 'stage', 'tissue', 'date'];
     
     /**
      * Initialize the container initiator
@@ -66,7 +66,9 @@ window.ContainerInitiator = (function() {
             // Initialize state
             console.log('📊 Initializing initiator state...');
             const initialState = {
-                currentStep: 'owner',
+                currentStep: 'qr',
+                qrExcelRow: null,
+                prePopulatedContainerId: null,
                 owner: null,
                 strain: null,
                 media: null,
@@ -141,6 +143,7 @@ window.ContainerInitiator = (function() {
     function checkDataLoadedStatus() {
         if (window.appState.isDataLoaded) {
             console.log('Data is now loaded, enabling initiator inputs');
+            updateNextAvailableId();
             enableInitiatorInputs();
             return;
         }
@@ -246,6 +249,10 @@ window.ContainerInitiator = (function() {
         }
         
         switch (currentStep) {
+            case 'qr':
+                console.log('Processing QR scan input...');
+                processQrInput();
+                break;
             case 'owner':
                 console.log('Processing owner input...');
                 processOwnerInput();
@@ -277,6 +284,54 @@ window.ContainerInitiator = (function() {
         }
     }
     
+    /**
+     * Process QR code scan input (first step).
+     * User scans a pre-printed QR label. The app parses the QR ID
+     * and verifies it exists in the pool and is unassigned.
+     */
+    function processQrInput() {
+        const input = document.getElementById('initiatorInput').value.trim();
+
+        if (!input) {
+            showFeedback('Please scan or enter a QR code', 'error');
+            return;
+        }
+
+        if (!window.QRCodeService) {
+            showFeedback('QR Code Service not available', 'error');
+            return;
+        }
+
+        const excelRow = QRCodeService.parseQrInput(input);
+        if (!excelRow) {
+            showFeedback('Invalid QR code. Expected format: Excel URL with Active_Inventory!A{row}, A{row}, or a row number', 'error');
+            return;
+        }
+
+        const poolEntry = QRCodeService.lookupByRow(excelRow);
+        if (!poolEntry) {
+            showFeedback(`QR code for row ${excelRow} not found in pool. Generate a batch first.`, 'error');
+            return;
+        }
+
+        if (poolEntry.assignedContainerId) {
+            showFeedback(`QR code for row ${excelRow} is already assigned to container ${poolEntry.assignedContainerId}`, 'error');
+            return;
+        }
+
+        // Store the Excel row and pre-populated Container_ID for later use
+        StateManager.setState('initiatorState.qrExcelRow', excelRow);
+        if (poolEntry.containerId) {
+            StateManager.setState('initiatorState.prePopulatedContainerId', poolEntry.containerId);
+            currentContainerId = poolEntry.containerId;
+        }
+        moveToStep('owner');
+        updateInitiatorUI();
+
+        const idLabel = poolEntry.containerId ? ` (Container ${poolEntry.containerId})` : '';
+        showFeedback(`QR code row ${excelRow}${idLabel} selected`, 'success');
+    }
+
     /**
      * Process owner input
      */
@@ -472,8 +527,13 @@ window.ContainerInitiator = (function() {
             return;
         }
         
-        // Get the next available container ID
-        updateNextAvailableId();
+        // Use pre-populated Container_ID from QR pool if available, otherwise auto-generate
+        const prePopulatedId = StateManager.getState('initiatorState.prePopulatedContainerId');
+        if (prePopulatedId) {
+            currentContainerId = prePopulatedId;
+        } else {
+            updateNextAvailableId();
+        }
         
         // Create new container with today's date
         const today = new Date();
@@ -603,8 +663,20 @@ window.ContainerInitiator = (function() {
         };
         
         // Add to inventory using StateManager to ensure proper tracking
-        window.appState.inventory.unshift(newContainer); // Add to beginning for visibility
-        
+        window.appState.inventory.push(newContainer); // Append to end to match Excel row order
+
+        // Assign the scanned QR code to this container
+        const qrExcelRow = StateManager.getState('initiatorState.qrExcelRow');
+        if (qrExcelRow && window.QRCodeService) {
+            const assigned = QRCodeService.assignRowToContainer(qrExcelRow, currentContainerId);
+            if (assigned) {
+                const poolEntry = QRCodeService.lookupByRow(qrExcelRow);
+                newContainer.qrExcelRow = qrExcelRow;
+                newContainer.qrExcelUrl = poolEntry ? poolEntry.excelUrl : null;
+                newContainer.qrDataUrl = poolEntry ? poolEntry.dataUrl : null;
+            }
+        }
+
         // Update highest container ID
         if (parseInt(currentContainerId) > window.appState.highestContainerId) {
             window.appState.highestContainerId = parseInt(currentContainerId);
@@ -632,63 +704,8 @@ window.ContainerInitiator = (function() {
             window.InventoryManager.saveToLocalStorage();
         }
         
-        // If we have a successful barcodeResult and QR service, kick off QR generation
-        if (barcodeResult && barcodeResult.success && window.QRCodeService) {
-            QRCodeService.createForBarcode(barcodeResult, currentContainerId)
-                .then(qrMeta => {
-                    if (!qrMeta) {
-                        console.warn('QR code generation returned null - backend may not be running');
-                        return;
-                    }
-
-                    try {
-                        // Attach QR metadata to container entry and update confirmation UI
-                        newContainer.barcodeMetadata = newContainer.barcodeMetadata || {};
-                        newContainer.barcodeMetadata.qrCode = {
-                            dataUrl: qrMeta.dataUrl,
-                            destinationUrl: qrMeta.destinationUrl,
-                            shortCode: qrMeta.shortCode,
-                            imageFormat: qrMeta.imageFormat
-                        };
-
-                        // Also persist top-level QR fields for easier export/sync
-                        if (qrMeta.destinationUrl) {
-                            newContainer.qrDestinationUrl = qrMeta.destinationUrl;
-                        }
-                        if (qrMeta.shortCode) {
-                            newContainer.qrShortCode = qrMeta.shortCode;
-                        }
-
-                        // Update the corresponding inventory entry (it was just unshifted to index 0)
-                        const latest = window.appState.inventory[0];
-                        if (latest && latest.containerId === newContainer.containerId) {
-                            latest.barcodeMetadata = newContainer.barcodeMetadata;
-                            if (newContainer.qrDestinationUrl) {
-                                latest.qrDestinationUrl = newContainer.qrDestinationUrl;
-                            }
-                            if (newContainer.qrShortCode) {
-                                latest.qrShortCode = newContainer.qrShortCode;
-                            }
-                        }
-
-                        // Update confirmation QR preview
-                        const qrEl = document.getElementById('confirmQrCode');
-                        if (qrEl && qrMeta.dataUrl) {
-                            qrEl.innerHTML = `<img src="${qrMeta.dataUrl}" alt="QR Code" style="max-width: 120px; height: auto;" /><p style="margin-top: 8px; font-size: 0.85rem; color: #6b7280;">Scan to view: ${qrMeta.shortCode}</p>`;
-                        }
-
-                        // Persist updated container with QR metadata
-                        if (window.InventoryManager && typeof window.InventoryManager.saveToLocalStorage === 'function') {
-                            window.InventoryManager.saveToLocalStorage();
-                        }
-                    } catch (err) {
-                        console.warn('Failed to attach QR metadata for initiated container:', err);
-                    }
-                })
-                .catch(err => {
-                    console.warn('QR code generation failed for initiated container:', err);
-                });
-        }
+        // QR codes are pre-printed and assigned during the QR scan step.
+        // No runtime QR generation needed.
         
         // Show success message
         showFeedback(`Container ${currentContainerId} created successfully!`, 'success');
@@ -711,7 +728,7 @@ window.ContainerInitiator = (function() {
     /**
      * Update the UI for container confirmation
      */
-    function updateContainerConfirmation(container) {
+    async function updateContainerConfirmation(container) {
         const confirmationElement = document.getElementById('initiatorConfirmation');
         if (!confirmationElement) return;
 
@@ -726,21 +743,21 @@ window.ContainerInitiator = (function() {
         document.getElementById('confirmDate').textContent = container.date;
         document.getElementById('confirmBarcode').textContent = container.barcode || container.sampleBarcode || '';
 
-        // Show QR code generation instructions
+        // Show assigned QR code info (QR is assigned at the start of the flow)
         const qrEl = document.getElementById('confirmQrCode');
         if (qrEl) {
-            const qrUrl = `${window.location.origin}?c=${container.containerId}`;
-            qrEl.innerHTML = `
-                <div style="background: #fef3c7; border: 2px solid #fbbf24; border-radius: 8px; padding: 12px; margin-top: 10px;">
-                    <p style="margin: 0 0 8px 0; font-weight: 600; color: #92400e;">📱 Create QR Code:</p>
-                    <p style="margin: 0 0 8px 0; font-size: 0.85rem; color: #78350f;">Visit <a href="https://app.qr-code-generator.com" target="_blank" style="color: #059669; text-decoration: underline;">qr-code-generator.com</a></p>
-                    <p style="margin: 0 0 8px 0; font-size: 0.85rem; color: #78350f;">Use this URL:</p>
-                    <input type="text" value="${qrUrl}" readonly onclick="this.select()" style="width: 100%; padding: 6px; font-size: 0.8rem; font-family: monospace; border: 1px solid #d97706; border-radius: 4px; background: white;">
-                    <p style="margin: 8px 0 4px 0; font-size: 0.75rem; color: #78350f;"><strong>Smart Routing:</strong></p>
-                    <p style="margin: 0 0 2px 0; font-size: 0.72rem; color: #78350f;">✅ <strong>With SharePoint permissions:</strong> Opens HQ Excel workbook with row highlighted</p>
-                    <p style="margin: 0; font-size: 0.72rem; color: #78350f;">📱 <strong>Without permissions:</strong> Shows container details in web app with edit options</p>
-                </div>
-            `;
+            const qrRow = StateManager.getState('initiatorState.qrExcelRow');
+            if (qrRow) {
+                const poolEntry = window.QRCodeService ? window.QRCodeService.lookupByRow(qrRow) : null;
+                qrEl.innerHTML = `
+                    <div style="background: #d1fae5; border: 2px solid #059669; border-radius: 8px; padding: 12px; margin-top: 10px;">
+                        <p style="margin: 0 0 4px 0; font-weight: 600; color: #065f46;">QR Code Assigned</p>
+                        <p style="margin: 0; font-size: 0.85rem; color: #047857;">Row ${qrRow}${poolEntry && poolEntry.containerId ? ` — ${poolEntry.containerId}` : ''}</p>
+                    </div>
+                `;
+            } else {
+                qrEl.innerHTML = '';
+            }
         }
     }
     
@@ -769,7 +786,7 @@ window.ContainerInitiator = (function() {
         
         // Enable/disable back button based on current step
         if (backBtn) {
-            backBtn.disabled = (currentStep === 'owner' || isCompleted);
+            backBtn.disabled = (currentStep === 'qr' || isCompleted);
         }
         
         // Update primary button label based on completion state
@@ -800,6 +817,10 @@ window.ContainerInitiator = (function() {
         
         // Update prompt and hint based on step
         switch (currentStep) {
+            case 'qr':
+                prompt.textContent = 'Scan QR Code Label:';
+                hint.textContent = 'Scan a pre-printed QR label or select from generated batch below';
+                break;
             case 'owner':
                 prompt.textContent = 'Enter Owner ID:';
                 hint.textContent = 'Type the owner identifier (e.g., LW, JR)';
@@ -829,9 +850,12 @@ window.ContainerInitiator = (function() {
                 hint.textContent = 'Type the required value and press Enter';
         }
         
+        // Show QR batch picker when on QR step
+        showQrBatchPicker(currentStep === 'qr');
+
         // Focus on input
         input.focus();
-        
+
         // Update status summary
         updateStatusSummary();
     }
@@ -843,21 +867,23 @@ window.ContainerInitiator = (function() {
         const summaryElement = document.getElementById('initiatorSummary');
         if (!summaryElement) return;
         
+        const qrExcelRow = StateManager.getState('initiatorState.qrExcelRow') || '-';
         const owner = StateManager.getState('initiatorState.owner') || '-';
         const strain = StateManager.getState('initiatorState.strain') || '-';
         const media = StateManager.getState('initiatorState.media') || '-';
         const stage = StateManager.getState('initiatorState.stage') || '-';
         const tissue = StateManager.getState('initiatorState.tissue') || '-';
         const date = StateManager.getState('initiatorState.date') || '-';
-        
+
         summaryElement.innerHTML = `
-            <div class="status-item">👤 Owner: <strong>${owner}</strong></div>
-            <div class="status-item">🧬 Strain: <strong>${strain}</strong></div>
-            <div class="status-item">🧪 Media: <strong>${media}</strong></div>
-            <div class="status-item">🌱 Stage: <strong>${stage}</strong></div>
-            <div class="status-item">🔢 Tissue: <strong>${tissue}</strong></div>
-            <div class="status-item">📅 Date: <strong>${date}</strong></div>
-            <div class="status-item">📦 Next ID: <strong>${currentContainerId || '-'}</strong></div>
+            <div class="status-item">QR Row: <strong>${qrExcelRow}</strong></div>
+            <div class="status-item">Owner: <strong>${owner}</strong></div>
+            <div class="status-item">Strain: <strong>${strain}</strong></div>
+            <div class="status-item">Media: <strong>${media}</strong></div>
+            <div class="status-item">Stage: <strong>${stage}</strong></div>
+            <div class="status-item">Tissue: <strong>${tissue}</strong></div>
+            <div class="status-item">Date: <strong>${date}</strong></div>
+            <div class="status-item">Next ID: <strong>${currentContainerId || '-'}</strong></div>
         `;
     }
     
@@ -919,7 +945,7 @@ window.ContainerInitiator = (function() {
             const currentIndex = STEPS.indexOf(currentStep);
 
             if (currentIndex <= 0) {
-                showFeedback('Already at the first step (Owner).', 'info');
+                showFeedback('Already at the first step (QR).', 'info');
                 return;
             }
 
@@ -935,6 +961,9 @@ window.ContainerInitiator = (function() {
             // Pre-fill input with existing value for that step, if any
             let previousValue = null;
             switch (previousStep) {
+                case 'qr':
+                    previousValue = StateManager.getState('initiatorState.qrExcelRow');
+                    break;
                 case 'owner':
                     previousValue = StateManager.getState('initiatorState.owner');
                     break;
@@ -1039,7 +1068,9 @@ window.ContainerInitiator = (function() {
     function resetInitiator() {
         // Clear state
         StateManager.setState('initiatorState', {
-            currentStep: 'owner',
+            currentStep: 'qr',
+            qrExcelRow: null,
+            prePopulatedContainerId: null,
             owner: null,
             strain: null,
             media: null,
@@ -1065,6 +1096,69 @@ window.ContainerInitiator = (function() {
         showFeedback('Ready to initiate a new container', 'info');
     }
     
+    /**
+     * Show/hide a visual picker of available QR codes from the generated batch.
+     * Allows the user to click a QR code to select it instead of scanning.
+     */
+    function showQrBatchPicker(show) {
+        let picker = document.getElementById('qrBatchPicker');
+
+        if (!show) {
+            if (picker) picker.style.display = 'none';
+            return;
+        }
+
+        if (!window.QRCodeService) return;
+
+        const unassigned = QRCodeService.getUnassigned();
+
+        if (!picker) {
+            // Create the picker container
+            picker = document.createElement('div');
+            picker.id = 'qrBatchPicker';
+            picker.style.cssText = 'margin-top: 12px; max-height: 260px; overflow-y: auto; border: 1px solid #e2e8f0; border-radius: 8px; padding: 10px; background: #f9fafb;';
+
+            // Insert after the initiator input area
+            const inputArea = document.getElementById('initiatorInput');
+            if (inputArea && inputArea.parentElement) {
+                inputArea.parentElement.parentElement.appendChild(picker);
+            }
+        }
+
+        picker.style.display = 'block';
+
+        if (unassigned.length === 0) {
+            picker.innerHTML = '<p style="color: #6b7280; font-size: 0.85rem; margin: 0;">No QR codes available. Generate a batch first using the QR Code Pool section above.</p>';
+            return;
+        }
+
+        let html = '<p style="margin: 0 0 8px; font-size: 0.85rem; font-weight: 600; color: #374151;">Or select from generated batch:</p>';
+        html += '<div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap: 8px;">';
+        unassigned.forEach(qr => {
+            html += `
+                <div class="qr-batch-item" data-excel-row="${qr.excelRow}" style="text-align: center; padding: 8px; border: 2px solid #e2e8f0; border-radius: 8px; background: white; cursor: pointer; transition: border-color 0.2s;" onmouseover="this.style.borderColor='#3b82f6'" onmouseout="this.style.borderColor='#e2e8f0'">
+                    <img src="${qr.dataUrl}" alt="Row ${qr.excelRow}" style="width: 90px; height: 90px;" />
+                    <p style="margin: 4px 0 0; font-family: monospace; font-size: 0.8rem; font-weight: bold;">Row ${qr.excelRow}</p>
+                    ${qr.containerId ? `<p style="margin: 2px 0 0; font-size: 0.7rem; color: #059669;">ID: ${qr.containerId}</p>` : ''}
+                </div>`;
+        });
+        html += '</div>';
+        picker.innerHTML = html;
+
+        // Add click handlers
+        picker.querySelectorAll('.qr-batch-item').forEach(item => {
+            item.addEventListener('click', function() {
+                const row = parseInt(this.getAttribute('data-excel-row'));
+                if (!row) return;
+
+                // Set the input value and process it
+                const input = document.getElementById('initiatorInput');
+                if (input) input.value = String(row);
+                processQrInput();
+            });
+        });
+    }
+
     // Public API
     return {
         initialize: initialize,

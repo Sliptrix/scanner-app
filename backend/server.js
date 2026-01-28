@@ -65,7 +65,7 @@ function generateShortCode() {
  */
 app.post('/api/qrcodes', async (req, res) => {
     try {
-        const { containerId, barcodeData, appUrl = 'http://localhost:8000' } = req.body;
+        const { containerId, barcodeData, appUrl = 'http://localhost:8000', destinationUrl: customDestUrl } = req.body;
 
         if (!containerId || !barcodeData) {
             return res.status(400).json({
@@ -84,8 +84,9 @@ app.post('/api/qrcodes', async (req, res) => {
             createdAt: new Date().toISOString()
         });
 
-        // Create the destination URL (qrco.de style: appUrl/?c=shortCode)
-        const destinationUrl = `${appUrl}?c=${shortCode}`;
+        // Use custom destination URL (e.g. Excel deep link) if provided,
+        // otherwise fall back to app URL with short code
+        const destinationUrl = customDestUrl || `${appUrl}?c=${shortCode}`;
 
         // Generate QR code as data URL
         const qrDataUrl = await QRCode.toDataURL(destinationUrl, {
@@ -113,6 +114,41 @@ app.post('/api/qrcodes', async (req, res) => {
             error: 'Failed to generate QR code',
             message: error.message
         });
+    }
+});
+
+/**
+ * Proxy endpoint for qr-code-generator.com API (avoids CORS issues)
+ * POST /api/qr-generate
+ *
+ * Body: { qr_code_text, image_format, image_width, foreground_color, background_color }
+ * Returns: PNG image as base64 data URL
+ */
+const QR_API_KEY = '2Z2MbdGz4I1ypDA8gIFNqmUYRHHmOW_qwP4INxNVgMDlZOOQMiuuKwIB7UZe34Ld';
+
+app.post('/api/qr-generate', async (req, res) => {
+    try {
+        const apiUrl = `https://api.qr-code-generator.com/v1/create?access-token=${QR_API_KEY}`;
+        const apiResponse = await fetch(apiUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(req.body)
+        });
+
+        if (!apiResponse.ok) {
+            const text = await apiResponse.text();
+            return res.status(apiResponse.status).json({ error: `QR API error: ${apiResponse.status}`, details: text });
+        }
+
+        // Convert the PNG response to a base64 data URL
+        const buffer = await apiResponse.arrayBuffer();
+        const base64 = Buffer.from(buffer).toString('base64');
+        const dataUrl = `data:image/png;base64,${base64}`;
+
+        res.json({ success: true, dataUrl });
+    } catch (error) {
+        console.error('QR proxy error:', error);
+        res.status(500).json({ error: 'Failed to generate QR code', message: error.message });
     }
 });
 
@@ -259,6 +295,81 @@ app.get('/api/email/recipients', (req, res) => {
             // Add more team members as needed
         ]
     });
+});
+
+/**
+ * Print ZPL to Zebra printer
+ * POST /api/print/zpl
+ *
+ * Body:
+ * - zpl: ZPL string to send to printer
+ * - copies: Number of copies (default 1)
+ * - printerIp: Optional printer IP (default from env ZEBRA_PRINTER_IP)
+ * - printerPort: Optional port (default 9100)
+ *
+ * The printer can be configured via environment variables:
+ *   ZEBRA_PRINTER_IP=192.168.1.100
+ *   ZEBRA_PRINTER_PORT=9100
+ */
+const net = require('net');
+
+app.post('/api/print/zpl', async (req, res) => {
+    try {
+        const {
+            zpl,
+            copies = 1,
+            printerIp = process.env.ZEBRA_PRINTER_IP,
+            printerPort = parseInt(process.env.ZEBRA_PRINTER_PORT) || 9100
+        } = req.body;
+
+        if (!zpl) {
+            return res.status(400).json({ error: 'Missing ZPL data' });
+        }
+
+        if (!printerIp) {
+            return res.status(400).json({
+                error: 'Printer IP not configured',
+                message: 'Set ZEBRA_PRINTER_IP environment variable or pass printerIp in request body'
+            });
+        }
+
+        // Repeat ZPL for copies
+        let fullZPL = zpl;
+        if (copies > 1) {
+            fullZPL = zpl.repeat(copies);
+        }
+
+        // Send ZPL to printer via raw TCP socket
+        await new Promise((resolve, reject) => {
+            const client = new net.Socket();
+            client.setTimeout(5000);
+
+            client.connect(printerPort, printerIp, () => {
+                client.write(fullZPL, () => {
+                    client.end();
+                });
+            });
+
+            client.on('close', () => resolve());
+            client.on('error', (err) => reject(err));
+            client.on('timeout', () => {
+                client.destroy();
+                reject(new Error('Connection to printer timed out'));
+            });
+        });
+
+        res.json({
+            success: true,
+            message: `Sent ${copies} label(s) to printer at ${printerIp}:${printerPort}`
+        });
+
+    } catch (error) {
+        console.error('Print error:', error);
+        res.status(500).json({
+            error: 'Failed to print',
+            message: error.message
+        });
+    }
 });
 
 // Error handling middleware

@@ -650,6 +650,15 @@ window.OneDriveSync = {
             const quantity = getField(row, ['quantity', 'tissuecount', 'tissue_count', 'tissue count']);
             const dateCreated = getField(row, ['datecreated', 'date_created', 'date created', 'date']);
             const notes = getField(row, ['notes', 'comment', 'comments']);
+            const lineage = getField(row, ['lineage', 'container_lineage', 'lineage_path', 'parent_lineage']);
+            const statusField = getField(row, ['status']);
+
+            // Skip pre-populated rows that have Container_ID/QRContainerID but no metadata yet
+            const hasMetadata = strainName || ownerName || stage || media || dateCreated;
+            if (!hasMetadata) {
+                console.log(`OneDriveSync: Skipping pre-populated but incomplete row (Container_ID: ${containerId})`);
+                return;
+            }
 
             const invEntry = {
                 containerId: containerId,
@@ -659,9 +668,20 @@ window.OneDriveSync = {
                 media: media || '',
                 tissueCount: quantity ? parseInt(quantity, 10) || 1 : 1,
                 date: dateCreated || '',
-                status: 'Active',
-                location: location || ''
+                status: statusField || 'Active',
+                location: location || '',
+                containerLineage: lineage || ''
             };
+
+            // Generate barcode from container ID so it displays in the UI
+            if (barcodeValue) {
+                invEntry.barcode = String(barcodeValue);
+                invEntry.sampleBarcode = String(barcodeValue);
+            } else {
+                // Use container ID as the barcode value
+                invEntry.barcode = String(containerId);
+                invEntry.sampleBarcode = String(containerId);
+            }
 
             // Preserve Batch_ID and prefix as optional metadata
             if (batchIdValue) {
@@ -988,6 +1008,9 @@ window.OneDriveSync = {
 
         const rowsToAdd = [];
 
+        let prePopulatedUpdated = 0;
+        const prePopulatedToUpdate = [];
+
         inventory.forEach(item => {
             if (!item || !item.containerId) return;
 
@@ -996,7 +1019,11 @@ window.OneDriveSync = {
 
             const rawKey = String(rawNum);
             if (existingRawIds.has(rawKey)) {
-                // Already present in workbook; skip
+                // Row exists in workbook. If this container came from a
+                // pre-populated QR row, PATCH its metadata into the existing row.
+                if (item.qrExcelRow) {
+                    prePopulatedToUpdate.push(item);
+                }
                 return;
             }
 
@@ -1056,6 +1083,14 @@ window.OneDriveSync = {
                     return item.notes || '';
                 }
 
+                if (['lineage', 'container_lineage', 'lineage_path', 'parent_lineage'].includes(nameNorm)) {
+                    return item.containerLineage || '';
+                }
+
+                if (nameNorm === 'status') {
+                    return item.status || '';
+                }
+
                 // QR URL column (optional): store explicit QR destination URL if available,
                 // otherwise derive it from barcode/sampleBarcode/containerId using current scheme.
                 if ([
@@ -1079,32 +1114,110 @@ window.OneDriveSync = {
             rowsToAdd.push(rowValues);
         });
 
-        if (!rowsToAdd.length) {
-            console.log('OneDriveSync: No new inventory rows to append (all Raw_IDs already present)');
-            if (window.NotificationSystem) {
-                window.NotificationSystem.info('No new inventory rows to sync to cloud');
+        // PATCH pre-populated rows with metadata
+        if (prePopulatedToUpdate.length > 0) {
+            console.log(`OneDriveSync: Updating ${prePopulatedToUpdate.length} pre-populated row(s) with metadata...`);
+            for (const item of prePopulatedToUpdate) {
+                try {
+                    await this.updateRowByContainerId(item.containerId, {
+                        strain: item.strain || '',
+                        owner: item.owner || '',
+                        stage: item.stage || '',
+                        media: item.media || '',
+                        tissueCount: item.tissueCount || 1,
+                        date: item.date || ''
+                    });
+                    prePopulatedUpdated++;
+                    console.log(`OneDriveSync: Updated pre-populated row for container ${item.containerId}`);
+                } catch (err) {
+                    console.warn(`OneDriveSync: Failed to update pre-populated row for container ${item.containerId}:`, err);
+                }
             }
-            return { success: true, count: 0 };
         }
 
-        // 4) Append rows via Graph table rows/add endpoint
-        const addResp = await fetch(`${baseUrl}/tables('${this.inventoryTableName}')/rows/add`, {
-            method: 'POST',
-            headers,
-            body: JSON.stringify({ values: rowsToAdd })
+        if (!rowsToAdd.length) {
+            if (prePopulatedUpdated > 0) {
+                console.log(`OneDriveSync: ${prePopulatedUpdated} container(s) updated in pre-populated Excel rows`);
+                if (window.NotificationSystem) {
+                    window.NotificationSystem.success(`${prePopulatedUpdated} container(s) synced to pre-populated Excel rows`);
+                }
+            } else {
+                console.log('OneDriveSync: No new inventory rows to append (all Raw_IDs already present)');
+                if (window.NotificationSystem) {
+                    window.NotificationSystem.info('No new inventory rows to sync to cloud');
+                }
+            }
+            return { success: true, count: prePopulatedUpdated };
+        }
+
+        // 4) Write rows into empty slots first, then append any overflow
+        // Find empty rows in the existing table (rows where the ID column is blank)
+        const emptyRowIndices = [];
+        rows.forEach((row, idx) => {
+            const valuesArray = row.values && row.values[0];
+            if (!Array.isArray(valuesArray)) {
+                emptyRowIndices.push(idx);
+                return;
+            }
+            const idVal = rawIdIndex >= 0 && rawIdIndex < valuesArray.length
+                ? valuesArray[rawIdIndex]
+                : null;
+            if (idVal === null || idVal === undefined || idVal === '' || String(idVal).trim() === '') {
+                emptyRowIndices.push(idx);
+            }
         });
 
-        if (!addResp.ok) {
-            const text = await addResp.text();
-            throw new Error(`Failed to append inventory rows: ${addResp.status} ${text}`);
+        let filledCount = 0;
+        const overflowRows = [];
+
+        for (let i = 0; i < rowsToAdd.length; i++) {
+            if (i < emptyRowIndices.length) {
+                // Write into the empty row using range PATCH
+                // Table data row index → Excel row = index + 3 (row 1 title, row 2 header)
+                const excelRowNum = emptyRowIndices[i] + 3;
+                const colLetter = String.fromCharCode(65 + columns.length - 1); // last column letter
+                const rangeAddress = `Active_Inventory!A${excelRowNum}:${colLetter}${excelRowNum}`;
+                const patchResp = await fetch(`${baseUrl}/worksheets('Active_Inventory')/range(address='${rangeAddress}')`, {
+                    method: 'PATCH',
+                    headers,
+                    body: JSON.stringify({ values: [rowsToAdd[i]] })
+                });
+                if (!patchResp.ok) {
+                    const text = await patchResp.text();
+                    console.warn(`Failed to write row into empty slot at Excel row ${excelRowNum}: ${patchResp.status} ${text}`);
+                    overflowRows.push(rowsToAdd[i]);
+                } else {
+                    filledCount++;
+                }
+            } else {
+                overflowRows.push(rowsToAdd[i]);
+            }
         }
 
-        console.log(`OneDriveSync: Appended ${rowsToAdd.length} new inventory rows to cloud`);
+        // Append any remaining rows that didn't fit into empty slots
+        if (overflowRows.length > 0) {
+            const addResp = await fetch(`${baseUrl}/tables('${this.inventoryTableName}')/rows/add`, {
+                method: 'POST',
+                headers,
+                body: JSON.stringify({ values: overflowRows })
+            });
+            if (!addResp.ok) {
+                const text = await addResp.text();
+                throw new Error(`Failed to append inventory rows: ${addResp.status} ${text}`);
+            }
+        }
+
+        const totalAdded = filledCount + overflowRows.length;
+        if (filledCount > 0) {
+            console.log(`OneDriveSync: Filled ${filledCount} empty rows, appended ${overflowRows.length} new rows`);
+        }
+
+        console.log(`OneDriveSync: Synced ${totalAdded} new inventory rows to cloud (${filledCount} filled empty slots, ${overflowRows.length} appended)`);
         if (window.NotificationSystem) {
-            window.NotificationSystem.success(`📤 Synced ${rowsToAdd.length} new inventory rows to cloud Active_Inventory`);
+            window.NotificationSystem.success(`Synced ${totalAdded} new inventory rows to cloud Active_Inventory`);
         }
 
-        return { success: true, count: rowsToAdd.length };
+        return { success: true, count: totalAdded };
     },
 
     /**
@@ -1308,5 +1421,292 @@ window.OneDriveSync = {
             driveId: this.driveId,
             itemId: this.itemId
         };
+    },
+
+    /**
+     * Find the Excel row number for a given Container_ID in the Active_Inventory table.
+     * Queries the table via MS Graph and searches the Container_ID column.
+     * @param {string|number} containerId - The container ID to find
+     * @returns {Promise<number|null>} Excel row number (1-based, accounts for title+header rows), or null if not found
+     */
+    /**
+     * Update an existing Excel row (identified by Container_ID) with metadata.
+     * Used when rows are pre-populated with Container_ID and QRContainerID,
+     * and the user fills in metadata later via the app.
+     * @param {string|number} containerId - The Container_ID of the row to update
+     * @param {Object} fieldValues - Metadata fields to write (e.g. {strain, owner, stage, media, tissueCount, date, notes})
+     * @returns {Promise<{success: boolean, excelRow?: number}>}
+     */
+    async updateRowByContainerId(containerId, fieldValues) {
+        if (!this.shareUrl) return { success: false };
+
+        try {
+            if (!this.driveId || !this.itemId) {
+                await this.resolveDriveItemFromShareUrl(this.shareUrl);
+            }
+
+            const token = await this.acquireToken();
+            const baseUrl = `https://graph.microsoft.com/v1.0/drives/${this.driveId}/items/${this.itemId}/workbook`;
+            const headers = {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            };
+
+            // Fetch table columns
+            const colResp = await fetch(`${baseUrl}/tables('${this.inventoryTableName}')/columns`, { headers });
+            if (!colResp.ok) throw new Error(`Failed to fetch columns: ${colResp.status}`);
+            const colJson = await colResp.json();
+            const columns = colJson.value || [];
+
+            const normalize = (name) => name ? name.toLowerCase().trim() : '';
+
+            // Find the Container_ID column index
+            const idColIndex = columns.findIndex(col => {
+                const n = normalize(col.name);
+                return ['container_id', 'containerid', 'container id', 'raw_id', 'rawid'].includes(n);
+            });
+            if (idColIndex === -1) throw new Error('Container_ID column not found');
+
+            // Fetch table rows to find the target row
+            const rowsResp = await fetch(`${baseUrl}/tables('${this.inventoryTableName}')/rows`, { headers });
+            if (!rowsResp.ok) throw new Error(`Failed to fetch rows: ${rowsResp.status}`);
+            const rowsJson = await rowsResp.json();
+            const rows = rowsJson.value || [];
+
+            const searchId = String(containerId);
+            let targetRowIndex = -1;
+            let existingValues = null;
+
+            for (let i = 0; i < rows.length; i++) {
+                const cellValue = rows[i].values && rows[i].values[0] ? String(rows[i].values[0][idColIndex]) : '';
+                if (cellValue === searchId || cellValue === String(parseInt(searchId))) {
+                    targetRowIndex = i;
+                    existingValues = rows[i].values[0];
+                    break;
+                }
+            }
+
+            if (targetRowIndex === -1) {
+                console.warn(`OneDriveSync.updateRowByContainerId: Container_ID ${containerId} not found in Excel`);
+                return { success: false };
+            }
+
+            // Build updated row values — preserve existing values, only overwrite metadata fields
+            const updatedRow = columns.map((col, idx) => {
+                const nameNorm = normalize(col.name);
+
+                // Preserve Container_ID and QRContainerID columns (already pre-populated)
+                if (['container_id', 'containerid', 'container id', 'raw_id', 'rawid',
+                     'barcodevalue', 'barcode_value', 'barcode value',
+                     'batch_id', 'batchid', 'batch id',
+                     'qrcontainerid', 'qr_container_id', 'qr container id',
+                     'qr_url', 'qr link', 'qr', 'qr_destination',
+                     'qr code url', 'qr code link', 'qr_url_link'].includes(nameNorm)) {
+                    return existingValues[idx] !== undefined ? existingValues[idx] : '';
+                }
+
+                // Map metadata fields from fieldValues
+                if (['strain_name', 'strain', 'strain id'].includes(nameNorm) && fieldValues.strain !== undefined) {
+                    return fieldValues.strain;
+                }
+                if (['owner', 'owner_name', 'owner name'].includes(nameNorm) && fieldValues.owner !== undefined) {
+                    return fieldValues.owner;
+                }
+                if (nameNorm === 'stage' && fieldValues.stage !== undefined) {
+                    return fieldValues.stage;
+                }
+                if (['location', 'room', 'rack'].includes(nameNorm) && fieldValues.location !== undefined) {
+                    return fieldValues.location;
+                }
+                if (['media', 'media_type', 'media type'].includes(nameNorm) && fieldValues.media !== undefined) {
+                    return fieldValues.media;
+                }
+                if (['quantity', 'tissuecount', 'tissue_count', 'tissue count'].includes(nameNorm) && fieldValues.tissueCount !== undefined) {
+                    return fieldValues.tissueCount;
+                }
+                if (['datecreated', 'date_created', 'date created', 'date'].includes(nameNorm) && fieldValues.date !== undefined) {
+                    return fieldValues.date;
+                }
+                if (['notes', 'comment', 'comments'].includes(nameNorm) && fieldValues.notes !== undefined) {
+                    return fieldValues.notes;
+                }
+                if (['lineage', 'container_lineage', 'lineage_path', 'parent_lineage'].includes(nameNorm) && fieldValues.containerLineage !== undefined) {
+                    return fieldValues.containerLineage;
+                }
+                if (nameNorm === 'status' && fieldValues.status !== undefined) {
+                    return fieldValues.status;
+                }
+
+                // Preserve any other existing values
+                return existingValues[idx] !== undefined ? existingValues[idx] : '';
+            });
+
+            // PATCH the row
+            const excelRowNum = targetRowIndex + 3; // title + header offset
+            const colLetter = String.fromCharCode(65 + columns.length - 1);
+            const rangeAddress = `Active_Inventory!A${excelRowNum}:${colLetter}${excelRowNum}`;
+
+            const patchResp = await fetch(`${baseUrl}/worksheets('Active_Inventory')/range(address='${rangeAddress}')`, {
+                method: 'PATCH',
+                headers,
+                body: JSON.stringify({ values: [updatedRow] })
+            });
+
+            if (!patchResp.ok) {
+                const text = await patchResp.text();
+                throw new Error(`PATCH failed: ${patchResp.status} ${text}`);
+            }
+
+            console.log(`OneDriveSync: Updated row ${excelRowNum} for Container_ID ${containerId}`);
+            return { success: true, excelRow: excelRowNum };
+
+        } catch (err) {
+            console.error('OneDriveSync.updateRowByContainerId error:', err);
+            return { success: false };
+        }
+    },
+
+    /**
+     * Read the Container_ID values from specific table rows.
+     * Used by QRCodeService to fetch pre-populated IDs for batch entries.
+     * @param {number} startRow - Starting Excel row number (1-based)
+     * @param {number} count - Number of rows to read
+     * @returns {Promise<Array<{excelRow: number, containerId: string}>>}
+     */
+    async readContainerIdsForRows(startRow, count) {
+        if (!this.shareUrl) return [];
+
+        try {
+            if (!this.driveId || !this.itemId) {
+                await this.resolveDriveItemFromShareUrl(this.shareUrl);
+            }
+
+            const token = await this.acquireToken();
+            const baseUrl = `https://graph.microsoft.com/v1.0/drives/${this.driveId}/items/${this.itemId}/workbook`;
+            const headers = {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            };
+
+            // Fetch table columns to find Container_ID and QRContainerID indices
+            const colResp = await fetch(`${baseUrl}/tables('${this.inventoryTableName}')/columns`, { headers });
+            if (!colResp.ok) return [];
+            const colJson = await colResp.json();
+            const columns = colJson.value || [];
+
+            const normalize = (name) => name ? name.toLowerCase().trim() : '';
+            const idColIndex = columns.findIndex(col => {
+                const n = normalize(col.name);
+                return ['container_id', 'containerid', 'container id', 'raw_id', 'rawid'].includes(n);
+            });
+            if (idColIndex === -1) return [];
+
+            const qrColIndex = columns.findIndex(col => {
+                const n = normalize(col.name);
+                return ['qrcontainerid', 'qr_container_id', 'qr container id',
+                        'qr_url', 'qr link', 'qr', 'qr_destination',
+                        'qr code url', 'qr code link', 'qr_url_link'].includes(n);
+            });
+
+            // Also find metadata columns to determine if a row has been filled
+            const strainColIndex = columns.findIndex(col => {
+                const n = normalize(col.name);
+                return ['strain_name', 'strain', 'strain id'].includes(n);
+            });
+            const ownerColIndex = columns.findIndex(col => {
+                const n = normalize(col.name);
+                return ['owner', 'owner_name', 'owner name'].includes(n);
+            });
+
+            // Read the range of rows
+            const endRow = startRow + count - 1;
+            const colLetter = String.fromCharCode(65 + columns.length - 1);
+            const rangeAddress = `Active_Inventory!A${startRow}:${colLetter}${endRow}`;
+
+            const rangeResp = await fetch(`${baseUrl}/worksheets('Active_Inventory')/range(address='${rangeAddress}')`, { headers });
+            if (!rangeResp.ok) return [];
+            const rangeJson = await rangeResp.json();
+            const values = rangeJson.values || [];
+
+            const results = [];
+            for (let i = 0; i < values.length; i++) {
+                const row = values[i];
+                const id = row[idColIndex];
+                if (id !== null && id !== undefined && String(id).trim() !== '') {
+                    const entry = {
+                        excelRow: startRow + i,
+                        containerId: String(id).trim()
+                    };
+
+                    // Include QRContainerID URL if available
+                    if (qrColIndex >= 0 && row[qrColIndex]) {
+                        const qrVal = String(row[qrColIndex]).trim();
+                        if (qrVal) entry.qrContainerUrl = qrVal;
+                    }
+
+                    // Flag whether metadata is already filled (not blank/pre-populated only)
+                    const hasStrain = strainColIndex >= 0 && row[strainColIndex] && String(row[strainColIndex]).trim();
+                    const hasOwner = ownerColIndex >= 0 && row[ownerColIndex] && String(row[ownerColIndex]).trim();
+                    entry.hasMetadata = !!(hasStrain || hasOwner);
+
+                    results.push(entry);
+                }
+            }
+
+            return results;
+        } catch (err) {
+            console.warn('OneDriveSync.readContainerIdsForRows error:', err);
+            return [];
+        }
+    },
+
+    async findContainerRow(containerId) {
+        if (!this.shareUrl) return null;
+
+        try {
+            if (!this.driveId || !this.itemId) {
+                await this.resolveDriveItemFromShareUrl(this.shareUrl);
+            }
+
+            const token = await this.acquireToken();
+            const baseUrl = `https://graph.microsoft.com/v1.0/drives/${this.driveId}/items/${this.itemId}/workbook`;
+            const authHeader = { 'Authorization': `Bearer ${token}` };
+
+            // Fetch table columns to find Container_ID column index
+            const colResp = await fetch(`${baseUrl}/tables('${this.inventoryTableName}')/columns`, { headers: authHeader });
+            if (!colResp.ok) return null;
+            const colJson = await colResp.json();
+            const columns = colJson.value || [];
+
+            const normalize = (name) => name ? name.toLowerCase().trim() : '';
+            const idColIndex = columns.findIndex(col => {
+                const n = normalize(col.name);
+                return ['container_id', 'containerid', 'container id', 'raw_id', 'rawid'].includes(n);
+            });
+            if (idColIndex === -1) return null;
+
+            // Fetch table rows
+            const rowsResp = await fetch(`${baseUrl}/tables('${this.inventoryTableName}')/rows`, { headers: authHeader });
+            if (!rowsResp.ok) return null;
+            const rowsJson = await rowsResp.json();
+            const rows = rowsJson.value || [];
+
+            // Search for matching Container_ID
+            const searchId = String(containerId);
+            for (let i = 0; i < rows.length; i++) {
+                const cellValue = rows[i].values && rows[i].values[0] ? String(rows[i].values[0][idColIndex]) : '';
+                if (cellValue === searchId || cellValue === String(parseInt(searchId))) {
+                    // Row 1 = title, Row 2 = headers, data starts at row 3
+                    // Table row index i (0-based) → Excel row = i + 3
+                    return i + 3;
+                }
+            }
+
+            // Not found — return next available row (append position)
+            return rows.length + 3;
+        } catch (err) {
+            console.warn('OneDriveSync.findContainerRow error:', err);
+            return null;
+        }
     }
 };

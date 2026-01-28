@@ -498,6 +498,15 @@ async function syncInventoryFromCloud() {
             }
         }
 
+        // After pulling cloud inventory, update the next available container ID
+        // so the initiator doesn't overwrite existing containers
+        if (result && result.success) {
+            if (window.ContainerInitiator && typeof ContainerInitiator.updateNextAvailableId === 'function') {
+                ContainerInitiator.updateNextAvailableId();
+                console.log('✅ Updated next available container ID after cloud sync');
+            }
+        }
+
         if (!result || !result.success) {
             if (window.NotificationSystem) {
                 NotificationSystem.warn('Cloud inventory sync completed but no rows were loaded.');
@@ -574,6 +583,11 @@ async function quickCloudSync() {
 
     try {
         await OneDriveSync.manualSync();
+        // Update next container ID after cloud sync to prevent overwrites
+        if (window.ContainerInitiator && typeof ContainerInitiator.updateNextAvailableId === 'function') {
+            ContainerInitiator.updateNextAvailableId();
+            console.log('✅ Updated next available container ID after quick cloud sync');
+        }
     } catch (error) {
         console.error('Quick cloud sync error:', error);
         if (window.NotificationSystem) {
@@ -672,15 +686,54 @@ function selectTransferMode(mode) {
 }
 
 function adjustSplitCount(change) {
-    const currentCount = StateManager.getState('transferState.splitCount');
-    const newCount = Math.max(2, Math.min(10, currentCount + change));
-    
+    const currentCount = StateManager.getState('transferState.splitCount') || 1;
+    const newCount = Math.max(1, Math.min(10, currentCount + change));
+
     if (window.ContainerTransfer) {
         ContainerTransfer.handleSplitCountChange(newCount);
     } else {
-        // Fallback for legacy support
         StateManager.setState('transferState.splitCount', newCount);
         UIUtils.updateContent('splitCount', newCount);
+    }
+
+    // Update preview and button
+    if (window.TransferInputManager) {
+        TransferInputManager.updateTransferPreview();
+        TransferInputManager.updateTransferButtonState();
+    }
+}
+
+function toggleDiscardPanel() {
+    const toggle = document.getElementById('discardToggle');
+    const panel = document.getElementById('discardPanel');
+    if (panel) {
+        panel.style.display = toggle && toggle.checked ? 'block' : 'none';
+    }
+    if (!toggle || !toggle.checked) {
+        StateManager.setState('transferState.discardCount', 0);
+        StateManager.setState('transferState.discardReason', '');
+        const countEl = document.getElementById('discardCount');
+        if (countEl) countEl.textContent = '0';
+    }
+    if (window.TransferInputManager) {
+        TransferInputManager.updateTransferPreview();
+        TransferInputManager.updateTransferButtonState();
+    }
+}
+
+function adjustDiscardCount(change) {
+    const source = StateManager.getState('transferState.sourceContainer');
+    const maxDiscard = source && source.data ? source.data.totalSamples - 1 : 0;
+    const current = StateManager.getState('transferState.discardCount') || 0;
+    const newCount = Math.max(0, Math.min(maxDiscard, current + change));
+    StateManager.setState('transferState.discardCount', newCount);
+
+    const countEl = document.getElementById('discardCount');
+    if (countEl) countEl.textContent = newCount;
+
+    if (window.TransferInputManager) {
+        TransferInputManager.updateTransferPreview();
+        TransferInputManager.updateTransferButtonState();
     }
 }
 
@@ -843,12 +896,13 @@ async function emailIntakeForm() {
 }
 
 /**
- * Handle QR code scan from URL parameters with smart routing
+ * Handle QR code scan from URL with smart routing
  * - If user has SharePoint permissions → Opens Excel workbook with row highlighted
  * - If no permissions → Falls back to web app modal
  *
- * Supports multiple URL parameter formats:
- * - ?c=containerId (from qr-code-generator.com short links)
+ * Supports URL formats:
+ * - /qr/XXXXXX (pre-printed QR code with pool ID)
+ * - ?c=containerId
  * - ?container=containerId
  * - ?barcode=barcodeData
  */
@@ -856,7 +910,6 @@ async function handleQRCodeScan() {
     try {
         const urlParams = new URLSearchParams(window.location.search);
 
-        // Check for container parameter (multiple formats)
         const containerParam = urlParams.get('c') || urlParams.get('container');
         const barcodeParam = urlParams.get('barcode');
 
@@ -864,7 +917,7 @@ async function handleQRCodeScan() {
             return; // No QR scan parameter present
         }
 
-        console.log(`📱 QR code scanned! Container:`, containerParam, 'Barcode:', barcodeParam);
+        console.log('QR code scanned!', `Container: ${containerParam}`);
 
         // Wait for data to be loaded
         let waitCount = 0;
@@ -877,7 +930,6 @@ async function handleQRCodeScan() {
         let container = null;
 
         if (containerParam) {
-            // Search by container ID
             container = window.appState.inventory.find(item =>
                 item.containerId === containerParam ||
                 item.containerId === parseInt(containerParam)
@@ -885,7 +937,6 @@ async function handleQRCodeScan() {
         }
 
         if (!container && barcodeParam) {
-            // Search by barcode
             container = window.appState.inventory.find(item =>
                 item.barcode === barcodeParam ||
                 item.sampleBarcode === barcodeParam
@@ -895,7 +946,6 @@ async function handleQRCodeScan() {
         if (!container) {
             console.warn(`Container not found for QR scan. Container: ${containerParam}, Barcode: ${barcodeParam}`);
             NotificationSystem.warning(`Container not found in inventory. It may not be loaded yet.`);
-            // Clean URL
             window.history.replaceState({}, document.title, window.location.pathname);
             return;
         }
@@ -946,13 +996,13 @@ async function handleQRCodeScan() {
  */
 async function tryOpenExcelWorkbook(container) {
     try {
-        if (!window.OneDriveSync || !window.OneDriveSync.config) {
+        if (!window.OneDriveSync || !window.OneDriveSync.shareUrl) {
             console.warn('OneDriveSync not configured');
             return false;
         }
 
         // Get the SharePoint workbook URL
-        const shareUrl = window.OneDriveSync.config.shareUrl;
+        const shareUrl = window.OneDriveSync.shareUrl;
         if (!shareUrl) {
             console.warn('SharePoint URL not configured');
             return false;
@@ -961,19 +1011,16 @@ async function tryOpenExcelWorkbook(container) {
         // Extract the base SharePoint URL (before query params)
         const baseUrl = shareUrl.split('?')[0];
 
-        // Find the row number in the inventory
-        // Assuming the Excel table starts at row 2 (row 1 is headers)
-        const inventoryIndex = window.appState.inventory.findIndex(item =>
-            item.containerId === container.containerId
-        );
-
-        if (inventoryIndex === -1) {
-            console.warn('Container not found in inventory array');
-            return false;
+        // Find the row number by querying the Excel table via Graph API
+        let excelRow = null;
+        if (window.OneDriveSync.findContainerRow) {
+            excelRow = await window.OneDriveSync.findContainerRow(container.containerId);
         }
 
-        // Excel row = inventory index + 2 (1 for header, 1 for 1-based indexing)
-        const excelRow = inventoryIndex + 2;
+        if (!excelRow) {
+            console.warn('Could not determine Excel row for container');
+            return false;
+        }
 
         // Construct Excel Online URL with cell reference
         // Format: URL#SheetName!CellReference
@@ -1056,7 +1103,7 @@ function highlightContainerInTable(barcodeData, containerId) {
  * Show container detail modal with metadata
  * @param {Object} container - Container object from inventory
  */
-function showContainerDetail(container) {
+async function showContainerDetail(container) {
     const modal = document.getElementById('containerDetailModal');
     const content = document.getElementById('containerDetailContent');
 
@@ -1067,6 +1114,21 @@ function showContainerDetail(container) {
 
     // Store current container for editing
     window.currentEditingContainer = container;
+
+    // Compute Excel deep link for QR destination
+    let excelDeepLink = '';
+    if (window.OneDriveSync && window.OneDriveSync.shareUrl && window.OneDriveSync.findContainerRow) {
+        try {
+            const baseUrl = window.OneDriveSync.shareUrl.split('?')[0];
+            const excelRow = await window.OneDriveSync.findContainerRow(container.containerId);
+            if (excelRow) {
+                excelDeepLink = `${baseUrl}?web=1#Active_Inventory!A${excelRow}`;
+            }
+        } catch (e) {
+            console.warn('Failed to resolve Excel row for detail modal:', e);
+        }
+    }
+    const qrDestUrl = excelDeepLink || `${window.location.origin}?c=${container.containerId}`;
 
     // Build detail view HTML
     const html = `
@@ -1132,21 +1194,74 @@ function showContainerDetail(container) {
         </div>
 
         <div class="qr-code-instructions">
-            <h4>📱 QR Code Instructions</h4>
-            <p><strong>To create a QR code for this container on qr-code-generator.com:</strong></p>
-            <p>1. Visit <a href="https://app.qr-code-generator.com" target="_blank">app.qr-code-generator.com</a></p>
-            <p>2. Select "URL" as the QR code type</p>
-            <p>3. Enter this URL: <code>${window.location.origin}?c=${container.containerId}</code></p>
-            <p>4. Click "Create QR Code" and customize as needed</p>
-            <p>5. Download and print your QR code</p>
-            <p style="margin-top: 12px;"><strong>🔄 Smart Routing When Scanned:</strong></p>
-            <p style="margin: 4px 0; padding-left: 12px;">✅ <strong>Internal users (with SharePoint permissions):</strong><br>Opens HQ Excel workbook with this container's row highlighted for direct editing</p>
-            <p style="margin: 4px 0; padding-left: 12px;">📱 <strong>External users (no SharePoint access):</strong><br>Shows this web app modal with container details and edit options</p>
+            <h4>QR Code</h4>
+            ${container.qrcoDeUrl ? `
+                <p style="margin: 4px 0;"><strong>Assigned QR:</strong> <a href="${container.qrcoDeUrl}" target="_blank">${container.qrcoDeUrl}</a></p>
+            ` : `
+                <p style="margin: 0 0 4px 0; font-size: 0.85rem;"><strong>Assign pre-printed QR code:</strong></p>
+                <div style="display: flex; gap: 6px; margin-bottom: 8px;">
+                    <input type="text" id="detailQrAssignInput" placeholder="Scan or paste qrco.de URL" style="flex: 1; padding: 6px; font-size: 0.8rem; font-family: monospace; border: 1px solid #d97706; border-radius: 4px;">
+                    <button type="button" id="detailQrAssignBtn" style="padding: 6px 12px; font-size: 0.8rem; background: #059669; color: white; border: none; border-radius: 4px; cursor: pointer;">Assign</button>
+                </div>
+                <p id="detailQrAssignStatus" style="margin: 0; font-size: 0.75rem;"></p>
+            `}
+            <p style="margin: 4px 0; font-size: 0.8rem;"><strong>Destination URL:</strong></p>
+            <input type="text" value="${qrDestUrl}" readonly onclick="this.select()" style="width: 100%; padding: 6px; font-size: 0.75rem; font-family: monospace; border: 1px solid #d1d5db; border-radius: 4px; background: #f9fafb;">
         </div>
     `;
 
     content.innerHTML = html;
     modal.style.display = 'flex';
+
+    // Wire up QR assign button in detail modal (if container has no QR assigned yet)
+    const detailAssignBtn = document.getElementById('detailQrAssignBtn');
+    const detailAssignInput = document.getElementById('detailQrAssignInput');
+    if (detailAssignBtn && detailAssignInput) {
+        const doAssign = () => {
+            const rawUrl = detailAssignInput.value.trim();
+            if (!rawUrl) return;
+
+            let shortCode = rawUrl;
+            try {
+                const parsed = new URL(rawUrl);
+                shortCode = parsed.pathname.replace(/^\//, '');
+            } catch (_) { /* raw short code */ }
+
+            if (!shortCode) {
+                document.getElementById('detailQrAssignStatus').textContent = 'Invalid QR code URL.';
+                return;
+            }
+
+            // Update inventory
+            const inv = window.appState.inventory.find(
+                item => item.containerId === container.containerId
+            );
+            if (inv) {
+                inv.qrcoDeUrl = rawUrl;
+                inv.qrcoDeShortCode = shortCode;
+                inv.barcodeMetadata = inv.barcodeMetadata || {};
+                inv.barcodeMetadata.qrCode = inv.barcodeMetadata.qrCode || {};
+                inv.barcodeMetadata.qrCode.qrcoDeUrl = rawUrl;
+                inv.barcodeMetadata.qrCode.qrcoDeShortCode = shortCode;
+            }
+            container.qrcoDeUrl = rawUrl;
+            container.qrcoDeShortCode = shortCode;
+
+            if (window.InventoryManager && typeof window.InventoryManager.saveToLocalStorage === 'function') {
+                window.InventoryManager.saveToLocalStorage();
+            }
+
+            const statusEl = document.getElementById('detailQrAssignStatus');
+            if (statusEl) statusEl.innerHTML = `<span style="color: #059669;">Assigned: <strong>${shortCode}</strong></span>`;
+            detailAssignInput.readOnly = true;
+            detailAssignBtn.disabled = true;
+            detailAssignBtn.textContent = 'Assigned';
+            detailAssignBtn.style.background = '#6b7280';
+        };
+
+        detailAssignBtn.addEventListener('click', doAssign);
+        detailAssignInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') doAssign(); });
+    }
 
     // Reset edit mode
     document.getElementById('editContainerBtn').style.display = 'inline-block';
@@ -1287,6 +1402,109 @@ function saveContainerChanges() {
     NotificationSystem.success(`Container ${container.containerId} updated successfully!`);
 }
 
+// ─── QR Pool UI Functions ──────────────────────────────────────────
+
+function updateQrPoolStatus() {
+    const statusEl = document.getElementById('qrPoolStatus');
+    if (!statusEl || !window.QRCodeService) return;
+    const unassigned = QRCodeService.getUnassigned().length;
+    const assigned = QRCodeService.getAssigned().length;
+    statusEl.textContent = `${unassigned} available, ${assigned} assigned`;
+}
+
+async function generateQrBatch() {
+    if (!window.QRCodeService) {
+        NotificationSystem.error('QR Code Service not available');
+        return;
+    }
+
+    const countInput = document.getElementById('qrBatchCount');
+    const count = parseInt(countInput?.value) || 10;
+
+    const progressDiv = document.getElementById('qrBatchProgress');
+    const progressBar = document.getElementById('qrBatchProgressBar');
+    const progressText = document.getElementById('qrBatchProgressText');
+    const btn = document.getElementById('qrBatchGenerateBtn');
+
+    if (progressDiv) progressDiv.style.display = 'block';
+    if (btn) { btn.disabled = true; btn.textContent = 'Generating...'; }
+
+    const result = await QRCodeService.generateBatch(count, (done, total) => {
+        const pct = Math.round((done / total) * 100);
+        if (progressBar) progressBar.style.width = pct + '%';
+        if (progressText) progressText.textContent = `${done} / ${total}`;
+    });
+
+    if (btn) { btn.disabled = false; btn.textContent = 'Generate QR Batch'; }
+    if (progressDiv) setTimeout(() => { progressDiv.style.display = 'none'; }, 2000);
+
+    updateQrPoolStatus();
+    NotificationSystem.success(`Generated ${result.generated} QR codes${result.errors ? ` (${result.errors} errors)` : ''}`);
+}
+
+function viewQrPool() {
+    if (!window.QRCodeService) return;
+
+    const pool = QRCodeService.getPool();
+    const unassigned = pool.filter(qr => !qr.assignedContainerId);
+    const assigned = pool.filter(qr => qr.assignedContainerId);
+
+    const modal = document.getElementById('containerDetailModal');
+    const content = document.getElementById('containerDetailContent');
+    if (!modal || !content) return;
+
+    let html = '<h3 style="margin-bottom: 15px;">QR Code Pool</h3>';
+    html += `<p style="margin-bottom: 10px;"><strong>${unassigned.length}</strong> available, <strong>${assigned.length}</strong> assigned</p>`;
+
+    if (unassigned.length > 0) {
+        html += '<h4 style="margin: 15px 0 10px;">Available (Unassigned)</h4>';
+        html += '<div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px;">';
+        unassigned.forEach(qr => {
+            html += `
+                <div style="text-align: center; padding: 10px; border: 1px solid #e2e8f0; border-radius: 8px; background: white;">
+                    <img src="${qr.dataUrl}" alt="QR Row ${qr.excelRow}" style="width: 120px; height: 120px;" />
+                    <p style="margin: 6px 0 0; font-family: monospace; font-size: 0.85rem; font-weight: bold;">Row ${qr.excelRow}</p>
+                    ${qr.containerId ? `<p style="margin: 2px 0 0; font-size: 0.75rem; color: #059669;">ID: ${qr.containerId}</p>` : ''}
+                </div>`;
+        });
+        html += '</div>';
+    }
+
+    if (assigned.length > 0) {
+        html += '<h4 style="margin: 20px 0 10px;">Assigned</h4>';
+        html += '<div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px;">';
+        assigned.forEach(qr => {
+            html += `
+                <div style="text-align: center; padding: 10px; border: 1px solid #10b981; border-radius: 8px; background: #f0fdf4;">
+                    <img src="${qr.dataUrl}" alt="QR Row ${qr.excelRow}" style="width: 120px; height: 120px;" />
+                    <p style="margin: 6px 0 0; font-family: monospace; font-size: 0.85rem; font-weight: bold;">Row ${qr.excelRow}</p>
+                    <p style="margin: 2px 0 0; font-size: 0.75rem; color: #059669;">Container: ${qr.assignedContainerId}</p>
+                </div>`;
+        });
+        html += '</div>';
+    }
+
+    if (pool.length === 0) {
+        html += '<p style="color: #6b7280; margin-top: 10px;">No QR codes generated yet. Use "Generate QR Batch" to create some.</p>';
+    }
+
+    content.innerHTML = html;
+    modal.style.display = 'flex';
+
+    // Hide edit buttons since this isn't a container detail view
+    const editBtn = document.getElementById('editContainerBtn');
+    const saveBtn = document.getElementById('saveContainerBtn');
+    const cancelBtn = document.getElementById('cancelEditBtn');
+    if (editBtn) editBtn.style.display = 'none';
+    if (saveBtn) saveBtn.style.display = 'none';
+    if (cancelBtn) cancelBtn.style.display = 'none';
+}
+
+// Update pool status on page load
+document.addEventListener('DOMContentLoaded', () => {
+    setTimeout(updateQrPoolStatus, 500);
+});
+
 // Legacy compatibility for global function references
 window.switchMode = switchMode;
 window.nextBuilderStep = nextBuilderStep;
@@ -1296,6 +1514,8 @@ window.selectTransferMode = selectTransferMode;
 window.adjustSplitCount = adjustSplitCount;
 window.processTransfer = processTransfer;
 window.clearTransfer = clearTransfer;
+window.toggleDiscardPanel = toggleDiscardPanel;
+window.adjustDiscardCount = adjustDiscardCount;
 window.exportInventory = exportInventory;
 window.clearInventory = clearInventory;
 window.toggleBarcodeDetails = toggleBarcodeDetails;
@@ -1306,4 +1526,27 @@ window.toggleContainerEdit = toggleContainerEdit;
 window.cancelContainerEdit = cancelContainerEdit;
 window.saveContainerChanges = saveContainerChanges;
 window.tryOpenExcelWorkbook = tryOpenExcelWorkbook;
+window.generateQrBatch = generateQrBatch;
+window.viewQrPool = viewQrPool;
+window.updateQrPoolStatus = updateQrPoolStatus;
+
+// Label printing
+function printAssignedLabels() {
+    if (window.LabelPrintService) {
+        LabelPrintService.printNewAssignments();
+    } else {
+        NotificationSystem.error('Label print service not available');
+    }
+}
+
+function printTransferLabels(containerIds) {
+    if (window.LabelPrintService) {
+        LabelPrintService.printFromPool(containerIds);
+    } else {
+        NotificationSystem.error('Label print service not available');
+    }
+}
+
+window.printAssignedLabels = printAssignedLabels;
+window.printTransferLabels = printTransferLabels;
 

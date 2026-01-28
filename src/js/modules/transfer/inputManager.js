@@ -1,5 +1,5 @@
 // Transfer Input Manager - Phase 5: Container Transfer Feature
-// Handles source and destination container input validation and processing
+// Handles source container input, discard controls, and transfer preview
 
 window.TransferInputManager = (function() {
     'use strict';
@@ -11,716 +11,327 @@ window.TransferInputManager = (function() {
         containerIdPattern: /^\d{1,5}$/
     };
 
-    // Initialize the input manager
     function initialize() {
         console.log('TransferInputManager initialized');
         setupEventListeners();
     }
 
-    // Setup event listeners for transfer inputs
     function setupEventListeners() {
         const sourceInput = document.getElementById('sourceContainerInput');
-        const destInput = document.getElementById('destContainerInput');
-
         if (sourceInput) {
-            sourceInput.addEventListener('blur', validateSourceInput);
-            sourceInput.addEventListener('input', handleSourceInputChange);
-        }
-
-        if (destInput) {
-            destInput.addEventListener('blur', validateDestInput);
-            destInput.addEventListener('input', handleDestInputChange);
+            sourceInput.addEventListener('keydown', function(e) {
+                if (e.key === 'Enter') {
+                    const val = this.value.trim();
+                    if (val) processSourceContainer(val);
+                }
+            });
+            sourceInput.addEventListener('blur', function() {
+                const val = this.value.trim();
+                if (val) processSourceContainer(val);
+            });
         }
     }
 
-    // Handle source container input processing
+    // Process source container
     function processSourceContainer(containerId) {
-        if (!validateContainerId(containerId)) {
-            return false;
-        }
+        if (!validateContainerId(containerId)) return false;
 
-        // Look up container in inventory
         const containerData = findContainerInInventory(containerId);
-        
         if (!containerData) {
             NotificationSystem.error(`Container ${containerId} not found in inventory`);
-            updateSourceDisplay(containerId, null);
             return false;
         }
 
-        // Update state and UI
         StateManager.setState('transferState.sourceContainer', {
             id: containerId,
             data: containerData
         });
 
-        updateSourceDisplay(containerId, containerData);
-        
-        // Trigger smart suggestions and auto-set split count if in split mode
-        const transferMode = StateManager.getState('transferState.mode');
-        if (transferMode === 'split') {
-            // Auto-generate split count suggestions based on sample count
-            autoGenerateSplitSuggestions(containerData);
-            
-            // Update split preview
-            if (window.ContainerTransfer) {
-                ContainerTransfer.updateSplitPreview();
-            }
+        // Reset discard state
+        StateManager.setState('transferState.discardCount', 0);
+        StateManager.setState('transferState.discardReason', '');
+
+        // Set default split count to 1
+        StateManager.setState('transferState.splitCount', 1);
+
+        // Show source info
+        const sourceInfo = document.getElementById('sourceInfo');
+        const valueEl = document.getElementById('sourceContainerValue');
+        const summaryEl = document.getElementById('sourceSummary');
+        const countEl = document.getElementById('sourceSampleCountNumber');
+
+        if (sourceInfo) sourceInfo.style.display = 'block';
+        if (valueEl) valueEl.textContent = `Container ${containerId}`;
+        if (summaryEl) {
+            summaryEl.textContent = `${containerData.owner} | ${containerData.strains.join(', ')} | ${containerData.stage}`;
         }
-        
-        NotificationSystem.success(`Source container ${containerId} loaded`);
-        
-        // Don't auto-focus to prevent cursor jumping issues
-        // Let user manually move to next field
-        
-        return true;
-    }
+        if (countEl) countEl.textContent = containerData.totalSamples;
 
-    // Handle destination container input processing
-    function processDestContainer(containerId) {
-        // For split mode, destination is auto-generated, so skip manual input
-        const transferMode = StateManager.getState('transferState.mode');
-        if (transferMode === 'split') {
-            NotificationSystem.info('Split mode auto-generates destination containers');
-            return true;
-        }
-        
-        if (!validateContainerId(containerId)) {
-            return false;
-        }
+        // Show step 2
+        const step2 = document.getElementById('transferStep2');
+        if (step2) step2.style.display = 'block';
 
-        // Check if destination already exists (for single mode)
-        const existingContainer = findContainerInInventory(containerId);
-        
-        if (transferMode === 'single') {
-            if (!existingContainer) {
-                NotificationSystem.error(`Destination container ${containerId} not found in inventory`);
-                return false;
-            }
-        }
+        // Update split count display
+        const splitCountEl = document.getElementById('splitCount');
+        if (splitCountEl) splitCountEl.textContent = '1';
 
-        // Update state and UI
-        StateManager.setState('transferState.destContainer', {
-            id: containerId,
-            exists: !!existingContainer,
-            data: existingContainer
-        });
+        // Populate plant data dropdowns
+        showPlantDataUpdatePanel(containerData);
 
-        updateDestDisplay(containerId, existingContainer, transferMode);
-        NotificationSystem.success(`Destination container ${containerId} set`);
+        // Show smart suggestions
+        displaySmartSuggestions(containerData);
 
+        // Update preview
+        updateTransferPreview();
+        updateTransferButtonState();
+
+        NotificationSystem.success(`Source container ${containerId} loaded (${containerData.totalSamples} tissues)`);
         return true;
     }
 
     // Validate container ID format
     function validateContainerId(containerId) {
         const id = String(containerId).trim();
-        
         if (!id) {
             NotificationSystem.error('Container ID cannot be empty');
             return false;
         }
-
         if (!config.containerIdPattern.test(id)) {
             NotificationSystem.error('Container ID must be 1-5 digits');
             return false;
         }
-
-        const numId = parseInt(id);
-        if (numId < config.minContainerId || numId > config.maxContainerId) {
-            NotificationSystem.error(`Container ID must be between ${config.minContainerId} and ${config.maxContainerId}`);
-            return false;
-        }
-
         return true;
     }
 
-    // Find container data in inventory
+    // Find container in inventory
     function findContainerInInventory(containerId) {
         const inventory = StateManager.getState('inventory');
-        // Handle both string and integer container IDs
         const numericId = parseInt(containerId);
-        const containers = inventory.filter(item => 
-            item.containerId === containerId || 
+        const containers = inventory.filter(item =>
+            item.containerId === containerId ||
             item.containerId === numericId ||
             parseInt(item.containerId) === numericId
         );
-        
-        if (containers.length === 0) {
-            return null;
-        }
 
-        // Group samples by strain for summary with enhanced owner information
-        const strainGroups = {};
+        if (containers.length === 0) return null;
+
         let totalTissueCount = 0;
-        const ownerInfo = {}; // Track owner information for each strain
-        
         containers.forEach(item => {
-            const strain = item.strain || 'Unknown';
-            if (!strainGroups[strain]) {
-                strainGroups[strain] = [];
-                
-                // Get owner info for this strain using strain-to-owner mapping
-                const ownerCode = getOwnerForStrain(strain);
-                const ownerName = getOwnerName(ownerCode);
-                
-                ownerInfo[strain] = {
-                    code: ownerCode,
-                    name: ownerName
-                };
-            }
-            strainGroups[strain].push(item);
-            
-            // Sum up actual tissue counts from each barcode entry
-            // IMPORTANT: tissueCount field in each barcode entry represents the number of tissue samples in that barcode
-            // This fixes the issue where we were counting barcode entries instead of actual tissue samples
-            const tissueCount = parseInt(item.tissueCount) || 1;
-            totalTissueCount += tissueCount;
+            totalTissueCount += parseInt(item.tissueCount) || 1;
         });
 
         return {
             containerId: containerId,
-            totalSamples: totalTissueCount, // This is now the actual tissue count, not entry count
-            barcodeEntries: containers.length, // Number of barcode entries
-            strains: Object.keys(strainGroups),
-            strainGroups: strainGroups,
+            totalSamples: totalTissueCount,
+            barcodeEntries: containers.length,
+            strains: [...new Set(containers.map(c => c.strain || 'Unknown'))],
             samples: containers,
             owner: containers[0]?.owner || 'Unknown',
             stage: containers[0]?.stage || 'Unknown',
-            media: containers[0]?.media || 'Unknown'
+            media: containers[0]?.media || containers[0]?.mediaType || 'Unknown'
         };
     }
 
-    // Update source container display
-    function updateSourceDisplay(containerId, containerData) {
-        const valueElement = document.getElementById('sourceContainerValue');
-        const summaryElement = document.getElementById('sourceSummary');
-        const containerElement = document.getElementById('sourceContainer');
+    // Display smart split suggestions
+    function displaySmartSuggestions(containerData) {
+        const suggestionsEl = document.getElementById('smartSuggestions');
+        if (!suggestionsEl) return;
 
-        if (valueElement) {
-            valueElement.textContent = containerId;
+        const total = containerData.totalSamples;
+        if (total < 2) {
+            suggestionsEl.style.display = 'none';
+            return;
         }
 
-        if (containerData) {
-            if (summaryElement) {
-                // Create enhanced summary with strain-owner relationships
-                let strainOwnerInfo = '';
-                if (containerData.strainGroups && Object.keys(containerData.strainGroups).length > 0) {
-                    const strainSummaries = Object.keys(containerData.strainGroups).map(strain => {
-                        const ownerCode = getOwnerForStrain(strain);
-                        const ownerName = getOwnerName(ownerCode);
-                        const sampleCount = containerData.strainGroups[strain].length;
-                        
-                        if (ownerCode) {
-                            return `Strain ${strain} (${ownerName}): ${sampleCount} entries`;
-                        } else {
-                            return `Strain ${strain}: ${sampleCount} entries`;
-                        }
-                    });
-                    
-                    strainOwnerInfo = strainSummaries.join('<br>');
-                }
-                
-                summaryElement.innerHTML = `
-                    <div class="container-summary">
-                        <div class="summary-main">
-                            <strong>${containerData.totalSamples}</strong> tissue samples | 
-                            <strong>${containerData.strains.length}</strong> strain(s)
-                        </div>
-                        ${strainOwnerInfo ? `<div class="strain-owner-details">${strainOwnerInfo}</div>` : ''}
-                    </div>
-                `;
+        const buttons = [];
+        [1, 2, 3, 4].forEach(n => {
+            if (n <= total) {
+                const perContainer = Math.ceil((total) / n);
+                buttons.push(`<button onclick="window.ContainerTransfer.applySuggestion(${n})" style="padding: 6px 14px; border: 1px solid #93c5fd; border-radius: 6px; background: white; cursor: pointer; font-size: 0.85rem;">${n === 1 ? '1 container' : n + '-way'} (${perContainer}/ea)</button>`);
             }
-            
-        // Show prominent sample count
-        const sampleCountElement = document.getElementById('sourceSampleCount');
-        const sampleCountNumberElement = document.getElementById('sourceSampleCountNumber');
-        if (sampleCountElement && sampleCountNumberElement) {
-            sampleCountNumberElement.textContent = containerData.totalSamples;
-            sampleCountElement.style.display = 'block';
-        }
-        
-        // Show plant data update panel
-        showPlantDataUpdatePanel(containerData);
-        
-        // Show transfer options panel for technician to choose
-        showTransferOptionsPanel();
-        
-        // Update workflow progress - let technician proceed manually
-        updateWorkflowStep(2); // Show step 2: Update Plant Data available
-        
-        UIUtils.addClass('sourceContainer', 'filled');
-        } else {
-            if (summaryElement) {
-                summaryElement.textContent = 'Container not found in inventory';
-            }
-            
-            // Hide sample count display
-            const sampleCountElement = document.getElementById('sourceSampleCount');
-            if (sampleCountElement) {
-                sampleCountElement.style.display = 'none';
-            }
-            
-            UIUtils.removeClass('sourceContainer', 'filled');
+        });
+
+        if (total > 1 && total <= 10) {
+            buttons.push(`<button onclick="window.ContainerTransfer.applySuggestion(${total})" style="padding: 6px 14px; border: 1px solid #93c5fd; border-radius: 6px; background: white; cursor: pointer; font-size: 0.85rem;">1 per container</button>`);
         }
 
-        // Update transfer button state
-        updateTransferButtonState();
+        suggestionsEl.innerHTML = `<div style="display: flex; flex-wrap: wrap; gap: 6px; justify-content: center;">${buttons.join('')}</div>`;
+        suggestionsEl.style.display = 'block';
     }
 
-    // Update destination container display
-    function updateDestDisplay(containerId, containerData, transferMode) {
-        const valueElement = document.getElementById('destContainerValue');
-        const summaryElement = document.getElementById('destSummary');
+    // Update the live transfer preview
+    function updateTransferPreview() {
+        const previewEl = document.getElementById('transferPreview');
+        if (!previewEl) return;
 
-        if (valueElement) {
-            valueElement.textContent = containerId;
+        const source = StateManager.getState('transferState.sourceContainer');
+        if (!source || !source.data) {
+            previewEl.style.display = 'none';
+            return;
         }
 
-        if (transferMode === 'single') {
-            if (containerData) {
-                if (summaryElement) {
-                    summaryElement.innerHTML = `
-                        Existing: <strong>${containerData.totalSamples}</strong> samples | 
-                        <strong>${containerData.strains.length}</strong> strain(s)
-                    `;
-                }
-            } else {
-                if (summaryElement) {
-                    summaryElement.textContent = 'New container will be created';
-                }
-            }
-        } else {
-            // Split mode
-            const splitCount = StateManager.getState('transferState.splitCount');
-            if (summaryElement) {
-                summaryElement.innerHTML = `Split into <strong>${splitCount}</strong> new containers`;
-            }
+        const total = source.data.totalSamples;
+        const splitCount = StateManager.getState('transferState.splitCount') || 1;
+        const discardCount = StateManager.getState('transferState.discardCount') || 0;
+        const transferable = total - discardCount;
+
+        if (transferable <= 0) {
+            previewEl.innerHTML = '<span style="color: #dc2626; font-weight: 600;">Cannot discard all tissues</span>';
+            previewEl.style.display = 'block';
+            return;
         }
 
-        UIUtils.addClass('destContainer', 'filled');
-        updateTransferButtonState();
+        const perContainer = Math.floor(transferable / splitCount);
+        const remainder = transferable % splitCount;
+        const distribution = remainder > 0
+            ? `${perContainer}-${perContainer + 1} tissues each`
+            : `${perContainer} tissues each`;
+
+        let html = `<strong>${total}</strong> tissues`;
+        if (discardCount > 0) {
+            html += ` → <span style="color: #dc2626;"><strong>${discardCount}</strong> discarded</span>`;
+        }
+        html += ` → <strong>${splitCount}</strong> new container${splitCount > 1 ? 's' : ''} (${distribution})`;
+
+        previewEl.innerHTML = html;
+        previewEl.style.display = 'block';
     }
 
-    // Update transfer button enabled state
+    // Update transfer button state
     function updateTransferButtonState() {
         const transferBtn = document.getElementById('transferBtn');
-        const sourceContainer = StateManager.getState('transferState.sourceContainer');
-        const transferMode = StateManager.getState('transferState.mode');
+        const source = StateManager.getState('transferState.sourceContainer');
 
         if (transferBtn) {
-            let canTransfer = false;
-            
-            // NEW WORKFLOW: We always create new containers, so we only need source container
-            if (sourceContainer && sourceContainer.data) {
-                canTransfer = true; // Both single and split modes only need source container
-            }
-            
+            const canTransfer = source && source.data;
             transferBtn.disabled = !canTransfer;
-            
-            // Update button text to be more descriptive
+
             if (canTransfer) {
-                if (transferMode === 'split') {
-                    const splitCount = StateManager.getState('transferState.splitCount');
-                    transferBtn.textContent = `Create ${splitCount} New Containers`;
-                } else {
-                    transferBtn.textContent = 'Create New Container';
-                }
+                const splitCount = StateManager.getState('transferState.splitCount') || 1;
+                const discardCount = StateManager.getState('transferState.discardCount') || 0;
+                let label = `Create ${splitCount} Container${splitCount > 1 ? 's' : ''}`;
+                if (discardCount > 0) label += ` + Discard ${discardCount}`;
+                transferBtn.textContent = label;
             } else {
                 transferBtn.textContent = 'Process Transfer';
             }
         }
-
-        // Update single transfer count
-        const singleCountElement = document.getElementById('singleTransferCount');
-        if (singleCountElement && sourceContainer && sourceContainer.data) {
-            singleCountElement.textContent = sourceContainer.data.totalSamples;
-        }
     }
 
-    // Event handlers
-    function handleSourceInputChange(e) {
-        // Clear previous state on input change
-        StateManager.setState('transferState.sourceContainer', null);
-        updateTransferButtonState();
-    }
-
-    function handleDestInputChange(e) {
-        // Clear previous state on input change
-        StateManager.setState('transferState.destContainer', null);
-        updateTransferButtonState();
-    }
-
-    function validateSourceInput(e) {
-        const input = e.target.value.trim();
-        if (input) {
-            processSourceContainer(input);
-        }
-    }
-
-    function validateDestInput(e) {
-        const input = e.target.value.trim();
-        if (input) {
-            processDestContainer(input);
-        }
-    }
-
-    // Auto-generate split suggestions based on sample count
-    function autoGenerateSplitSuggestions(containerData) {
-        if (!containerData || !containerData.totalSamples) {
-            return;
-        }
-        
-        const totalSamples = containerData.totalSamples;
-        
-        // Auto-set split count to optimal value
-        let optimalSplitCount = 2; // Default minimum
-        
-        // Logic: choose a split count that gives even distribution
-        if (totalSamples >= 4) {
-            // For 4+ samples, prefer half-split (2 samples per container) or 3-way split
-            if (totalSamples % 2 === 0) {
-                optimalSplitCount = Math.min(totalSamples / 2, 10);
-            } else {
-                optimalSplitCount = Math.min(3, 10);
-            }
-        } else if (totalSamples >= 2) {
-            optimalSplitCount = 2;
-        }
-        
-        // Set the optimal split count
-        StateManager.setState('transferState.splitCount', optimalSplitCount);
-        
-        // Update UI to show the auto-selected count
-        const splitCountElement = document.getElementById('splitCount');
-        if (splitCountElement) {
-            splitCountElement.textContent = optimalSplitCount;
-        }
-        
-        // Update split count display buttons
-        const decreaseBtn = document.getElementById('decreaseBtn');
-        const increaseBtn = document.getElementById('increaseBtn');
-        
-        if (decreaseBtn) decreaseBtn.disabled = optimalSplitCount <= 2;
-        if (increaseBtn) increaseBtn.disabled = optimalSplitCount >= 10;
-        
-        // Display suggestions
-        displaySmartSuggestions(containerData);
-    }
-    
-    // Display smart suggestions in the UI
-    function displaySmartSuggestions(containerData) {
-        const totalSamples = containerData.totalSamples;
-        const suggestions = [];
-        
-        // Generate suggestions
-        if (totalSamples >= 2) {
-            suggestions.push({ count: 2, label: '2-way split', description: `${Math.ceil(totalSamples/2)} samples each` });
-        }
-        if (totalSamples >= 3) {
-            suggestions.push({ count: 3, label: '3-way split', description: `${Math.ceil(totalSamples/3)} samples each` });
-        }
-        if (totalSamples >= 4) {
-            suggestions.push({ count: 4, label: '4-way split', description: `${Math.ceil(totalSamples/4)} samples each` });
-        }
-        
-        // One container per sample (if reasonable)
-        if (totalSamples > 1 && totalSamples <= 10) {
-            suggestions.push({ count: totalSamples, label: '1 sample per container', description: '1 sample each' });
-        }
-        
-        // Two samples per container
-        if (totalSamples >= 4 && totalSamples % 2 === 0) {
-            const halfSplit = totalSamples / 2;
-            if (halfSplit >= 2 && halfSplit <= 10) {
-                suggestions.push({ count: halfSplit, label: '2 samples per container', description: '2 samples each' });
-            }
-        }
-        
-        // Display suggestions in UI
-        const suggestionsElement = document.getElementById('smartSuggestions');
-        if (suggestionsElement && suggestions.length > 0) {
-            const suggestionsHTML = suggestions.map(suggestion => `
-                <button class="suggestion-btn" onclick="window.ContainerTransfer.applySuggestion(${suggestion.count})">
-                    <span class="suggestion-label">${suggestion.label}</span>
-                    <span class="suggestion-description">${suggestion.description}</span>
-                </button>
-            `).join('');
-            
-            suggestionsElement.innerHTML = `
-                <div class="suggestions-header">💡 Smart Suggestions for ${totalSamples} samples:</div>
-                <div class="suggestions-buttons">${suggestionsHTML}</div>
-            `;
-            suggestionsElement.style.display = 'block';
-        }
-    }
-
-    // Show plant data update panel with current container data
-    function showPlantDataUpdatePanel(containerData) {
-        const updatePanel = document.getElementById('plantDataUpdate');
-        if (!updatePanel) return;
-        
-        // Get first sample to use as baseline for current values
-        const firstSample = containerData.samples[0];
-        
-        // Populate stage dropdown
-        populateStageOptions(firstSample.stage);
-        
-        // Populate media dropdown
-        populateMediaOptions(firstSample.mediaType || firstSample.media);
-        
-        // Set current date as default
-        const dateInput = document.getElementById('updateDate');
-        if (dateInput) {
-            const today = new Date().toISOString().split('T')[0];
-            dateInput.value = today;
-        }
-        
-        // Clear notes
-        const notesInput = document.getElementById('updateNotes');
-        if (notesInput) {
-            notesInput.value = '';
-        }
-        
-        // Show the panel
-        updatePanel.style.display = 'block';
-    }
-    
-    // Populate stage dropdown options from Excel data
+    // Populate stage dropdown
     function populateStageOptions(currentStage) {
         const stageSelect = document.getElementById('updateStage');
         if (!stageSelect) return;
-        
-        // Clear existing options except "keep same"
+
         stageSelect.innerHTML = `<option value="keep-same">Keep Same (${currentStage})</option>`;
-        
-        // Get stage data from app state
         const stagesData = StateManager.getState('stagesTable');
         if (stagesData && typeof stagesData === 'object') {
             Object.entries(stagesData).forEach(([key, value]) => {
-                if (value !== currentStage) { // Don't duplicate current stage
+                if (value !== currentStage) {
                     stageSelect.innerHTML += `<option value="${key}">${value}</option>`;
                 }
             });
         }
     }
-    
-    // Populate media dropdown options from Excel data
+
+    // Populate media dropdown
     function populateMediaOptions(currentMedia) {
         const mediaSelect = document.getElementById('updateMedia');
         if (!mediaSelect) return;
-        
-        // Clear existing options except "keep same"
+
         mediaSelect.innerHTML = `<option value="keep-same">Keep Same (${currentMedia})</option>`;
-        
-        // Get media data from app state
         const mediaData = StateManager.getState('mediaTable');
         if (mediaData && typeof mediaData === 'object') {
             Object.entries(mediaData).forEach(([key, value]) => {
-                if (value !== currentMedia) { // Don't duplicate current media
+                if (value !== currentMedia) {
                     mediaSelect.innerHTML += `<option value="${key}">${value}</option>`;
                 }
             });
         }
     }
-    
-    // Get updated plant data for new containers
+
+    // Show plant data update panel
+    function showPlantDataUpdatePanel(containerData) {
+        const firstSample = containerData.samples[0];
+        populateStageOptions(firstSample.stage);
+        populateMediaOptions(firstSample.mediaType || firstSample.media);
+
+        const dateInput = document.getElementById('updateDate');
+        if (dateInput) {
+            dateInput.value = new Date().toISOString().split('T')[0];
+        }
+
+        const notesInput = document.getElementById('updateNotes');
+        if (notesInput) notesInput.value = '';
+    }
+
+    // Get updated plant data
     function getUpdatedPlantData() {
         const stageSelect = document.getElementById('updateStage');
         const mediaSelect = document.getElementById('updateMedia');
         const dateInput = document.getElementById('updateDate');
         const notesInput = document.getElementById('updateNotes');
-        
+
         const updates = {};
-        
-        // Check if stage was updated
+
         if (stageSelect && stageSelect.value !== 'keep-same') {
             const stagesData = StateManager.getState('stagesTable');
             updates.stage = stagesData[stageSelect.value];
             updates.stageId = stageSelect.value;
         }
-        
-        // Check if media was updated
+
         if (mediaSelect && mediaSelect.value !== 'keep-same') {
             const mediaData = StateManager.getState('mediaTable');
             updates.mediaType = mediaData[mediaSelect.value];
             updates.mediaId = mediaSelect.value;
         }
-        
-        // Always update date if provided
+
         if (dateInput && dateInput.value) {
             updates.date = dateInput.value;
         }
-        
-        // Add notes if provided
+
         if (notesInput && notesInput.value.trim()) {
             updates.notes = notesInput.value.trim();
         }
-        
+
         return updates;
     }
-    
-    // Hide plant data update panel
-    function hidePlantDataUpdatePanel() {
-        const updatePanel = document.getElementById('plantDataUpdate');
-        if (updatePanel) {
-            updatePanel.style.display = 'none';
-        }
-    }
-    
-    // Show transfer options panel for technician to choose transfer type
-    function showTransferOptionsPanel() {
-        const transferOptionsPanel = document.getElementById('transferOptions');
-        if (transferOptionsPanel) {
-            transferOptionsPanel.style.display = 'block';
-        }
-        
-        // Clear any existing mode selection to require manual choice
-        UIUtils.removeClass('singleTransferOption', 'selected');
-        UIUtils.removeClass('splitTransferOption', 'selected');
-        
-        // Update workflow to step 3 to indicate transfer type selection is available
-        updateWorkflowStep(3);
-    }
-    
-    // Hide transfer options panel
-    function hideTransferOptionsPanel() {
-        const transferOptionsPanel = document.getElementById('transferOptions');
-        if (transferOptionsPanel) {
-            transferOptionsPanel.style.display = 'none';
-        }
-    }
-    
-    // Update workflow step progress
+
+    // Update workflow step (kept for compatibility)
     function updateWorkflowStep(activeStep) {
-        // Clear all step states
-        for (let i = 1; i <= 4; i++) {
-            const stepElement = document.getElementById(`step${i}`);
-            if (stepElement) {
-                stepElement.classList.remove('active', 'completed');
-            }
-        }
-        
-        // Set completed steps
-        for (let i = 1; i < activeStep; i++) {
-            const stepElement = document.getElementById(`step${i}`);
-            if (stepElement) {
-                stepElement.classList.add('completed');
-            }
-        }
-        
-        // Set active step
-        const activeStepElement = document.getElementById(`step${activeStep}`);
-        if (activeStepElement) {
-            activeStepElement.classList.add('active');
-        }
-        
-        // Update feedback text based on step
-        const feedbackElement = document.getElementById('transferFeedback');
-        if (feedbackElement) {
-            switch (activeStep) {
-                case 1:
-                    feedbackElement.textContent = '👆 Start by scanning a source container';
-                    break;
-                case 2:
-                    feedbackElement.textContent = '🌱 Review and update plant data if needed, then choose transfer type';
-                    break;
-                case 3:
-                    feedbackElement.textContent = '⚙️ Choose your transfer type and proceed';
-                    break;
-                case 4:
-                    feedbackElement.textContent = '🚀 Ready to process transfer!';
-                    break;
-                default:
-                    feedbackElement.textContent = '👆 Start by scanning a source container';
-            }
-        }
+        // No-op in new UI — steps are shown/hidden directly
     }
 
-    // Get owner code for a given strain using strain-to-owner mapping
-    function getOwnerForStrain(strainId) {
-        try {
-            // Get demo data with strain-owner mapping
-            const demoData = getDemoData();
-            if (demoData && demoData.strainOwnerMapping && demoData.strainOwnerMapping[strainId]) {
-                return demoData.strainOwnerMapping[strainId];
-            }
-            
-            return null;
-        } catch (error) {
-            console.warn('Could not get owner for strain:', error);
-            return null;
-        }
-    }
-    
-    // Get owner name from owner code
-    function getOwnerName(ownerCode) {
-        if (!ownerCode) return 'Unknown';
-        
-        try {
-            const demoData = getDemoData();
-            if (demoData && demoData.owners && demoData.owners[ownerCode]) {
-                return demoData.owners[ownerCode];
-            }
-            
-            return ownerCode; // Fallback to code if name not found
-        } catch (error) {
-            console.warn('Could not get owner name:', error);
-            return ownerCode;
-        }
-    }
-    
-    // Get demo data with strain-owner mapping
-    function getDemoData() {
-        try {
-            // Try to get from StateManager first
-            if (window.StateManager) {
-                const demoData = StateManager.getState('demoData');
-                if (demoData) {
-                    return demoData;
-                }
-            }
-            
-            // Fallback to global demoData if available
-            if (typeof demoData !== 'undefined') {
-                return demoData;
-            }
-            
-            return null;
-        } catch (error) {
-            console.warn('Could not access demo data:', error);
-            return null;
-        }
-    }
-    
-    // Clear all transfer inputs
+    // Clear all inputs
     function clearInputs() {
-        UIUtils.clearInput('sourceContainerInput');
-        UIUtils.clearInput('destContainerInput');
+        const sourceInput = document.getElementById('sourceContainerInput');
+        if (sourceInput) sourceInput.value = '';
+
+        const sourceInfo = document.getElementById('sourceInfo');
+        if (sourceInfo) sourceInfo.style.display = 'none';
+
+        const step2 = document.getElementById('transferStep2');
+        if (step2) step2.style.display = 'none';
+
+        const discardToggle = document.getElementById('discardToggle');
+        if (discardToggle) discardToggle.checked = false;
+
+        const discardPanel = document.getElementById('discardPanel');
+        if (discardPanel) discardPanel.style.display = 'none';
+
+        const discardCountEl = document.getElementById('discardCount');
+        if (discardCountEl) discardCountEl.textContent = '0';
+
+        const discardReasonEl = document.getElementById('discardReason');
+        if (discardReasonEl) discardReasonEl.value = '';
+
+        const previewEl = document.getElementById('transferPreview');
+        if (previewEl) previewEl.style.display = 'none';
+
         StateManager.setState('transferState.sourceContainer', null);
-        StateManager.setState('transferState.destContainer', null);
-        
-        updateSourceDisplay('-', null);
-        updateDestDisplay('-', null, 'single');
-        
-        UIUtils.removeClass('sourceContainer', 'filled');
-        UIUtils.removeClass('destContainer', 'filled');
-        
-        // Hide smart suggestions
-        const suggestionsElement = document.getElementById('smartSuggestions');
-        if (suggestionsElement) {
-            suggestionsElement.style.display = 'none';
-        }
-        
-        // Hide plant data update panel
-        hidePlantDataUpdatePanel();
-        
-        // Hide transfer options panel
-        hideTransferOptionsPanel();
-        
-        // Reset workflow to step 1
-        updateWorkflowStep(1);
-        
+        StateManager.setState('transferState.discardCount', 0);
+        StateManager.setState('transferState.discardReason', '');
+
         updateTransferButtonState();
     }
 
@@ -728,13 +339,13 @@ window.TransferInputManager = (function() {
     return {
         initialize,
         processSourceContainer,
-        processDestContainer,
         validateContainerId,
         findContainerInInventory,
         clearInputs,
         updateTransferButtonState,
         getUpdatedPlantData,
-        updateWorkflowStep
+        updateWorkflowStep,
+        updateTransferPreview
     };
 
 })();
