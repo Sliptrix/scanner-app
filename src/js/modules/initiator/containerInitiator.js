@@ -736,7 +736,9 @@ window.ContainerInitiator = (function() {
                     <p style="margin: 0 0 8px 0; font-size: 0.85rem; color: #78350f;">Visit <a href="https://app.qr-code-generator.com" target="_blank" style="color: #059669; text-decoration: underline;">qr-code-generator.com</a></p>
                     <p style="margin: 0 0 8px 0; font-size: 0.85rem; color: #78350f;">Use this URL:</p>
                     <input type="text" value="${qrUrl}" readonly onclick="this.select()" style="width: 100%; padding: 6px; font-size: 0.8rem; font-family: monospace; border: 1px solid #d97706; border-radius: 4px; background: white;">
-                    <p style="margin: 8px 0 0 0; font-size: 0.75rem; color: #78350f; font-style: italic;">Click the URL to copy. When scanned, the QR code will show this container's details.</p>
+                    <p style="margin: 8px 0 4px 0; font-size: 0.75rem; color: #78350f;"><strong>Smart Routing:</strong></p>
+                    <p style="margin: 0 0 2px 0; font-size: 0.72rem; color: #78350f;">✅ <strong>With SharePoint permissions:</strong> Opens HQ Excel workbook with row highlighted</p>
+                    <p style="margin: 0; font-size: 0.72rem; color: #78350f;">📱 <strong>Without permissions:</strong> Shows container details in web app with edit options</p>
                 </div>
             `;
         }

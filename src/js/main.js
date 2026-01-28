@@ -843,8 +843,11 @@ async function emailIntakeForm() {
 }
 
 /**
- * Handle QR code scan from URL parameters
- * Supports multiple formats:
+ * Handle QR code scan from URL parameters with smart routing
+ * - If user has SharePoint permissions → Opens Excel workbook with row highlighted
+ * - If no permissions → Falls back to web app modal
+ *
+ * Supports multiple URL parameter formats:
  * - ?c=containerId (from qr-code-generator.com short links)
  * - ?container=containerId
  * - ?barcode=barcodeData
@@ -899,8 +902,31 @@ async function handleQRCodeScan() {
 
         console.log(`✅ Container found:`, container);
 
-        // Show container detail modal
-        showContainerDetail(container);
+        // SMART ROUTING: Check if user has SharePoint permissions
+        const hasSharePointAccess = window.AuthManager && window.AuthManager.isSignedIn();
+
+        if (hasSharePointAccess) {
+            // User is authenticated - Try to open Excel workbook with row highlighted
+            const success = await tryOpenExcelWorkbook(container);
+
+            if (success) {
+                console.log('✅ Opening Excel workbook with row highlighted');
+                NotificationSystem.success(`Opening HQ workbook for container ${container.containerId}...`);
+                // Give Excel a moment to open, then fall back to modal if needed
+                setTimeout(() => {
+                    // Show modal as backup in case Excel didn't open properly
+                    showContainerDetail(container);
+                }, 3000);
+            } else {
+                // Excel open failed, fall back to modal
+                console.log('⚠️ Excel workbook open failed, showing modal instead');
+                showContainerDetail(container);
+            }
+        } else {
+            // No SharePoint permissions - Show web app modal
+            console.log('ℹ️ No SharePoint access, showing web app modal');
+            showContainerDetail(container);
+        }
 
         // Clean the URL (remove QR parameters)
         window.history.replaceState({}, document.title, window.location.pathname);
@@ -910,6 +936,67 @@ async function handleQRCodeScan() {
         NotificationSystem.error('Error processing QR code scan');
         // Clean URL even on error
         window.history.replaceState({}, document.title, window.location.pathname);
+    }
+}
+
+/**
+ * Try to open Excel workbook with specific container row highlighted
+ * @param {Object} container - Container object
+ * @returns {Promise<boolean>} - True if successful, false otherwise
+ */
+async function tryOpenExcelWorkbook(container) {
+    try {
+        if (!window.OneDriveSync || !window.OneDriveSync.config) {
+            console.warn('OneDriveSync not configured');
+            return false;
+        }
+
+        // Get the SharePoint workbook URL
+        const shareUrl = window.OneDriveSync.config.shareUrl;
+        if (!shareUrl) {
+            console.warn('SharePoint URL not configured');
+            return false;
+        }
+
+        // Extract the base SharePoint URL (before query params)
+        const baseUrl = shareUrl.split('?')[0];
+
+        // Find the row number in the inventory
+        // Assuming the Excel table starts at row 2 (row 1 is headers)
+        const inventoryIndex = window.appState.inventory.findIndex(item =>
+            item.containerId === container.containerId
+        );
+
+        if (inventoryIndex === -1) {
+            console.warn('Container not found in inventory array');
+            return false;
+        }
+
+        // Excel row = inventory index + 2 (1 for header, 1 for 1-based indexing)
+        const excelRow = inventoryIndex + 2;
+
+        // Construct Excel Online URL with cell reference
+        // Format: URL#SheetName!CellReference
+        // Navigate to cell A{row} to highlight the container row
+        const excelDeepLink = `${baseUrl}?web=1#Active_Inventory!A${excelRow}`;
+
+        console.log(`📊 Opening Excel workbook at row ${excelRow}: ${excelDeepLink}`);
+
+        // Try to open the workbook in a new window
+        const excelWindow = window.open(excelDeepLink, '_blank');
+
+        if (excelWindow) {
+            // Window opened successfully
+            return true;
+        } else {
+            // Pop-up blocked or failed
+            console.warn('Failed to open Excel window (pop-up blocked?)');
+            return false;
+        }
+
+    } catch (error) {
+        console.error('Error opening Excel workbook:', error);
+        return false;
     }
 }
 
@@ -1052,7 +1139,9 @@ function showContainerDetail(container) {
             <p>3. Enter this URL: <code>${window.location.origin}?c=${container.containerId}</code></p>
             <p>4. Click "Create QR Code" and customize as needed</p>
             <p>5. Download and print your QR code</p>
-            <p><strong>When scanned:</strong> The QR code will open this app and show this container's details.</p>
+            <p style="margin-top: 12px;"><strong>🔄 Smart Routing When Scanned:</strong></p>
+            <p style="margin: 4px 0; padding-left: 12px;">✅ <strong>Internal users (with SharePoint permissions):</strong><br>Opens HQ Excel workbook with this container's row highlighted for direct editing</p>
+            <p style="margin: 4px 0; padding-left: 12px;">📱 <strong>External users (no SharePoint access):</strong><br>Shows this web app modal with container details and edit options</p>
         </div>
     `;
 
@@ -1063,6 +1152,26 @@ function showContainerDetail(container) {
     document.getElementById('editContainerBtn').style.display = 'inline-block';
     document.getElementById('saveContainerBtn').style.display = 'none';
     document.getElementById('cancelEditBtn').style.display = 'none';
+
+    // Show "Open in Excel" button if user has SharePoint access
+    const hasSharePointAccess = window.AuthManager && window.AuthManager.isSignedIn();
+    if (hasSharePointAccess) {
+        // Add "Open in Excel" button
+        const actionsDiv = document.querySelector('.container-detail-actions');
+        if (actionsDiv && !document.getElementById('openExcelBtn')) {
+            const openExcelBtn = document.createElement('button');
+            openExcelBtn.id = 'openExcelBtn';
+            openExcelBtn.className = 'btn';
+            openExcelBtn.style.background = '#059669';
+            openExcelBtn.style.color = 'white';
+            openExcelBtn.textContent = '📊 Open in Excel';
+            openExcelBtn.onclick = () => {
+                tryOpenExcelWorkbook(container);
+                NotificationSystem.info('Opening HQ workbook in new tab...');
+            };
+            actionsDiv.insertBefore(openExcelBtn, actionsDiv.firstChild);
+        }
+    }
 
     NotificationSystem.success(`Container ${container.containerId} details loaded`);
 }
@@ -1075,6 +1184,13 @@ function closeContainerDetail() {
     if (modal) {
         modal.style.display = 'none';
     }
+
+    // Remove "Open in Excel" button if it exists
+    const openExcelBtn = document.getElementById('openExcelBtn');
+    if (openExcelBtn) {
+        openExcelBtn.remove();
+    }
+
     window.currentEditingContainer = null;
 }
 
@@ -1189,4 +1305,5 @@ window.closeContainerDetail = closeContainerDetail;
 window.toggleContainerEdit = toggleContainerEdit;
 window.cancelContainerEdit = cancelContainerEdit;
 window.saveContainerChanges = saveContainerChanges;
+window.tryOpenExcelWorkbook = tryOpenExcelWorkbook;
 
