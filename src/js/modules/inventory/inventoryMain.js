@@ -167,7 +167,7 @@ window.InventoryManager = (function() {
         validateAllData();
     }
 
-    // Save inventory to local storage
+    // Save inventory to local storage with quota handling
     function saveToLocalStorage() {
         try {
             const state = {
@@ -177,12 +177,48 @@ window.InventoryManager = (function() {
                 highestContainerId: StateManager.getState('highestContainerId') || 0,
                 lastSaved: new Date().toISOString()
             };
-            
+
             localStorage.setItem('labInventoryData', JSON.stringify(state));
             updateAutoSaveStatus('saved');
-            
+
         } catch (error) {
             console.error('Failed to save to localStorage:', error);
+
+            // CRITICAL FIX: Handle QuotaExceededError specifically
+            if (error.name === 'QuotaExceededError' || error.code === 22 || error.code === 1014) {
+                console.warn('localStorage quota exceeded, attempting recovery...');
+
+                // Try to free up space by removing old backups
+                try {
+                    const backupKeys = Object.keys(localStorage)
+                        .filter(key => key.startsWith('labInventoryBackup_'))
+                        .sort()
+                        .reverse();
+
+                    // Remove all but the most recent backup
+                    backupKeys.slice(1).forEach(key => {
+                        localStorage.removeItem(key);
+                        console.log('Removed old backup:', key);
+                    });
+
+                    // Try saving again after cleanup
+                    const state = {
+                        inventory: StateManager.getState('inventory') || [],
+                        transferHistory: StateManager.getState('transferHistory') || [],
+                        containerLineage: StateManager.getState('containerLineage') || {},
+                        highestContainerId: StateManager.getState('highestContainerId') || 0,
+                        lastSaved: new Date().toISOString()
+                    };
+                    localStorage.setItem('labInventoryData', JSON.stringify(state));
+                    updateAutoSaveStatus('saved');
+                    NotificationSystem.warning('Storage was full. Old backups were removed to save your data.');
+                    return;
+                } catch (retryError) {
+                    console.error('Failed to save even after cleanup:', retryError);
+                    NotificationSystem.error('Storage is full! Please export your data immediately to prevent data loss.');
+                }
+            }
+
             updateAutoSaveStatus('error');
         }
     }

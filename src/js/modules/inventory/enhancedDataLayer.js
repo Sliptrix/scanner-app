@@ -27,6 +27,104 @@ const EnhancedDataLayer = (function() {
         media_batches: []
     };
 
+    // Storage key for localStorage persistence
+    const STORAGE_KEY = 'enhancedDataLayer_data';
+
+    /**
+     * Persist data store to localStorage
+     * CRITICAL FIX: Data was being lost on page refresh because this wasn't being called
+     */
+    function persistToLocalStorage() {
+        try {
+            const dataToSave = {
+                inventory: dataStore.inventory,
+                strains: dataStore.strains,
+                stages: dataStore.stages,
+                locations: dataStore.locations,
+                owners: dataStore.owners,
+                media_batches: dataStore.media_batches,
+                lastSaved: new Date().toISOString()
+            };
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(dataToSave));
+            console.log('EnhancedDataLayer: Data persisted to localStorage');
+        } catch (error) {
+            // Handle quota exceeded error
+            if (error.name === 'QuotaExceededError' || error.code === 22) {
+                console.error('EnhancedDataLayer: localStorage quota exceeded, attempting cleanup...');
+                cleanupOldData();
+                // Retry once after cleanup
+                try {
+                    localStorage.setItem(STORAGE_KEY, JSON.stringify({
+                        inventory: dataStore.inventory,
+                        strains: dataStore.strains,
+                        stages: dataStore.stages,
+                        locations: dataStore.locations,
+                        owners: dataStore.owners,
+                        media_batches: dataStore.media_batches,
+                        lastSaved: new Date().toISOString()
+                    }));
+                } catch (retryError) {
+                    console.error('EnhancedDataLayer: Failed to persist even after cleanup:', retryError);
+                    if (typeof NotificationSystem !== 'undefined') {
+                        NotificationSystem.error('Storage full - some data may not be saved. Please export your data.');
+                    }
+                }
+            } else {
+                console.error('EnhancedDataLayer: Failed to persist to localStorage:', error);
+            }
+        }
+    }
+
+    /**
+     * Load data store from localStorage
+     */
+    function loadFromLocalStorage() {
+        try {
+            const savedData = localStorage.getItem(STORAGE_KEY);
+            if (savedData) {
+                const parsed = JSON.parse(savedData);
+                dataStore.inventory = parsed.inventory || [];
+                dataStore.strains = parsed.strains || [];
+                dataStore.stages = parsed.stages || [];
+                dataStore.locations = parsed.locations || [];
+                dataStore.owners = parsed.owners || [];
+                dataStore.media_batches = parsed.media_batches || [];
+                console.log('EnhancedDataLayer: Loaded data from localStorage');
+                console.log(`  - ${dataStore.inventory.length} inventory items`);
+                console.log(`  - ${dataStore.strains.length} strains`);
+                console.log(`  - ${dataStore.owners.length} owners`);
+                return true;
+            }
+            return false;
+        } catch (error) {
+            console.error('EnhancedDataLayer: Failed to load from localStorage:', error);
+            return false;
+        }
+    }
+
+    /**
+     * Cleanup old data to free up localStorage space
+     */
+    function cleanupOldData() {
+        try {
+            // Remove old backups
+            const keysToRemove = [];
+            for (let i = 0; i < localStorage.length; i++) {
+                const key = localStorage.key(i);
+                if (key && (key.includes('Backup_') || key.includes('backup_'))) {
+                    keysToRemove.push(key);
+                }
+            }
+            keysToRemove.slice(0, -3).forEach(key => localStorage.removeItem(key));
+            console.log(`EnhancedDataLayer: Cleaned up ${keysToRemove.length - 3} old backups`);
+        } catch (error) {
+            console.error('EnhancedDataLayer: Cleanup failed:', error);
+        }
+    }
+
+    // Load data on initialization
+    loadFromLocalStorage();
+
     // Schema definitions for validation and sheet creation
     const SCHEMAS = {
         Active_Inventory: ['Asset_ID', 'Strain_Name', 'Stage_Name', 'Location', 'Owner_Code', 'Media_Batch_ID', 'Date_Created', 'Sample_Count', 'Status', 'Lineage', 'Notes'],
@@ -232,10 +330,13 @@ const EnhancedDataLayer = (function() {
 
             // Emit event for UI updates
             if (typeof window !== 'undefined') {
-                window.dispatchEvent(new CustomEvent('inventoryUpdated', { 
+                window.dispatchEvent(new CustomEvent('inventoryUpdated', {
                     detail: { item: normalizedItem, action: existingIndex >= 0 ? 'update' : 'add' }
                 }));
             }
+
+            // CRITICAL FIX: Persist to localStorage after every save
+            persistToLocalStorage();
 
             return { success: true, item: normalizedItem };
 
@@ -277,19 +378,22 @@ const EnhancedDataLayer = (function() {
      */
     function deleteItem(assetId) {
         const index = dataStore.inventory.findIndex(inv => inv.asset_id === assetId);
-        
+
         if (index >= 0) {
             const removed = dataStore.inventory.splice(index, 1)[0];
-            
+
             if (typeof window !== 'undefined') {
-                window.dispatchEvent(new CustomEvent('inventoryUpdated', { 
+                window.dispatchEvent(new CustomEvent('inventoryUpdated', {
                     detail: { item: removed, action: 'delete' }
                 }));
             }
-            
+
+            // CRITICAL FIX: Persist to localStorage after delete
+            persistToLocalStorage();
+
             return { success: true, item: removed };
         }
-        
+
         return { success: false, error: 'Item not found' };
     }
 
@@ -320,6 +424,9 @@ const EnhancedDataLayer = (function() {
             dataStore.strains.push(normalizedStrain);
         }
 
+        // Persist to localStorage
+        persistToLocalStorage();
+
         return { success: true, strain: normalizedStrain };
     }
 
@@ -343,6 +450,9 @@ const EnhancedDataLayer = (function() {
         } else {
             dataStore.owners.push(normalizedOwner);
         }
+
+        // Persist to localStorage
+        persistToLocalStorage();
 
         return { success: true, owner: normalizedOwner };
     }
@@ -370,6 +480,9 @@ const EnhancedDataLayer = (function() {
         } else {
             dataStore.media_batches.push(normalizedBatch);
         }
+
+        // Persist to localStorage
+        persistToLocalStorage();
 
         return { success: true, batch: normalizedBatch };
     }
@@ -671,6 +784,10 @@ const EnhancedDataLayer = (function() {
         // Integration
         syncWithAppState,
         pushToAppState,
+
+        // Persistence (CRITICAL FIX: Now exposed for manual saves)
+        persistToLocalStorage,
+        loadFromLocalStorage,
 
         // Direct access to schemas
         SCHEMAS,

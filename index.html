@@ -703,6 +703,7 @@
                         <input type="number" id="qrBatchCount" min="1" max="50" value="10" style="width: 60px; padding: 6px; border: 1px solid #d1d5db; border-radius: 4px; font-size: 0.85rem;">
                         <button class="btn" id="qrBatchGenerateBtn" onclick="generateQrBatch()" style="background: #7c3aed; color: white; font-size: 0.85rem; padding: 6px 12px;">Generate QR Batch</button>
                         <button class="btn" id="qrPoolViewBtn" onclick="viewQrPool()" style="background: #6b7280; color: white; font-size: 0.85rem; padding: 6px 12px;">View Pool</button>
+                        <button class="btn" onclick="printUnassignedLabels()" style="background: #2563eb; color: white; font-size: 0.85rem; padding: 6px 12px;">🖨️ Print Unassigned</button>
                         <button class="btn" onclick="printAssignedLabels()" style="background: #059669; color: white; font-size: 0.85rem; padding: 6px 12px;">🖨️ Print Labels</button>
                     </div>
                     <div id="qrBatchProgress" style="display: none; margin-top: 8px;">
@@ -911,6 +912,50 @@
                 </div>
             </div>
 
+            <!-- Media Batch Manager Section -->
+            <div class="batch-section" id="batchSection">
+                <h2 style="margin-bottom: 20px; color: #2c3e50;">🧫 Media Batch Tracking</h2>
+
+                <!-- Batch Stats Dashboard -->
+                <div class="batch-stats-dashboard" id="batchStatsDashboard" style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; margin-bottom: 20px;">
+                    <div class="stat-card" style="background: #e3f2fd; padding: 15px; border-radius: 8px; text-align: center;">
+                        <div class="stat-value" id="statReady" style="font-size: 2em; font-weight: bold; color: #1976d2;">0</div>
+                        <div class="stat-label" style="color: #666;">Ready to Use</div>
+                    </div>
+                    <div class="stat-card" style="background: #fff3e0; padding: 15px; border-radius: 8px; text-align: center;">
+                        <div class="stat-value" id="statInPrep" style="font-size: 2em; font-weight: bold; color: #f57c00;">0</div>
+                        <div class="stat-label" style="color: #666;">In Preparation</div>
+                    </div>
+                    <div class="stat-card" style="background: #fce4ec; padding: 15px; border-radius: 8px; text-align: center;">
+                        <div class="stat-value" id="statExpiring" style="font-size: 2em; font-weight: bold; color: #c62828;">0</div>
+                        <div class="stat-label" style="color: #666;">Expiring Soon</div>
+                    </div>
+                    <div class="stat-card" style="background: #e8f5e9; padding: 15px; border-radius: 8px; text-align: center;">
+                        <div class="stat-value" id="statContainers" style="font-size: 2em; font-weight: bold; color: #2e7d32;">0</div>
+                        <div class="stat-label" style="color: #666;">Containers Available</div>
+                    </div>
+                </div>
+
+                <!-- Batch Actions -->
+                <div class="batch-actions" style="display: flex; gap: 10px; margin-bottom: 20px;">
+                    <button class="btn btn-primary" onclick="MediaLabUI.showNewBatchModal()">
+                        ➕ Start New Batch
+                    </button>
+                    <button class="btn btn-secondary" onclick="MediaLabUI.refreshBatchList()">
+                        🔄 Refresh
+                    </button>
+                </div>
+
+                <!-- Active Batches List -->
+                <div class="batch-list-container" style="background: white; border: 1px solid #dee2e6; border-radius: 8px; padding: 15px;">
+                    <h4 style="margin-bottom: 15px;">Active Batches</h4>
+                    <div id="activeBatchList" style="max-height: 400px; overflow-y: auto;">
+                        <!-- Batch list will be populated here -->
+                        <p style="color: #666; text-align: center; padding: 20px;">No batches yet. Start a new batch to begin tracking.</p>
+                    </div>
+                </div>
+            </div>
+
             <div class="inventory-section" id="inventorySection">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
                     <h2 style="color: #2c3e50;">📦 Inventory Log</h2>
@@ -996,6 +1041,8 @@
     <script src="src/js/modules/recipe/recipeStorage.js"></script>
     <script src="src/js/modules/recipe/recipeCalculator.js"></script>
     <script src="src/js/modules/recipe/recipeManager.js"></script>
+    <script src="src/js/modules/recipe/mediaBatchManager.js"></script>
+    <script src="src/js/modules/recipe/mediaLabUI.js"></script>
     <!-- Builder Module -->
     <script src="src/js/modules/builder/stepManager.js"></script>
     <script src="src/js/modules/builder/barcodeGenerator.js"></script>
@@ -1005,6 +1052,7 @@
     <script src="src/js/modules/transfer/transferProcessor.js"></script>
     <script src="src/js/modules/transfer/transferMain.js"></script>
     <!-- Inventory Module -->
+    <script src="src/js/modules/inventory/inventoryLookupService.js"></script>
     <script src="src/js/modules/inventory/enhancedDataLayer.js"></script>
     <script src="src/js/modules/inventory/dataLayerBridge.js"></script>
     <script src="src/js/modules/inventory/qrInventoryEditor.js"></script>

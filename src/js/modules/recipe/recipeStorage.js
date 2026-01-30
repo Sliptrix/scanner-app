@@ -14,6 +14,10 @@ window.RecipeStorage = (function() {
     const BACKUP_KEY = 'labRecipesBackup';
     const MAX_BACKUP_COUNT = 5;
 
+    // CRITICAL FIX: Lock to prevent concurrent save race conditions
+    let saveLock = false;
+    const saveQueue = [];
+
     /**
      * Check if localStorage is available
      */
@@ -63,7 +67,8 @@ window.RecipeStorage = (function() {
     }
 
     /**
-     * Save a recipe to localStorage
+     * Save a recipe to localStorage with race condition protection
+     * CRITICAL FIX: Uses lock to prevent concurrent save corruption
      */
     function saveRecipe(recipeData) {
         // Check localStorage availability
@@ -73,48 +78,113 @@ window.RecipeStorage = (function() {
             throw error;
         }
 
+        // CRITICAL FIX: Acquire lock to prevent race conditions
+        if (saveLock) {
+            // Queue the save operation and return a promise
+            return new Promise((resolve, reject) => {
+                saveQueue.push({ recipeData, resolve, reject });
+                console.log('Recipe save queued, waiting for lock...');
+            });
+        }
+
+        saveLock = true;
+
+        try {
+            const result = _doSaveRecipe(recipeData);
+            return result;
+        } finally {
+            saveLock = false;
+            // Process any queued saves
+            if (saveQueue.length > 0) {
+                const next = saveQueue.shift();
+                saveRecipe(next.recipeData)
+                    .then(next.resolve)
+                    .catch(next.reject);
+            }
+        }
+    }
+
+    /**
+     * Internal save function (called with lock held)
+     */
+    function _doSaveRecipe(recipeData) {
         try {
             // Validate recipe data
             if (!recipeData.name || !recipeData.mediaType) {
                 throw new Error('Recipe must have at least a name and media type');
             }
 
-            // Generate ID if not provided
-            if (!recipeData.id) {
+            // Get existing recipes (fresh read within lock)
+            const recipes = getAllRecipes();
+
+            // CRITICAL FIX: Check for existing recipe by name AND mediaType to prevent duplicates
+            // This is checked BEFORE generating a new ID
+            let existingRecipe = null;
+            let existingIndex = -1;
+
+            if (recipeData.id) {
+                // If ID is provided, look for that specific recipe
+                existingIndex = recipes.findIndex(r => r.id === recipeData.id);
+                if (existingIndex >= 0) {
+                    existingRecipe = recipes[existingIndex];
+                }
+            }
+
+            // Also check for matching name+mediaType (regardless of ID) to prevent name duplicates
+            const duplicateByNameIndex = recipes.findIndex(r =>
+                r.name.toLowerCase().trim() === recipeData.name.toLowerCase().trim() &&
+                r.mediaType === recipeData.mediaType &&
+                !r.isTemplate &&  // Don't match against default templates
+                r.id !== recipeData.id  // Don't match against self
+            );
+
+            if (duplicateByNameIndex >= 0 && existingIndex < 0) {
+                // Found a recipe with same name+mediaType but different/no ID
+                // Update the existing one instead of creating a duplicate
+                existingIndex = duplicateByNameIndex;
+                existingRecipe = recipes[duplicateByNameIndex];
+                console.log(`Found existing recipe with same name "${recipeData.name}" - updating instead of creating duplicate`);
+            }
+
+            // Generate ID if not provided and no existing recipe found
+            if (!recipeData.id && existingIndex < 0) {
                 recipeData.id = generateRecipeId();
+            } else if (existingRecipe) {
+                // Use existing recipe's ID to ensure we update, not create
+                recipeData.id = existingRecipe.id;
             }
 
             // Add metadata
             const recipe = {
                 ...RECIPE_TEMPLATE,
                 ...recipeData,
-                createdDate: recipeData.createdDate || new Date().toISOString(),
+                createdDate: existingRecipe?.createdDate || recipeData.createdDate || new Date().toISOString(),
                 lastModified: new Date().toISOString()
             };
 
-            // Get existing recipes
-            const recipes = getAllRecipes();
+            // Filter out template recipes before saving (they are merged back on read)
+            const userRecipes = recipes.filter(r => !r.isTemplate);
 
-            // Check if recipe already exists (update) or is new
-            const existingIndex = recipes.findIndex(r => r.id === recipe.id);
+            // Check if recipe already exists in user recipes
+            const userExistingIndex = userRecipes.findIndex(r => r.id === recipe.id);
 
-            if (existingIndex >= 0) {
+            if (userExistingIndex >= 0) {
                 // Update existing recipe
-                recipes[existingIndex] = recipe;
+                userRecipes[userExistingIndex] = recipe;
             } else {
                 // Add new recipe
-                recipes.push(recipe);
+                userRecipes.push(recipe);
             }
 
-            // Save to localStorage
-            localStorage.setItem(STORAGE_KEY, JSON.stringify(recipes));
-            
-            // Update usage statistics
-            updateRecipeUsage(recipe.id);
-            
+            // Save to localStorage (only user recipes, templates are merged on read)
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(userRecipes));
+
+            // Don't call updateRecipeUsage here - it can cause issues
+            // Usage should only be updated when a recipe is actually used, not saved
+
             UIUtils.showNotification(`Recipe "${recipe.name}" saved successfully`, 'success');
             return recipe.id;
-            
+
         } catch (error) {
             console.error('Failed to save recipe:', error);
             UIUtils.showNotification(`Failed to save recipe: ${error.message}`, 'error');
@@ -135,17 +205,19 @@ window.RecipeStorage = (function() {
         try {
             const recipes = getAllRecipes();
             const recipe = recipes.find(r => r.id === recipeId);
-            
+
             if (!recipe) {
                 throw new Error(`Recipe with ID ${recipeId} not found`);
             }
 
-            // Update last used date
-            recipe.lastUsed = new Date().toISOString();
-            saveRecipe(recipe);
-            
+            // Update usage statistics (separate from loading to avoid save loop)
+            // Only update for non-template recipes
+            if (!recipe.isTemplate) {
+                updateRecipeUsage(recipeId);
+            }
+
             return recipe;
-            
+
         } catch (error) {
             console.error('Failed to load recipe:', error);
             UIUtils.showNotification(`Failed to load recipe: ${error.message}`, 'error');
@@ -446,21 +518,30 @@ window.RecipeStorage = (function() {
 
     /**
      * Update recipe usage statistics
+     * Called when a recipe is actually used (not when saved)
      */
     function updateRecipeUsage(recipeId) {
+        // Prevent concurrent usage updates
+        if (saveLock) {
+            console.log('Recipe usage update skipped - save in progress');
+            return;
+        }
+
         try {
-            const recipes = getAllRecipes();
-            const recipe = recipes.find(r => r.id === recipeId);
-            
-            if (recipe && !recipe.isTemplate) {
+            // Read directly from localStorage to avoid merging with defaults
+            const recipesJson = localStorage.getItem(STORAGE_KEY);
+            const userRecipes = recipesJson ? JSON.parse(recipesJson) : [];
+
+            const recipe = userRecipes.find(r => r.id === recipeId);
+
+            if (recipe) {
                 recipe.useCount = (recipe.useCount || 0) + 1;
                 recipe.lastUsed = new Date().toISOString();
-                
-                // Save updated recipes without triggering notifications
-                const filteredRecipes = recipes.filter(r => !r.isTemplate);
-                localStorage.setItem(STORAGE_KEY, JSON.stringify(filteredRecipes));
+
+                // Save updated recipes
+                localStorage.setItem(STORAGE_KEY, JSON.stringify(userRecipes));
             }
-            
+
         } catch (error) {
             console.error('Failed to update recipe usage:', error);
         }

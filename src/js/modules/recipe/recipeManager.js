@@ -802,23 +802,150 @@ window.RecipeManager = (function() {
             return;
         }
 
-        try {
-            const recipeId = RecipeStorage.saveRecipe(recipeData);
+        // Get save button for visual feedback
+        const saveBtn = document.getElementById('saveRecipeBtn');
+        const originalBtnText = saveBtn?.innerHTML || '💾 Save Recipe';
+
+        // Show saving state immediately
+        if (saveBtn) {
+            saveBtn.disabled = true;
+            saveBtn.innerHTML = '⏳ Saving...';
+            saveBtn.style.background = '#6c757d';
+        }
+
+        // Helper function to show success state
+        function showSuccessState(recipeId) {
+            // Store the saved recipe with its ID for future updates
             currentRecipe = { ...recipeData, id: recipeId };
-            if (window.UIUtils) {
-                UIUtils.showNotification(`Recipe "${recipeName}" saved successfully`, 'success');
+
+            // Show success state on button
+            if (saveBtn) {
+                saveBtn.innerHTML = '✅ Saved!';
+                saveBtn.style.background = '#28a745';
             }
+
+            // Show inline success message near the form
+            showSaveConfirmation(recipeName);
 
             // Refresh recipe list if in existing mode
             if (recipeMode === 'existing') {
                 loadRecipeList();
             }
-        } catch (error) {
+
+            // Reset button after 2 seconds
+            setTimeout(() => {
+                if (saveBtn) {
+                    saveBtn.disabled = false;
+                    saveBtn.innerHTML = originalBtnText;
+                    saveBtn.style.background = '';
+                }
+            }, 2000);
+        }
+
+        // Helper function to show error state
+        function showErrorState(error) {
             console.error('saveCurrentRecipe: Error saving recipe:', error);
             if (window.UIUtils) {
                 UIUtils.showNotification(`Failed to save recipe: ${error.message}`, 'error');
             }
+
+            // Reset button on error
+            if (saveBtn) {
+                saveBtn.disabled = false;
+                saveBtn.innerHTML = originalBtnText;
+                saveBtn.style.background = '';
+            }
         }
+
+        try {
+            // If we have a current recipe with an ID, pass it to update instead of create
+            if (currentRecipe && currentRecipe.id) {
+                recipeData.id = currentRecipe.id;
+            }
+
+            const result = RecipeStorage.saveRecipe(recipeData);
+
+            // Handle both Promise and direct return value
+            if (result && typeof result.then === 'function') {
+                // It's a Promise (queued save)
+                result
+                    .then(recipeId => showSuccessState(recipeId))
+                    .catch(error => showErrorState(error));
+            } else {
+                // It's a direct return (recipe ID string)
+                showSuccessState(result);
+            }
+
+        } catch (error) {
+            showErrorState(error);
+        }
+    }
+
+    /**
+     * Show inline save confirmation message
+     */
+    function showSaveConfirmation(recipeName) {
+        // Remove any existing confirmation
+        const existingConfirm = document.getElementById('saveConfirmation');
+        if (existingConfirm) {
+            existingConfirm.remove();
+        }
+
+        // Create confirmation element
+        const confirmation = document.createElement('div');
+        confirmation.id = 'saveConfirmation';
+        confirmation.innerHTML = `
+            <div style="display: flex; align-items: center; gap: 10px;">
+                <span style="font-size: 1.5em;">✅</span>
+                <div>
+                    <div style="font-weight: 600;">Recipe Saved!</div>
+                    <div style="font-size: 0.9em; opacity: 0.9;">"${recipeName}" has been saved successfully</div>
+                </div>
+            </div>
+        `;
+        confirmation.style.cssText = `
+            background: linear-gradient(135deg, #28a745, #20c997);
+            color: white;
+            padding: 15px 20px;
+            border-radius: 8px;
+            margin: 15px 0;
+            animation: slideIn 0.3s ease, fadeOut 0.5s ease 3s forwards;
+            box-shadow: 0 4px 12px rgba(40, 167, 69, 0.3);
+        `;
+
+        // Add animation keyframes if not present
+        if (!document.getElementById('saveConfirmStyles')) {
+            const style = document.createElement('style');
+            style.id = 'saveConfirmStyles';
+            style.textContent = `
+                @keyframes slideIn {
+                    from { opacity: 0; transform: translateY(-10px); }
+                    to { opacity: 1; transform: translateY(0); }
+                }
+                @keyframes fadeOut {
+                    from { opacity: 1; }
+                    to { opacity: 0; }
+                }
+            `;
+            document.head.appendChild(style);
+        }
+
+        // Insert after the recipe name field
+        const recipeNameField = document.getElementById('recipeName');
+        if (recipeNameField && recipeNameField.parentElement) {
+            recipeNameField.parentElement.insertAdjacentElement('afterend', confirmation);
+        } else {
+            // Fallback: insert at top of recipe form
+            const recipeForm = document.getElementById('newRecipeForm');
+            if (recipeForm) {
+                recipeForm.insertAdjacentElement('afterbegin', confirmation);
+            }
+        }
+
+        // Remove after animation
+        setTimeout(() => {
+            confirmation.remove();
+        }, 3500);
     }
 
     /**

@@ -334,128 +334,237 @@ window.ContainerInitiator = (function() {
 
     /**
      * Process owner input
+     * Uses InventoryLookupService to resolve any input format (code, name, or alternate)
      */
     function processOwnerInput() {
         const input = document.getElementById('initiatorInput').value.trim();
-        
+
         if (!input) {
-            showFeedback('Please enter a valid owner ID', 'error');
+            showFeedback('Please enter a valid owner (code, name, or alternate)', 'error');
             return;
         }
-        
-        // Check if owner exists in data
-        if (window.appState.isDataLoaded) {
-            const ownersTable = window.appState.ownersTable;
-            const ownerExists = Object.keys(ownersTable).some(key => 
-                key.toLowerCase() === input.toLowerCase());
-            
-            if (!ownerExists) {
-                showFeedback(`Owner "${input}" not found in reference data`, 'warning');
-                // Continue anyway since we can create new owners
+
+        // Use InventoryLookupService if available
+        let resolvedOwner = null;
+        let ownerDisplay = input.toUpperCase();
+
+        if (window.InventoryLookupService && window.InventoryLookupService.isInitialized()) {
+            const ownerData = window.InventoryLookupService.resolveOwner(input);
+            if (ownerData) {
+                resolvedOwner = ownerData.code;
+                ownerDisplay = ownerData.code;
+                const ownerName = ownerData.name || ownerData.code;
+                showFeedback(`Owner resolved: ${input} → ${ownerData.code} (${ownerName})`, 'success');
+            } else {
+                // Not found in lookup - BLOCK progression
+                showFeedback(`ERROR: Owner "${input}" not recognized. Please enter a valid owner code, name, or alternate from the HQ workbook.`, 'error');
+                return; // Do not proceed
             }
+        } else {
+            // Fallback to legacy behavior - require match in reference data
+            if (window.appState.isDataLoaded) {
+                const ownersTable = window.appState.ownersTable;
+                const ownerExists = Object.keys(ownersTable).some(key =>
+                    key.toLowerCase() === input.toLowerCase());
+
+                if (!ownerExists) {
+                    showFeedback(`ERROR: Owner "${input}" not found in reference data. Cannot proceed.`, 'error');
+                    return; // Do not proceed
+                }
+            }
+            resolvedOwner = input.toUpperCase();
         }
-        
-        // Store the owner and move to strain step
-        StateManager.setState('initiatorState.owner', input.toUpperCase());
+
+        // Store the resolved owner and move to strain step
+        StateManager.setState('initiatorState.owner', resolvedOwner);
         moveToStep('strain');
-        
+
         // Update UI
         updateInitiatorUI();
-        showFeedback(`Owner set to: ${input.toUpperCase()}`, 'success');
     }
     
     /**
      * Process strain input
+     * Uses InventoryLookupService to resolve any input format (ID, abbreviation, or name)
      */
     function processStrainInput() {
         const input = document.getElementById('initiatorInput').value.trim();
-        
+
         if (!input) {
-            showFeedback('Please enter a valid strain ID', 'error');
+            showFeedback('Please enter a valid strain (ID, abbreviation, or name)', 'error');
             return;
         }
-        
-        // Check if strain exists in data
-        if (window.appState.isDataLoaded) {
-            const strainsTable = window.appState.strainsTable;
-            const strainExists = Object.keys(strainsTable).some(key => 
-                key === input);
-            
-            if (!strainExists) {
-                showFeedback(`Strain "${input}" not found in reference data`, 'warning');
-                // Continue anyway since we can create new strains
+
+        // Use InventoryLookupService if available
+        let resolvedStrainId = null;
+        let strainName = null;
+
+        if (window.InventoryLookupService && window.InventoryLookupService.isInitialized()) {
+            const strainData = window.InventoryLookupService.resolveStrain(input);
+            if (strainData) {
+                resolvedStrainId = strainData.id;
+                strainName = strainData.name;
+                const abbr = strainData.abbreviation ? ` [${strainData.abbreviation}]` : '';
+                showFeedback(`Strain resolved: ${input} → #${strainData.id} ${strainData.name}${abbr}`, 'success');
+            } else {
+                // Not found in lookup - BLOCK progression
+                showFeedback(`ERROR: Strain "${input}" not recognized. Please enter a valid strain ID, abbreviation (e.g., AC1), or exact name from the HQ workbook.`, 'error');
+                return; // Do not proceed
             }
+        } else {
+            // Fallback to legacy behavior - require match in reference data
+            if (window.appState.isDataLoaded) {
+                const strainsTable = window.appState.strainsTable;
+                const strainExists = Object.keys(strainsTable).some(key =>
+                    key === input);
+
+                if (!strainExists) {
+                    showFeedback(`ERROR: Strain "${input}" not found in reference data. Cannot proceed.`, 'error');
+                    return; // Do not proceed
+                }
+            }
+            resolvedStrainId = input;
         }
-        
-        // Store the strain and move to media step
-        StateManager.setState('initiatorState.strain', input);
+
+        // Store the resolved strain ID and move to media step
+        StateManager.setState('initiatorState.strain', resolvedStrainId);
+
+        // Also store the resolved strain name for display purposes
+        if (strainName) {
+            StateManager.setState('initiatorState.strainName', strainName);
+        }
+
         moveToStep('media');
-        
+
         // Update UI
         updateInitiatorUI();
-        showFeedback(`Strain set to: ${input}`, 'success');
     }
     
     /**
      * Process media input
+     * Uses InventoryLookupService to resolve any input format (code or name)
      */
     function processMediaInput() {
         const rawInput = document.getElementById('initiatorInput').value.trim();
         const upperInput = rawInput.toUpperCase();
-        
+
         // Treat empty, NA, N/A, NONE as "no media" selections
         const isNoMedia = !rawInput || upperInput === 'NA' || upperInput === 'N/A' || upperInput === 'NONE';
-        
+
         if (isNoMedia) {
             // Explicitly store N/A so the user can see that no media is present
             StateManager.setState('initiatorState.media', 'N/A');
+            StateManager.setState('initiatorState.mediaName', 'N/A');
             moveToStep('stage');
             updateInitiatorUI();
             showFeedback('Media set to: N/A (no media present)', 'success');
             return;
         }
-        
-        // Media is optional, check if it exists but don't require it
-        if (window.appState.isDataLoaded) {
-            const mediaTypesTable = window.appState.mediaTypesTable;
-            const mediaExists = Object.keys(mediaTypesTable).some(key => 
-                key.toLowerCase() === upperInput.toLowerCase());
-            
-            if (!mediaExists) {
-                showFeedback(`Media "${rawInput}" not found in reference data`, 'warning');
-                // Continue anyway since we can create new media types
+
+        // Use InventoryLookupService if available
+        let resolvedMediaCode = null;
+        let mediaName = null;
+
+        if (window.InventoryLookupService && window.InventoryLookupService.isInitialized()) {
+            const mediaData = window.InventoryLookupService.resolveMediaType(rawInput);
+            if (mediaData) {
+                resolvedMediaCode = mediaData.code;
+                mediaName = mediaData.name;
+                showFeedback(`Media resolved: ${rawInput} → ${mediaData.code} (${mediaData.name})`, 'success');
+            } else {
+                // Not found in lookup - BLOCK progression
+                showFeedback(`ERROR: Media "${rawInput}" not recognized. Please enter a valid media code or name from the HQ workbook, or type "N/A" for no media.`, 'error');
+                return; // Do not proceed
+            }
+        } else {
+            // Fallback to legacy behavior - require match in reference data
+            if (window.appState.isDataLoaded) {
+                const mediaTypesTable = window.appState.mediaTypesTable;
+                const mediaExists = Object.keys(mediaTypesTable).some(key =>
+                    key.toLowerCase() === upperInput.toLowerCase());
+
+                if (!mediaExists) {
+                    showFeedback(`ERROR: Media "${rawInput}" not found in reference data. Cannot proceed.`, 'error');
+                    return; // Do not proceed
+                }
+            }
+            resolvedMediaCode = upperInput;
+        }
+
+        // Store the resolved media code
+        StateManager.setState('initiatorState.media', resolvedMediaCode);
+
+        // Also store the resolved media name for display purposes
+        if (mediaName) {
+            StateManager.setState('initiatorState.mediaName', mediaName);
+        }
+
+        // Check for available media batches
+        if (window.MediaBatchManager && mediaName) {
+            const availableBatches = MediaBatchManager.getAvailableBatches(mediaName);
+            if (availableBatches.length > 0) {
+                // Show batch info in feedback
+                const batchInfo = availableBatches.map(b =>
+                    `${b.id} (${b.availableContainers} containers)`
+                ).join(', ');
+                showFeedback(`Media: ${mediaName}. Available batches: ${batchInfo}`, 'info');
+
+                // Store first available batch as default (can be changed later)
+                StateManager.setState('initiatorState.mediaBatchId', availableBatches[0].id);
             }
         }
-        
-        // Store the media code
-        StateManager.setState('initiatorState.media', upperInput);
-        
+
         // Move to next step (stage)
         moveToStep('stage');
         updateInitiatorUI();
-        showFeedback(`Media set to: ${rawInput}`, 'success');
     }
     
     /**
      * Process stage input
+     * Uses InventoryLookupService to resolve any input format (ID or name)
      */
     function processStageInput() {
         const input = document.getElementById('initiatorInput').value.trim();
-        
+
         if (!input) {
-            showFeedback('Please enter a valid stage (1-9)', 'error');
+            showFeedback('Please enter a valid stage (ID or name)', 'error');
             return;
         }
-        
-        if (!input.match(/^[1-9]$/)) {
-            showFeedback('Stage must be a single digit between 1 and 9', 'error');
-            return;
+
+        // Use InventoryLookupService if available
+        let resolvedStageId = null;
+        let stageName = null;
+
+        if (window.InventoryLookupService && window.InventoryLookupService.isInitialized()) {
+            const stageData = window.InventoryLookupService.resolveStage(input);
+            if (stageData) {
+                resolvedStageId = stageData.id;
+                stageName = stageData.name;
+                showFeedback(`Stage resolved: ${input} → ${stageData.id} (${stageData.name})`, 'success');
+            } else {
+                // Not found in lookup - BLOCK progression
+                showFeedback(`ERROR: Stage "${input}" not recognized. Please enter a valid stage ID (1-9) or name (e.g., "In Vitro", "Rooted") from the HQ workbook.`, 'error');
+                return; // Do not proceed
+            }
+        } else {
+            // Fallback to legacy behavior - only accept numeric IDs
+            if (!input.match(/^[1-9]$/)) {
+                showFeedback(`ERROR: Stage must be a single digit between 1 and 9. Cannot proceed.`, 'error');
+                return;
+            }
+            resolvedStageId = input;
         }
-        
-        StateManager.setState('initiatorState.stage', input.toUpperCase());
+
+        // Store the resolved stage ID
+        StateManager.setState('initiatorState.stage', resolvedStageId);
+
+        // Also store the resolved stage name for display purposes
+        if (stageName) {
+            StateManager.setState('initiatorState.stageName', stageName);
+        }
+
         moveToStep('tissue');
         updateInitiatorUI();
-        showFeedback(`Stage set to: ${input}`, 'success');
     }
     
     /**
@@ -1108,9 +1217,14 @@ window.ContainerInitiator = (function() {
             return;
         }
 
-        if (!window.QRCodeService) return;
+        if (!window.QRCodeService) {
+            console.warn('QRCodeService not available for picker');
+            return;
+        }
 
+        // Force fresh read from localStorage
         const unassigned = QRCodeService.getUnassigned();
+        console.log('showQrBatchPicker: Found', unassigned.length, 'unassigned QR codes');
 
         if (!picker) {
             // Create the picker container
@@ -1122,24 +1236,37 @@ window.ContainerInitiator = (function() {
             const inputArea = document.getElementById('initiatorInput');
             if (inputArea && inputArea.parentElement) {
                 inputArea.parentElement.parentElement.appendChild(picker);
+            } else {
+                // Fallback: try to find initiator section
+                const initiatorSection = document.querySelector('.initiator-section, #containerInitiator');
+                if (initiatorSection) {
+                    initiatorSection.appendChild(picker);
+                }
             }
         }
 
         picker.style.display = 'block';
 
         if (unassigned.length === 0) {
-            picker.innerHTML = '<p style="color: #6b7280; font-size: 0.85rem; margin: 0;">No QR codes available. Generate a batch first using the QR Code Pool section above.</p>';
+            picker.innerHTML = `
+                <p style="color: #6b7280; font-size: 0.85rem; margin: 0;">
+                    No QR codes available. Generate a batch first using the QR Code Pool section above.
+                </p>
+                <p style="color: #9ca3af; font-size: 0.75rem; margin: 8px 0 0 0;">
+                    Make sure the backend server is running (npm run backend)
+                </p>
+            `;
             return;
         }
 
         let html = '<p style="margin: 0 0 8px; font-size: 0.85rem; font-weight: 600; color: #374151;">Or select from generated batch:</p>';
         html += '<div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap: 8px;">';
         unassigned.forEach(qr => {
+            const displayId = qr.containerId || `#${qr.excelRow}`;
             html += `
                 <div class="qr-batch-item" data-excel-row="${qr.excelRow}" style="text-align: center; padding: 8px; border: 2px solid #e2e8f0; border-radius: 8px; background: white; cursor: pointer; transition: border-color 0.2s;" onmouseover="this.style.borderColor='#3b82f6'" onmouseout="this.style.borderColor='#e2e8f0'">
-                    <img src="${qr.dataUrl}" alt="Row ${qr.excelRow}" style="width: 90px; height: 90px;" />
-                    <p style="margin: 4px 0 0; font-family: monospace; font-size: 0.8rem; font-weight: bold;">Row ${qr.excelRow}</p>
-                    ${qr.containerId ? `<p style="margin: 2px 0 0; font-size: 0.7rem; color: #059669;">ID: ${qr.containerId}</p>` : ''}
+                    <img src="${qr.dataUrl}" alt="ID ${displayId}" style="width: 90px; height: 90px;" />
+                    <p style="margin: 4px 0 0; font-family: monospace; font-size: 0.9rem; font-weight: bold; color: #059669;">ID: ${displayId}</p>
                 </div>`;
         });
         html += '</div>';
@@ -1159,6 +1286,27 @@ window.ContainerInitiator = (function() {
         });
     }
 
+    /**
+     * Refresh the QR batch picker (call after generating new QR codes)
+     * Always refreshes if the picker element exists, regardless of current step
+     */
+    function refreshQrPicker() {
+        const picker = document.getElementById('qrBatchPicker');
+        const currentStep = StateManager.getState('initiatorState.currentStep');
+
+        // If we're on the QR step, refresh the picker
+        if (currentStep === 'qr') {
+            showQrBatchPicker(true);
+        } else if (picker) {
+            // If picker exists but we're on a different step,
+            // still update it so it's ready when user goes back
+            showQrBatchPicker(true);
+        }
+
+        console.log('QR Picker refreshed. Unassigned count:',
+            window.QRCodeService ? QRCodeService.getUnassigned().length : 0);
+    }
+
     // Public API
     return {
         initialize: initialize,
@@ -1166,6 +1314,7 @@ window.ContainerInitiator = (function() {
         updateNextAvailableId: updateNextAvailableId,
         handleInitiatorInput: handleInitiatorInput,
         goToPreviousStep: goToPreviousStep,
-        selectQuickDate: selectQuickDate
+        selectQuickDate: selectQuickDate,
+        refreshQrPicker: refreshQrPicker
     };
 })();

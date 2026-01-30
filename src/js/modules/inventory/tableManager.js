@@ -338,18 +338,20 @@ window.InventoryTableManager = (function() {
         // Status indicator
         const statusDisplay = buildStatusDisplay(item);
 
+        // SECURITY FIX: Sanitize all user data before innerHTML
+        const s = UIUtils.sanitize;
         row.innerHTML = `
-            <td style="font-weight: 600; color: #495057;">${item.containerId}</td>
+            <td style="font-weight: 600; color: #495057;">${s(item.containerId)}</td>
             <td>${lineageDisplay}</td>
             <td style="font-family: monospace; font-size: 0.9rem; background: #f8f9fa; padding: 4px 8px; border-radius: 3px;">
-                ${item.barcode || '-'}
+                ${s(item.barcode) || '-'}
             </td>
             <td><span style="background: #e3f2fd; padding: 2px 8px; border-radius: 12px; font-size: 0.85rem;">
-                ${item.strain || 'Unknown'}
+                ${s(item.strain) || 'Unknown'}
             </span></td>
-            <td>${item.owner || 'Unknown'}</td>
-            <td>${item.stage || 'Unknown'}</td>
-            <td>${item.media || 'Unknown'}</td>
+            <td>${s(item.owner) || 'Unknown'}</td>
+            <td>${s(item.stage) || 'Unknown'}</td>
+            <td>${s(item.media) || 'Unknown'}</td>
             <td style="text-align: center; font-weight: 600;">${typeof item.tissueCount === 'number' ? item.tissueCount : (item.tissueCount === 'Unknown' ? 'Unknown' : (item.tissueCount || 1))}</td>
             <td style="font-size: 0.85rem; color: #6c757d;">${dateDisplay}</td>
             <td>${statusDisplay}</td>
@@ -362,8 +364,10 @@ window.InventoryTableManager = (function() {
     function buildLineageDisplay(item) {
         if (item.transferSource) {
             const transferType = item.transferType === 'split' ? '🌱' : '📦';
+            // SECURITY FIX: Sanitize transferSource
+            const safeSource = UIUtils.sanitize(item.transferSource);
             return `<span style="background: #fff3cd; padding: 2px 6px; border-radius: 8px; font-size: 0.8rem;">
-                ${transferType} from ${item.transferSource}
+                ${transferType} from ${safeSource}
             </span>`;
         }
         

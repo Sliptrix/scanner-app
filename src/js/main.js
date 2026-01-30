@@ -62,7 +62,10 @@ function initializeApp() {
     if (window.ContainerInitiator) {
         ContainerInitiator.initialize();
     }
-    
+
+    // Initialize Inventory Lookup Service (for flexible input resolution)
+    initializeInventoryLookupService();
+
     // Initialize intake module
     if (window.IntakeMain) {
         IntakeMain.init().catch(error => {
@@ -119,7 +122,13 @@ function initializeApp() {
         RecipeManager.setupRecipeUI();
         console.log('✅ RecipeManager initialized with UI setup');
     }
-    
+
+    // Initialize media lab UI (batch tracking)
+    if (window.MediaLabUI) {
+        MediaLabUI.initialize();
+        console.log('✅ MediaLabUI initialized');
+    }
+
     // Show initial status
     NotificationSystem.info('Lab system ready! Load Excel data to begin.');
 
@@ -1429,17 +1438,71 @@ async function generateQrBatch() {
     if (progressDiv) progressDiv.style.display = 'block';
     if (btn) { btn.disabled = true; btn.textContent = 'Generating...'; }
 
-    const result = await QRCodeService.generateBatch(count, (done, total) => {
-        const pct = Math.round((done / total) * 100);
-        if (progressBar) progressBar.style.width = pct + '%';
-        if (progressText) progressText.textContent = `${done} / ${total}`;
-    });
+    let result;
+    try {
+        result = await QRCodeService.generateBatch(count, (done, total) => {
+            const pct = Math.round((done / total) * 100);
+            if (progressBar) progressBar.style.width = pct + '%';
+            if (progressText) progressText.textContent = `${done} / ${total}`;
+        });
+    } catch (error) {
+        console.error('QR batch generation failed:', error);
+        NotificationSystem.error('Failed to generate QR codes: ' + error.message);
+        if (btn) { btn.disabled = false; btn.textContent = 'Generate QR Batch'; }
+        if (progressDiv) progressDiv.style.display = 'none';
+        return;
+    }
 
-    if (btn) { btn.disabled = false; btn.textContent = 'Generate QR Batch'; }
-    if (progressDiv) setTimeout(() => { progressDiv.style.display = 'none'; }, 2000);
+    console.log('QR batch generation result:', result);
 
+    // Check if any were actually generated
+    if (result.generated === 0) {
+        if (btn) {
+            btn.textContent = '⚠️ None Generated';
+            btn.style.background = '#dc3545';
+        }
+        NotificationSystem.warning('No QR codes were generated. Make sure the backend server is running (npm run backend) and Excel is configured.');
+        setTimeout(() => {
+            if (btn) {
+                btn.disabled = false;
+                btn.textContent = 'Generate QR Batch';
+                btn.style.background = '#7c3aed';
+            }
+            if (progressDiv) progressDiv.style.display = 'none';
+        }, 3000);
+        return;
+    }
+
+    // Show success state on button
+    if (btn) {
+        btn.textContent = `✅ ${result.generated} Generated!`;
+        btn.style.background = '#059669';
+    }
+
+    // Update pool status
     updateQrPoolStatus();
-    NotificationSystem.success(`Generated ${result.generated} QR codes${result.errors ? ` (${result.errors} errors)` : ''}`);
+
+    // Refresh the QR picker in Container Initiator so new codes appear immediately
+    // Use a small delay to ensure localStorage is fully updated
+    setTimeout(() => {
+        if (window.ContainerInitiator && typeof ContainerInitiator.refreshQrPicker === 'function') {
+            ContainerInitiator.refreshQrPicker();
+            console.log('QR picker refreshed after generation');
+        }
+    }, 100);
+
+    // Show success notification
+    NotificationSystem.success(`✅ Generated ${result.generated} QR codes${result.errors ? ` (${result.errors} errors)` : ''} - Available for selection now!`);
+
+    // Reset button after delay
+    setTimeout(() => {
+        if (btn) {
+            btn.disabled = false;
+            btn.textContent = 'Generate QR Batch';
+            btn.style.background = '#7c3aed';
+        }
+        if (progressDiv) progressDiv.style.display = 'none';
+    }, 2000);
 }
 
 function viewQrPool() {
@@ -1454,7 +1517,11 @@ function viewQrPool() {
     if (!modal || !content) return;
 
     let html = '<h3 style="margin-bottom: 15px;">QR Code Pool</h3>';
-    html += `<p style="margin-bottom: 10px;"><strong>${unassigned.length}</strong> available, <strong>${assigned.length}</strong> assigned</p>`;
+    html += `<p style="margin-bottom: 10px;"><strong>${unassigned.length}</strong> available, <strong>${assigned.length}</strong> assigned`;
+    if (unassigned.length > 0) {
+        html += ` <button onclick="printUnassignedLabels()" style="margin-left: 10px; padding: 4px 12px; background: #2563eb; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 0.85rem;">🖨️ Print Unassigned</button>`;
+    }
+    html += `</p>`;
 
     if (unassigned.length > 0) {
         html += '<h4 style="margin: 15px 0 10px;">Available (Unassigned)</h4>';
@@ -1505,6 +1572,88 @@ document.addEventListener('DOMContentLoaded', () => {
     setTimeout(updateQrPoolStatus, 500);
 });
 
+/**
+ * Initialize the Inventory Lookup Service
+ * Provides flexible input resolution (ID, abbreviation, or name) for strains, owners, stages, etc.
+ */
+function initializeInventoryLookupService() {
+    console.log('🔍 Initializing Inventory Lookup Service...');
+
+    if (!window.InventoryLookupService) {
+        console.warn('InventoryLookupService module not loaded');
+        return;
+    }
+
+    // Load abbreviation data from JSON if available
+    fetch('./inventory_lookup_data.json')
+        .then(response => {
+            if (!response.ok) throw new Error('Lookup data file not found');
+            return response.json();
+        })
+        .then(data => {
+            console.log('📁 Loading lookup abbreviation data...');
+
+            // Load abbreviations and alternates into the lookup service
+            if (data.strainAbbreviations || data.ownerAlternates) {
+                window.InventoryLookupService.loadAbbreviationData({
+                    strainAbbreviations: data.strainAbbreviations || {},
+                    ownerAlternates: data.ownerAlternates || {}
+                });
+            }
+
+            // Also populate appState tables if they're empty (fallback data source)
+            if (data.strainNameMapping && Object.keys(window.appState.strainsTable).length === 0) {
+                window.appState.strainsTable = data.strainNameMapping;
+                console.log(`  Loaded ${Object.keys(data.strainNameMapping).length} strains from lookup data`);
+            }
+
+            if (data.ownerNameMapping && Object.keys(window.appState.ownersTable).length === 0) {
+                window.appState.ownersTable = data.ownerNameMapping;
+                console.log(`  Loaded ${Object.keys(data.ownerNameMapping).length} owners from lookup data`);
+            }
+
+            if (data.stageNameMapping && Object.keys(window.appState.stagesTable).length === 0) {
+                window.appState.stagesTable = data.stageNameMapping;
+                console.log(`  Loaded ${Object.keys(data.stageNameMapping).length} stages from lookup data`);
+            }
+
+            if (data.mediaTypeMapping && Object.keys(window.appState.mediaTypesTable).length === 0) {
+                window.appState.mediaTypesTable = data.mediaTypeMapping;
+                console.log(`  Loaded ${Object.keys(data.mediaTypeMapping).length} media types from lookup data`);
+            }
+
+            if (data.locationsList && window.appState.locationsTable.length === 0) {
+                window.appState.locationsTable = data.locationsList;
+                console.log(`  Loaded ${data.locationsList.length} locations from lookup data`);
+            }
+
+            if (data.strainOwnerMapping && Object.keys(window.appState.strainOwnerMapping || {}).length === 0) {
+                window.appState.strainOwnerMapping = data.strainOwnerMapping;
+                console.log(`  Loaded ${Object.keys(data.strainOwnerMapping).length} strain-owner mappings from lookup data`);
+            }
+
+            // Initialize the lookup service
+            window.InventoryLookupService.initialize();
+
+            // Mark data as loaded
+            window.appState.isDataLoaded = true;
+
+            console.log('✅ Inventory Lookup Service initialized successfully');
+
+            // Notify other modules that data is available
+            if (window.DataUtils && window.DataUtils.triggerDataLoadedCallbacks) {
+                window.DataUtils.triggerDataLoadedCallbacks();
+            }
+        })
+        .catch(error => {
+            console.log('📁 inventory_lookup_data.json not found, initializing with existing data:', error.message);
+
+            // Initialize lookup service with whatever data we have
+            window.InventoryLookupService.initialize();
+            console.log('✅ Inventory Lookup Service initialized with existing appState data');
+        });
+}
+
 // Legacy compatibility for global function references
 window.switchMode = switchMode;
 window.nextBuilderStep = nextBuilderStep;
@@ -1529,8 +1678,17 @@ window.tryOpenExcelWorkbook = tryOpenExcelWorkbook;
 window.generateQrBatch = generateQrBatch;
 window.viewQrPool = viewQrPool;
 window.updateQrPoolStatus = updateQrPoolStatus;
+window.printUnassignedLabels = printUnassignedLabels;
 
 // Label printing
+function printUnassignedLabels() {
+    if (window.LabelPrintService) {
+        LabelPrintService.printUnassigned();
+    } else {
+        NotificationSystem.error('Label print service not available');
+    }
+}
+
 function printAssignedLabels() {
     if (window.LabelPrintService) {
         LabelPrintService.printNewAssignments();

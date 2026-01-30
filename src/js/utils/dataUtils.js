@@ -92,15 +92,41 @@ window.DataUtils = {
     },
     
     // Load Excel data from localStorage if available
+    // CRITICAL FIX: Better handling of corrupted JSON data
     loadSavedExcelData: function() {
         try {
             const savedData = localStorage.getItem(this.STORAGE_KEYS.EXCEL_DATA);
             const savedMetadata = localStorage.getItem(this.STORAGE_KEYS.EXCEL_METADATA);
-            
+
             if (savedData && savedMetadata) {
-                const data = JSON.parse(savedData);
-                const metadata = JSON.parse(savedMetadata);
-                
+                let data, metadata;
+
+                // Parse data with validation
+                try {
+                    data = JSON.parse(savedData);
+                } catch (parseError) {
+                    console.error('Corrupted Excel data in localStorage, clearing...', parseError);
+                    localStorage.removeItem(this.STORAGE_KEYS.EXCEL_DATA);
+                    NotificationSystem.warning('Cached Excel data was corrupted and has been cleared. Please reload your Excel file.');
+                    return { success: false, reason: 'Corrupted data cleared', corrupted: true };
+                }
+
+                try {
+                    metadata = JSON.parse(savedMetadata);
+                } catch (parseError) {
+                    console.error('Corrupted Excel metadata in localStorage, clearing...', parseError);
+                    localStorage.removeItem(this.STORAGE_KEYS.EXCEL_METADATA);
+                    NotificationSystem.warning('Cached Excel metadata was corrupted. Please reload your Excel file.');
+                    return { success: false, reason: 'Corrupted metadata cleared', corrupted: true };
+                }
+
+                // Validate data structure before using
+                if (!data || typeof data !== 'object') {
+                    console.error('Invalid Excel data structure');
+                    localStorage.removeItem(this.STORAGE_KEYS.EXCEL_DATA);
+                    return { success: false, reason: 'Invalid data structure' };
+                }
+
                 // Restore data to appState
                 window.appState.strainsTable = data.strainsTable || {};
                 window.appState.ownersTable = data.ownersTable || {};
@@ -109,20 +135,20 @@ window.DataUtils = {
                 window.appState.mediaTypesTable = data.mediaTypesTable || {};
                 window.appState.strainOwnerMapping = data.strainOwnerMapping || {};
                 window.appState.isDataLoaded = true;
-                
+
                 console.log('=== EXCEL DATA LOADED FROM CACHE ===');
-                console.log(`File: ${metadata.fileName}`);
-                console.log(`Loaded: ${new Date(metadata.loadDate).toLocaleString()}`);
+                console.log(`File: ${metadata.fileName || 'Unknown'}`);
+                console.log(`Loaded: ${metadata.loadDate ? new Date(metadata.loadDate).toLocaleString() : 'Unknown'}`);
                 console.log(`Strains: ${Object.keys(window.appState.strainsTable).length}`);
                 console.log(`Owners: ${Object.keys(window.appState.ownersTable).length}`);
                 console.log(`Stages: ${Object.keys(window.appState.stagesTable).length}`);
-                
+
                 return {
                     success: true,
                     metadata: metadata
                 };
             }
-            
+
             return { success: false, reason: 'No saved data found' };
         } catch (error) {
             console.error('Error loading saved Excel data:', error);
@@ -193,22 +219,98 @@ window.DataUtils = {
             this.loadLocations(workbook.Sheets['Locations']);
             this.loadMediaTypes(workbook.Sheets['Media_Types']);
             this.loadStrainOwnerMapping(workbook.Sheets['Strain_Owner_Mapping'] || workbook.Sheets['Strain-Owner']);
-            
+
+            // Load strain abbreviations if available (for flexible input resolution)
+            this.loadStrainAbbreviations(workbook.Sheets['Ref_Strains'] || workbook.Sheets['Strains']);
+            // Load owner alternates if available
+            this.loadOwnerAlternates(workbook.Sheets['Ref_Owners'] || workbook.Sheets['Owners']);
+
             window.appState.isDataLoaded = true;
-            
+
             // Save to localStorage for future use
             this.saveExcelData(fileName);
-            
+
             console.log('=== EXCEL DATA LOADED ===');
             console.log(`Strains: ${Object.keys(window.appState.strainsTable).length}`);
             console.log(`Owners: ${Object.keys(window.appState.ownersTable).length}`);
             console.log(`Stages: ${Object.keys(window.appState.stagesTable).length}`);
             console.log(`Strain-Owner Mappings: ${Object.keys(window.appState.strainOwnerMapping || {}).length}`);
-            
+
+            // Rebuild InventoryLookupService with new data
+            if (window.InventoryLookupService && window.InventoryLookupService.isInitialized()) {
+                window.InventoryLookupService.rebuild();
+                console.log('🔍 InventoryLookupService rebuilt with new Excel data');
+            } else if (window.InventoryLookupService) {
+                window.InventoryLookupService.initialize();
+                console.log('🔍 InventoryLookupService initialized with Excel data');
+            }
+
             return true;
         } catch (error) {
             console.error('Error processing Excel data:', error);
             return false;
+        }
+    },
+
+    // Load strain abbreviations for flexible input resolution
+    loadStrainAbbreviations: function(sheet) {
+        if (!sheet) return;
+        try {
+            const data = XLSX.utils.sheet_to_json(sheet);
+            const abbreviations = {};
+
+            data.forEach(row => {
+                // Try different column name variations
+                const strainId = row['Strain ID'] || row['Strain_ID'] || row['StrainID'];
+                const abbreviation = row['ABR'] || row['Abbreviation'] || row['Abbr'];
+
+                if (strainId && abbreviation) {
+                    abbreviations[String(strainId)] = String(abbreviation);
+                }
+            });
+
+            // Load into InventoryLookupService if available
+            if (window.InventoryLookupService && Object.keys(abbreviations).length > 0) {
+                window.InventoryLookupService.loadAbbreviationData({
+                    strainAbbreviations: abbreviations
+                });
+                console.log(`Loaded ${Object.keys(abbreviations).length} strain abbreviations`);
+            }
+        } catch (error) {
+            console.warn('Could not load strain abbreviations:', error.message);
+        }
+    },
+
+    // Load owner alternate names for flexible input resolution
+    loadOwnerAlternates: function(sheet) {
+        if (!sheet) return;
+        try {
+            const data = XLSX.utils.sheet_to_json(sheet);
+            const alternates = {};
+
+            data.forEach(row => {
+                // Try different column name variations
+                const ownerCode = row['Owner ID'] || row['Owner_ID'] || row['OwnerID'] || row['Owner Code'];
+                const alt1 = row['Alternate_names'] || row['Alt1'] || row['Alternate1'];
+                const alt2 = row['Alt2'] || row['Alternate2'];
+
+                if (ownerCode) {
+                    const altList = [alt1, alt2].filter(Boolean);
+                    if (altList.length > 0) {
+                        alternates[String(ownerCode)] = altList;
+                    }
+                }
+            });
+
+            // Load into InventoryLookupService if available
+            if (window.InventoryLookupService && Object.keys(alternates).length > 0) {
+                window.InventoryLookupService.loadAbbreviationData({
+                    ownerAlternates: alternates
+                });
+                console.log(`Loaded ${Object.keys(alternates).length} owner alternate names`);
+            }
+        } catch (error) {
+            console.warn('Could not load owner alternates:', error.message);
         }
     },
     

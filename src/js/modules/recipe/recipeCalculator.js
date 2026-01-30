@@ -595,6 +595,7 @@ window.RecipeCalculator = (function() {
 
     /**
      * Validates a complete recipe
+     * Includes validation against HQ workbook reference data when available
      */
     function validateRecipe(recipe) {
         const errors = [];
@@ -607,13 +608,65 @@ window.RecipeCalculator = (function() {
 
         if (!recipe.mediaType) {
             errors.push('Media type is required');
+        } else {
+            // Validate media type against HQ workbook
+            const validMediaTypes = ['Initiation', 'Multiplication', 'Rooting', 'I', 'M', 'R'];
+            if (!validMediaTypes.includes(recipe.mediaType)) {
+                // Check against InventoryLookupService if available
+                if (window.InventoryLookupService && window.InventoryLookupService.isInitialized()) {
+                    const mediaData = window.InventoryLookupService.resolveMediaType(recipe.mediaType);
+                    if (!mediaData) {
+                        warnings.push(`Media type "${recipe.mediaType}" not found in HQ workbook reference data`);
+                    }
+                }
+            }
         }
 
         if (!recipe.volume) {
             errors.push('Volume is required');
+        } else {
+            // Validate volume is one of the standard options
+            const validVolumes = ['500mL', '1L', '2L'];
+            if (!validVolumes.includes(recipe.volume)) {
+                warnings.push(`Non-standard volume "${recipe.volume}" - recommended: 500mL, 1L, or 2L`);
+            }
         }
 
-        // Validate amounts
+        // Validate basal salt
+        if (recipe.basalSalt) {
+            if (!recipe.basalSalt.type) {
+                errors.push('Basal salt type is required');
+            }
+            if (!recipe.basalSalt.amount || recipe.basalSalt.amount <= 0) {
+                errors.push('Basal salt amount must be greater than 0');
+            }
+        } else {
+            errors.push('Basal salt information is required');
+        }
+
+        // Validate gelling agent
+        if (recipe.gellingAgent) {
+            if (!recipe.gellingAgent.type) {
+                errors.push('Gelling agent type is required');
+            }
+            if (!recipe.gellingAgent.amount || recipe.gellingAgent.amount <= 0) {
+                errors.push('Gelling agent amount must be greater than 0');
+            }
+        } else {
+            errors.push('Gelling agent information is required');
+        }
+
+        // Validate pre-autoclave ingredients
+        if (recipe.preAutoclave) {
+            if (recipe.preAutoclave.sucrose < 0) {
+                errors.push('Sucrose amount cannot be negative');
+            }
+            if (recipe.preAutoclave.sucrose === 0) {
+                warnings.push('Sucrose amount is 0 - is this intentional?');
+            }
+        }
+
+        // Validate pH
         if (recipe.pH) {
             if (recipe.pH < 5.0 || recipe.pH > 7.0) {
                 errors.push('pH must be between 5.0 and 7.0');
@@ -624,15 +677,27 @@ window.RecipeCalculator = (function() {
 
         // Validate autoclave conditions
         if (recipe.autoclaveConditions) {
-            if (recipe.autoclaveConditions.temperature < 115 || 
+            if (recipe.autoclaveConditions.temperature < 115 ||
                 recipe.autoclaveConditions.temperature > 125) {
                 errors.push('Autoclave temperature must be between 115°C and 125°C');
             }
 
-            if (recipe.autoclaveConditions.time < 15 || 
+            if (recipe.autoclaveConditions.time < 15 ||
                 recipe.autoclaveConditions.time > 30) {
                 errors.push('Autoclave time must be between 15 and 30 minutes');
             }
+        }
+
+        // Validate post-autoclave additions
+        if (recipe.postAutoclave && Array.isArray(recipe.postAutoclave)) {
+            recipe.postAutoclave.forEach((item, index) => {
+                if (!item.name) {
+                    errors.push(`Post-autoclave item ${index + 1} is missing a name`);
+                }
+                if (item.amount < 0) {
+                    errors.push(`Post-autoclave item "${item.name}" has negative amount`);
+                }
+            });
         }
 
         return {

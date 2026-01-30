@@ -75,8 +75,16 @@ window.TransferProcessor = (function() {
      * Execute the transfer: create new containers, handle discards, assign QR codes, build lineage.
      */
     function executeTransfer(sourceContainer, splitCount, discardCount, discardReason) {
-        const samples = sourceContainer.data.samples;
-        const totalTissues = sourceContainer.data.totalSamples;
+        // CRITICAL FIX: Add null check for samples array to prevent runtime crash
+        const samples = sourceContainer.data?.samples;
+        if (!samples || !Array.isArray(samples) || samples.length === 0) {
+            return {
+                success: false,
+                message: 'Source container has no valid samples to transfer'
+            };
+        }
+
+        const totalTissues = sourceContainer.data.totalSamples || samples.reduce((sum, s) => sum + (s.tissueCount || 1), 0);
         const transferableTissues = totalTissues - discardCount;
 
         // Get updated plant data
@@ -132,19 +140,32 @@ window.TransferProcessor = (function() {
             }
 
             // Auto-assign QR code from pool
+            // CRITICAL FIX: Report failures instead of silent skip
             if (window.QRCodeService) {
-                const qrEntry = QRCodeService.assignNextToContainer(containerId);
-                if (qrEntry) {
-                    newSample.qrExcelRow = qrEntry.excelRow;
-                    newSample.qrExcelUrl = qrEntry.excelUrl;
-                    newSample.qrDataUrl = qrEntry.dataUrl;
-                    // Use pre-populated Container_ID if available
-                    if (qrEntry.containerId) {
-                        newSample.containerId = qrEntry.containerId;
-                        newContainerIds[i] = qrEntry.containerId;
-                        // Update lineage with the actual container ID
-                        newSample.containerLineage = parentLineage + ' → ' + qrEntry.containerId;
+                try {
+                    const qrEntry = QRCodeService.assignNextToContainer(containerId);
+                    if (qrEntry) {
+                        newSample.qrExcelRow = qrEntry.excelRow;
+                        newSample.qrExcelUrl = qrEntry.excelUrl;
+                        newSample.qrDataUrl = qrEntry.dataUrl;
+                        // Use pre-populated Container_ID if available
+                        if (qrEntry.containerId) {
+                            newSample.containerId = qrEntry.containerId;
+                            newContainerIds[i] = qrEntry.containerId;
+                            // Update lineage with the actual container ID
+                            newSample.containerLineage = parentLineage + ' → ' + qrEntry.containerId;
+                        }
+                    } else {
+                        // Log warning when no QR codes available
+                        console.warn(`No QR code available for container ${containerId}`);
+                        if (i === 0) {
+                            // Only warn once per transfer operation
+                            NotificationSystem.warning('No QR codes available in pool. Containers created without QR labels.');
+                        }
                     }
+                } catch (qrError) {
+                    console.error(`Failed to assign QR code to container ${containerId}:`, qrError);
+                    NotificationSystem.warning(`QR code assignment failed for container ${containerId}`);
                 }
             }
 
@@ -196,31 +217,59 @@ window.TransferProcessor = (function() {
         };
     }
 
-    // Generate new container IDs
+    // Lock to prevent concurrent ID generation race conditions
+    let idGenerationLock = false;
+
+    // Generate new container IDs with race condition protection
     function generateNewContainerIds(count) {
-        const newIds = [];
-        let highestId = StateManager.getState('highestContainerId') || 0;
-        const currentInventory = StateManager.getState('inventory') || [];
-
-        for (let i = 0; i < count; i++) {
-            let candidateId;
-            let attempts = 0;
-
-            do {
-                highestId++;
-                candidateId = highestId;
-                attempts++;
-                if (attempts > 1000) {
-                    throw new Error('Unable to generate unique container ID after 1000 attempts');
-                }
-            } while (currentInventory.some(entry => parseInt(entry.containerId) === candidateId));
-
-            newIds.push(candidateId);
+        // CRITICAL FIX: Prevent race condition when multiple transfers happen simultaneously
+        if (idGenerationLock) {
+            throw new Error('Container ID generation in progress. Please wait and try again.');
         }
 
-        StateManager.setState('highestContainerId', highestId);
-        console.log('Generated new container IDs:', newIds);
-        return newIds;
+        idGenerationLock = true;
+
+        try {
+            const newIds = [];
+            // Re-read highest ID at the start to get fresh value
+            let highestId = StateManager.getState('highestContainerId') || 0;
+            const currentInventory = StateManager.getState('inventory') || [];
+
+            // Also scan inventory for any IDs higher than tracked
+            currentInventory.forEach(entry => {
+                const entryId = parseInt(entry.containerId);
+                if (!isNaN(entryId) && entryId > highestId) {
+                    highestId = entryId;
+                }
+            });
+
+            for (let i = 0; i < count; i++) {
+                let candidateId;
+                let attempts = 0;
+
+                do {
+                    highestId++;
+                    candidateId = highestId;
+                    attempts++;
+                    if (attempts > 1000) {
+                        throw new Error('Unable to generate unique container ID after 1000 attempts');
+                    }
+                } while (
+                    currentInventory.some(entry => parseInt(entry.containerId) === candidateId) ||
+                    newIds.includes(candidateId)  // Also check against IDs we just generated
+                );
+
+                newIds.push(candidateId);
+            }
+
+            // Update state atomically
+            StateManager.setState('highestContainerId', highestId);
+            console.log('Generated new container IDs:', newIds);
+            return newIds;
+        } finally {
+            // Always release lock
+            idGenerationLock = false;
+        }
     }
 
     // Update inventory after transfer
@@ -254,9 +303,14 @@ window.TransferProcessor = (function() {
             UIUtils.rebuildInventoryTable();
         }
 
-        // Save to localStorage
-        if (window.InventoryManager && typeof window.InventoryManager.saveToLocalStorage === 'function') {
-            window.InventoryManager.saveToLocalStorage();
+        // CRITICAL FIX: Save to localStorage with error handling
+        try {
+            if (window.InventoryManager && typeof window.InventoryManager.saveToLocalStorage === 'function') {
+                window.InventoryManager.saveToLocalStorage();
+            }
+        } catch (saveError) {
+            console.error('Failed to save transfer to localStorage:', saveError);
+            NotificationSystem.warning('Transfer completed but may not be saved. Please export your data.');
         }
 
         console.log(`Inventory updated: ${transferResult.sourceContainerId} → ${transferResult.destinationContainers.join(', ')}${transferResult.samplesDiscarded ? `, ${transferResult.samplesDiscarded} discarded` : ''}`);

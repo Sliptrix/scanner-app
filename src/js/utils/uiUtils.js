@@ -2,6 +2,46 @@
 // Lab Barcode Builder & Transfer System
 
 window.UIUtils = {
+    /**
+     * Sanitize a string to prevent XSS attacks
+     * CRITICAL FIX: Use this before inserting user data into innerHTML
+     * @param {string} str - The string to sanitize
+     * @returns {string} - Sanitized string safe for innerHTML
+     */
+    sanitize: function(str) {
+        if (str === null || str === undefined) {
+            return '';
+        }
+        const div = document.createElement('div');
+        div.textContent = String(str);
+        return div.innerHTML;
+    },
+
+    /**
+     * Sanitize an object's string values for safe HTML display
+     * @param {Object} obj - Object with string values to sanitize
+     * @returns {Object} - New object with sanitized values
+     */
+    sanitizeObject: function(obj) {
+        if (!obj || typeof obj !== 'object') {
+            return obj;
+        }
+        const sanitized = {};
+        for (const key in obj) {
+            if (Object.prototype.hasOwnProperty.call(obj, key)) {
+                const value = obj[key];
+                if (typeof value === 'string') {
+                    sanitized[key] = this.sanitize(value);
+                } else if (typeof value === 'object' && value !== null) {
+                    sanitized[key] = this.sanitizeObject(value);
+                } else {
+                    sanitized[key] = value;
+                }
+            }
+        }
+        return sanitized;
+    },
+
     // Mode switching functionality
     switchMode: function(mode) {
         console.log('🔄 SWITCHING MODE:', window.appState.mode, '→', mode);

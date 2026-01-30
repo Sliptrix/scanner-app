@@ -16,7 +16,7 @@ window.BuilderStepManager = {
                 prompt: 'Enter the Tissue Count:',
                 hint: 'How many tissue samples? (1-99)',
                 placeholder: 'e.g., 15',
-                validation: /^\d{1,2}$/,
+                validation: /^([1-9]|[1-9]\d)$/,  // Fixed: Only allows 1-99, not 0 or 00
                 options: 'tissue_counts'
             },
             date: {

@@ -1,6 +1,6 @@
 // Label Print Service - Zebra GX420T ZPL Label Printing
-// Generates ZPL for 2"W x 1"H stickers with 2 QR codes per label
-// Each QR code has its Container ID printed underneath
+// Generates ZPL for 2"W x 1"H stickers with 1 QR code per label
+// QR code on the left, Container ID text on the right
 
 window.LabelPrintService = (function() {
     'use strict';
@@ -10,26 +10,26 @@ window.LabelPrintService = (function() {
         dpi: 203,
         labelWidthDots: 406,   // 2" x 203
         labelHeightDots: 203,  // 1" x 203
-        qrSize: 4,             // ZPL QR magnification (4 = ~0.6" at 203dpi)
+        qrSize: 3,             // ZPL QR magnification (3 = ~0.45" at 203dpi, keeps clear gap from text)
         fontSize: 20,          // Font size in dots for container ID text
         backendUrl: 'http://localhost:3001'
     };
 
-    // Build ZPL for a label with 2 QR codes side by side
-    // Each QR encodes the container's QR URL, with Container ID text below
-    function buildZPL(container1, container2) {
-        const qr1Text = container1.qrUrl || container1.containerId.toString();
-        const qr1Label = String(container1.containerId);
-        const qr2Text = container2 ? (container2.qrUrl || container2.containerId.toString()) : null;
-        const qr2Label = container2 ? String(container2.containerId) : null;
+    // Build ZPL for a single label: QR code on the left, Container ID on the right
+    function buildZPL(container) {
+        const qrText = container.qrUrl || container.containerId.toString();
+        const labelText = String(container.containerId);
 
-        // Layout: two QR codes centered in each half of the 2" label
-        // Left QR: x=30, Right QR: x=220
-        // QR codes at y=10, text at y=150
-        const leftX = 30;
-        const rightX = 220;
-        const qrY = 10;
-        const textY = 150;
+        // Layout: QR on left side, Container ID vertically centered on right
+        // QR at mag 3 is ~130 dots wide max. Starting at x=15, right edge ≤ ~145 dots.
+        // Text starts at x=165, leaving a 20-dot (~0.1") gap to avoid overlap.
+        const qrX = 15;
+        const qrY = 15;
+        const textX = 165;
+        const textFontH = 45;  // ~0.22" tall - clearly readable
+        const textFontW = 35;
+        // Center text vertically: (labelHeight - fontHeight) / 2
+        const textY = Math.round((config.labelHeightDots - textFontH) / 2);
 
         let zpl = '^XA\n';
         // Label size
@@ -38,33 +38,21 @@ window.LabelPrintService = (function() {
         // Print speed (2 = slow/quality)
         zpl += '^PR2,2\n';
 
-        // Left QR code
-        zpl += `^FO${leftX},${qrY}\n`;
+        // QR code on the left
+        zpl += `^FO${qrX},${qrY}\n`;
         zpl += `^BQN,2,${config.qrSize}\n`;
-        zpl += `^FDMA,${qr1Text}^FS\n`;
+        zpl += `^FDMA,${qrText}^FS\n`;
 
-        // Left label text (centered under QR)
-        zpl += `^FO${leftX},${textY}\n`;
-        zpl += `^A0N,${config.fontSize},${config.fontSize}\n`;
-        zpl += `^FD${qr1Label}^FS\n`;
-
-        // Right QR code (only if second container provided)
-        if (qr2Text) {
-            zpl += `^FO${rightX},${qrY}\n`;
-            zpl += `^BQN,2,${config.qrSize}\n`;
-            zpl += `^FDMA,${qr2Text}^FS\n`;
-
-            // Right label text
-            zpl += `^FO${rightX},${textY}\n`;
-            zpl += `^A0N,${config.fontSize},${config.fontSize}\n`;
-            zpl += `^FD${qr2Label}^FS\n`;
-        }
+        // Container ID text on the right - large, bold, vertically centered
+        zpl += `^FO${textX},${textY}\n`;
+        zpl += `^A0N,${textFontH},${textFontW}\n`;
+        zpl += `^FD${labelText}^FS\n`;
 
         zpl += '^XZ\n';
         return zpl;
     }
 
-    // Print labels for an array of containers (paired 2 per label)
+    // Print labels for an array of containers (1 per label)
     // Each container: { containerId, qrUrl }
     async function printLabels(containers) {
         if (!containers || containers.length === 0) {
@@ -72,12 +60,8 @@ window.LabelPrintService = (function() {
             return false;
         }
 
-        // Pair containers (2 per label)
-        const labels = [];
-        for (let i = 0; i < containers.length; i += 2) {
-            labels.push(buildZPL(containers[i], containers[i + 1] || null));
-        }
-
+        // One label per container
+        const labels = containers.map(c => buildZPL(c));
         const fullZPL = labels.join('');
 
         // Try backend print endpoint first
@@ -121,6 +105,22 @@ window.LabelPrintService = (function() {
                 qrUrl: poolEntry ? poolEntry.excelUrl : String(id)
             });
         });
+
+        return printLabels(containers);
+    }
+
+    // Print all unassigned QR codes from the pool (pre-print before container assignment)
+    async function printUnassigned() {
+        const pool = window.QRCodeService ? QRCodeService.getUnassigned() : [];
+        if (pool.length === 0) {
+            NotificationSystem.info('No unassigned QR codes to print');
+            return false;
+        }
+
+        const containers = pool.map(entry => ({
+            containerId: entry.containerId || `Row ${entry.excelRow}`,
+            qrUrl: entry.excelUrl || String(entry.containerId)
+        }));
 
         return printLabels(containers);
     }
@@ -204,6 +204,7 @@ window.LabelPrintService = (function() {
         buildZPL,
         printLabels,
         printFromPool,
+        printUnassigned,
         printNewAssignments,
         copyZPL,
         downloadZPL,

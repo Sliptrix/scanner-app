@@ -80,10 +80,23 @@ window.BuilderBarcodeGenerator = {
     },
     
     // Fallback basic barcode generation
+    // CRITICAL FIX: Only use fields that are actually passed (stage, tissue, date)
     generateBasicBarcode: function(fields) {
-        const compositeString = fields.owner + fields.strain + fields.media + 
-                               fields.stage + fields.tissue + fields.date;
-        
+        // Build composite string only from available fields
+        const parts = [];
+        if (fields.stage) parts.push(fields.stage);
+        if (fields.tissue) parts.push(String(fields.tissue).padStart(2, '0'));
+        if (fields.date) parts.push(fields.date);
+
+        const compositeString = parts.join('');
+
+        if (!compositeString) {
+            return {
+                success: false,
+                error: 'No valid fields provided for barcode generation'
+            };
+        }
+
         return {
             success: true,
             type: 'BASIC',
@@ -101,18 +114,21 @@ window.BuilderBarcodeGenerator = {
         // Create enhanced barcode display (text-only; image/SVG generation removed)
         const barcodeDisplay = document.getElementById('barcodeDisplay');
         if (barcodeDisplay && barcodeResult.success) {
+            // SECURITY FIX: Sanitize user-derived data before innerHTML
+            const safeType = UIUtils.sanitize(barcodeResult.type);
+            const safeData = UIUtils.sanitize(barcodeResult.data);
             const displayHtml = `
                 <div class="barcode-visual-container">
-                    <div class="barcode-type-badge">${barcodeResult.type}</div>
+                    <div class="barcode-type-badge">${safeType}</div>
                     <div class="barcode-data-display">
-                        <div class="barcode-string">${barcodeResult.data}</div>
+                        <div class="barcode-string">${safeData}</div>
                     </div>
                     <div class="barcode-metadata">
                         <small>Generated: ${new Date(barcodeResult.timestamp).toLocaleString()}</small>
                     </div>
                 </div>
             `;
-            
+
             barcodeDisplay.innerHTML = displayHtml;
         }
         
@@ -465,19 +481,21 @@ window.BuilderBarcodeGenerator = {
                 </span>`;
             }
             
+            // SECURITY FIX: Sanitize all user data before innerHTML
+            const s = UIUtils.sanitize;
             row.innerHTML = `
-                <td style="font-family: monospace; font-weight: bold;">${entry.containerId}</td>
+                <td style="font-family: monospace; font-weight: bold;">${s(entry.containerId)}</td>
                 <td>${lineageDisplay}</td>
-                <td style="font-family: monospace; font-size: 0.8rem; max-width: 120px; overflow: hidden; text-overflow: ellipsis;" title="${entry.sampleBarcode}">${entry.sampleBarcode}</td>
-                <td style="font-weight: 600;" title="${entry.strain} (ID: ${entry.strainId})">${entry.strain}</td>
-                <td title="${entry.owner} (${entry.ownerId})">${entry.owner}</td>
-                <td title="${entry.stage} (${entry.stageId})">${entry.stage}</td>
-                <td title="${entry.mediaType} (${entry.mediaId})">${entry.mediaType}</td>
-                <td style="text-align: center;">${entry.tissueCount}</td>
-                <td style="font-size: 0.8rem;">${entry.date}</td>
-                <td><span style="padding: 2px 6px; border-radius: 3px; font-size: 0.7rem; font-weight: bold; 
+                <td style="font-family: monospace; font-size: 0.8rem; max-width: 120px; overflow: hidden; text-overflow: ellipsis;" title="${s(entry.sampleBarcode)}">${s(entry.sampleBarcode)}</td>
+                <td style="font-weight: 600;" title="${s(entry.strain)} (ID: ${s(entry.strainId)})">${s(entry.strain)}</td>
+                <td title="${s(entry.owner)} (${s(entry.ownerId)})">${s(entry.owner)}</td>
+                <td title="${s(entry.stage)} (${s(entry.stageId)})">${s(entry.stage)}</td>
+                <td title="${s(entry.mediaType)} (${s(entry.mediaId)})">${s(entry.mediaType)}</td>
+                <td style="text-align: center;">${s(entry.tissueCount)}</td>
+                <td style="font-size: 0.8rem;">${s(entry.date)}</td>
+                <td><span style="padding: 2px 6px; border-radius: 3px; font-size: 0.7rem; font-weight: bold;
                      background: ${statusColor}; color: ${statusTextColor};">
-                     ${entry.status}</span></td>
+                     ${s(entry.status)}</span></td>
             `;
         });
     },
