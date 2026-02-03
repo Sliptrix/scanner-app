@@ -193,22 +193,9 @@ window.InventoryLookupService = (function() {
             });
         });
 
-        // Also check strainOwnerMapping for owner codes that might not be in ownersTable
-        const strainOwnerMapping = window.appState.strainOwnerMapping || {};
-        const ownerCodes = new Set(Object.values(strainOwnerMapping));
-
-        ownerCodes.forEach(code => {
-            const normalizedCode = String(code).toLowerCase();
-            if (!ownerMap.has(normalizedCode)) {
-                // Add owner with code as both code and name
-                const ownerData = {
-                    code: String(code),
-                    name: String(code),
-                    alternates: []
-                };
-                ownerMap.set(normalizedCode, ownerData);
-            }
-        });
+        // NOTE: Previously added owners from strainOwnerMapping, but this caused
+        // phantom owners to appear that weren't in Ref_Owners. Now we only use
+        // owners from ownersTable (Ref_Owners sheet) as the source of truth.
     }
 
     /**
@@ -688,11 +675,104 @@ window.InventoryLookupService = (function() {
      */
     function getAllStrains() {
         const strainsTable = window.appState.strainsTable || {};
+        const strainOwners = window.appState.strainOwners || {};
         return Object.entries(strainsTable).map(([id, name]) => ({
             id: id,
             name: typeof name === 'object' ? name.name : String(name),
-            abbreviation: strainAbbreviations[id] || null
+            abbreviation: strainAbbreviations[id] || null,
+            owners: strainOwners[id] || []
         }));
+    }
+
+    /**
+     * Get strains filtered by owner code or name
+     * @param {string} ownerInput - Owner code or name to filter by (case-insensitive)
+     * @returns {Array} Array of strain objects belonging to the owner
+     */
+    function getStrainsByOwner(ownerInput) {
+        if (!ownerInput) return getAllStrains();
+
+        const strainsTable = window.appState.strainsTable || {};
+        const strainOwners = window.appState.strainOwners || {};
+
+        // Resolve owner input to get both code and name for matching
+        // The strainOwners might contain owner NAMES (like "Vibe") not codes (like "V")
+        const ownerData = resolveOwner(ownerInput);
+        const matchValues = [];
+
+        if (ownerData) {
+            // Add both code and name for matching
+            if (ownerData.code) matchValues.push(ownerData.code.toLowerCase().trim());
+            if (ownerData.name) matchValues.push(ownerData.name.toLowerCase().trim());
+            // Also add alternates
+            if (ownerData.alternates) {
+                ownerData.alternates.forEach(alt => {
+                    if (alt) matchValues.push(alt.toLowerCase().trim());
+                });
+            }
+        } else {
+            // Fallback: just use the input as-is
+            matchValues.push(String(ownerInput).toLowerCase().trim());
+        }
+
+        console.log(`getStrainsByOwner: Filtering for owner "${ownerInput}", matching against:`, matchValues);
+
+        const results = [];
+
+        Object.entries(strainsTable).forEach(([id, name]) => {
+            const owners = strainOwners[id] || [];
+            // Check if any of the strain's owners match any of our match values
+            const belongsToOwner = owners.some(o => {
+                const ownerLower = String(o).toLowerCase().trim();
+                return matchValues.includes(ownerLower);
+            });
+
+            if (belongsToOwner) {
+                results.push({
+                    id: id,
+                    name: typeof name === 'object' ? name.name : String(name),
+                    abbreviation: strainAbbreviations[id] || null,
+                    owners: owners
+                });
+            }
+        });
+
+        console.log(`getStrainsByOwner: Found ${results.length} strains for owner "${ownerInput}"`);
+        return results;
+    }
+
+    /**
+     * Check if a strain belongs to a specific owner
+     * @param {string} strainId - Strain ID
+     * @param {string} ownerInput - Owner code or name
+     * @returns {boolean} True if strain belongs to owner
+     */
+    function strainBelongsToOwner(strainId, ownerInput) {
+        if (!strainId || !ownerInput) return false;
+
+        const strainOwners = window.appState.strainOwners || {};
+        const owners = strainOwners[String(strainId)] || [];
+
+        // Resolve owner input to get both code and name for matching
+        const ownerData = resolveOwner(ownerInput);
+        const matchValues = [];
+
+        if (ownerData) {
+            if (ownerData.code) matchValues.push(ownerData.code.toLowerCase().trim());
+            if (ownerData.name) matchValues.push(ownerData.name.toLowerCase().trim());
+            if (ownerData.alternates) {
+                ownerData.alternates.forEach(alt => {
+                    if (alt) matchValues.push(alt.toLowerCase().trim());
+                });
+            }
+        } else {
+            matchValues.push(String(ownerInput).toLowerCase().trim());
+        }
+
+        return owners.some(o => {
+            const ownerLower = String(o).toLowerCase().trim();
+            return matchValues.includes(ownerLower);
+        });
     }
 
     /**
@@ -816,7 +896,11 @@ window.InventoryLookupService = (function() {
         getAllOwners: getAllOwners,
         getAllStages: getAllStages,
         getAllMediaTypes: getAllMediaTypes,
-        getAllLocations: getAllLocations
+        getAllLocations: getAllLocations,
+
+        // Strain-owner relationships
+        getStrainsByOwner: getStrainsByOwner,
+        strainBelongsToOwner: strainBelongsToOwner
     };
 })();
 

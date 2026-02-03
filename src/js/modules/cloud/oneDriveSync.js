@@ -880,12 +880,27 @@ window.OneDriveSync = {
                 window.appState.strainAbbreviations = {};
             }
 
+            // Initialize strain-owner mappings (strain ID → array of owner codes)
+            if (!window.appState.strainOwners) {
+                window.appState.strainOwners = {};
+            }
+            // Clear existing strain-owner mappings for fresh cloud sync
+            window.appState.strainOwners = {};
+
+            // Log the first row's column names to help debug
+            if (rows.length > 0) {
+                console.log('OneDriveSync: Ref_Strains column names:', Object.keys(rows[0]));
+            }
+
             let count = 0;
+            let ownerMappingsCount = 0;
             rows.forEach(row => {
-                // Expanded column matching for strain ID, name, and abbreviation
+                // Expanded column matching for strain ID, name, abbreviation, and owner
                 const id = getField(row, ['strain_id', 'strainid', 'strain id', 'id', 'strain-id', 'variety_id', 'varietyid', 'cultivar_id', 'genetic_id', '#', 'no', 'number']);
                 const name = getField(row, ['strain_name', 'strain name', 'strainname', 'strain', 'name', 'variety', 'cultivar', 'genetic', 'variety_name', 'cultivar_name']);
                 const abbreviation = getField(row, ['abr', 'abbr', 'abbreviation', 'code', 'short_name', 'shortname', 'short']);
+                // Expanded owner column matching - include variations with spaces, underscores, and different cases
+                const ownerCode = getField(row, ['owner_code', 'ownercode', 'owner code', 'owner', 'owner_id', 'ownerid', 'owner id', 'owners', 'owned_by', 'ownedby']);
 
                 if (id !== undefined && id !== null && id !== '') {
                     const strainId = String(id).trim();
@@ -902,11 +917,29 @@ window.OneDriveSync = {
                     if (strainAbbr) {
                         window.appState.strainAbbreviations[strainId] = strainAbbr;
                     }
+
+                    // Store strain-owner mapping (handles comma-separated owners)
+                    if (ownerCode !== undefined && ownerCode !== null && ownerCode !== '') {
+                        const ownerStr = String(ownerCode).trim();
+                        // Split by comma to handle multiple owners (e.g., "LW, JR")
+                        const owners = ownerStr.split(',').map(o => o.trim()).filter(o => o.length > 0);
+                        window.appState.strainOwners[strainId] = owners;
+                        ownerMappingsCount++;
+                    }
                 }
             });
 
             console.log(`OneDriveSync: Added ${count} strains from ${strainsSheetName} sheet`);
             console.log(`OneDriveSync: Loaded ${Object.keys(window.appState.strainAbbreviations).length} strain abbreviations`);
+            console.log(`OneDriveSync: Loaded ${ownerMappingsCount} strain-owner mappings`);
+
+            // Log sample of strain-owner mappings for debugging
+            const sampleMappings = Object.entries(window.appState.strainOwners).slice(0, 5);
+            if (sampleMappings.length > 0) {
+                console.log('OneDriveSync: Sample strain-owner mappings:', sampleMappings);
+            } else {
+                console.warn('OneDriveSync: WARNING - No strain-owner mappings found! Check if Owner column exists in Ref_Strains');
+            }
         } else {
             console.log('OneDriveSync: No dedicated Strains reference sheet found');
         }
@@ -1132,6 +1165,14 @@ window.OneDriveSync = {
         console.log('Adding to strainsTable - current count:', Object.keys(strainsTable).length);
         let newStrainsCount = 0;
 
+        // Also build strain-owner mappings from inventory data
+        // This is the primary source since Ref_Strains may not have owner info
+        if (!window.appState.strainOwners) {
+            window.appState.strainOwners = {};
+        }
+        const strainOwners = window.appState.strainOwners;
+        let strainOwnerMappingsCount = 0;
+
         inventory.forEach(item => {
             // Get strain name (required)
             const strainValue = item.strain ? String(item.strain).trim() : '';
@@ -1185,10 +1226,36 @@ window.OneDriveSync = {
                     console.log(`OneDriveSync: Discovered strain by name: "${strainValue}"`);
                 }
             }
+
+            // Build strain-owner mapping from this inventory item
+            // Get the owner from the inventory item (could be owner code or name)
+            const ownerValue = item.owner || item.ownerId || item.ownerCode;
+            if (strainId && ownerValue) {
+                const ownerStr = String(ownerValue).trim();
+                if (ownerStr) {
+                    // Initialize the strain's owners array if needed
+                    if (!strainOwners[strainId]) {
+                        strainOwners[strainId] = [];
+                    }
+                    // Add owner if not already present (case-insensitive check)
+                    const ownerLower = ownerStr.toLowerCase();
+                    const alreadyHasOwner = strainOwners[strainId].some(
+                        o => o.toLowerCase() === ownerLower
+                    );
+                    if (!alreadyHasOwner) {
+                        strainOwners[strainId].push(ownerStr);
+                        strainOwnerMappingsCount++;
+                    }
+                }
+            }
         });
 
         // Update appState
         window.appState.strainsTable = strainsTable;
+        window.appState.strainOwners = strainOwners;
+
+        console.log(`OneDriveSync: Built ${strainOwnerMappingsCount} strain-owner mappings from inventory`);
+        console.log(`OneDriveSync: Strain-owner mappings sample:`, Object.entries(strainOwners).slice(0, 10));
         window.appState.isDataLoaded = true;
 
         console.log(`OneDriveSync: Strains table now has ${Object.keys(strainsTable).length} entries (${newStrainsCount} new from inventory)`);

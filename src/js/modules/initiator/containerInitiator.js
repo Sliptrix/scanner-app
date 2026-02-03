@@ -180,10 +180,12 @@ window.ContainerInitiator = (function() {
                 }
             });
 
-            // Add input event for autocomplete (strain lookup)
+            // Add input event for autocomplete (owner and strain lookup)
             initiatorInput.addEventListener('input', function(e) {
                 const currentStep = StateManager.getState('initiatorState.currentStep');
-                if (currentStep === 'strain') {
+                if (currentStep === 'owner') {
+                    showOwnerAutocomplete(e.target.value);
+                } else if (currentStep === 'strain') {
                     showStrainAutocomplete(e.target.value);
                 } else {
                     hideAutocomplete();
@@ -279,7 +281,84 @@ window.ContainerInitiator = (function() {
     }
 
     /**
+     * Show owner autocomplete suggestions
+     * @param {string} query - User input to filter owners
+     */
+    function showOwnerAutocomplete(query) {
+        const autocompleteEl = document.getElementById('strainAutocomplete');
+        if (!autocompleteEl) return;
+
+        if (!query || query.length < 1) {
+            hideAutocomplete();
+            return;
+        }
+
+        // Get all owners from lookup service
+        if (!window.InventoryLookupService || !window.InventoryLookupService.isInitialized()) {
+            hideAutocomplete();
+            return;
+        }
+
+        const allOwners = window.InventoryLookupService.getAllOwners();
+        if (!allOwners || allOwners.length === 0) {
+            hideAutocomplete();
+            return;
+        }
+
+        // Filter owners by query (match code, name, or alternates)
+        const queryLower = query.toLowerCase();
+        autocompleteResults = allOwners.filter(owner => {
+            const codeMatch = owner.code && owner.code.toLowerCase().includes(queryLower);
+            const nameMatch = owner.name && owner.name.toLowerCase().includes(queryLower);
+            // Also check alternate names
+            const alternatesMatch = owner.alternates && owner.alternates.some(alt =>
+                alt && alt.toLowerCase().includes(queryLower)
+            );
+            return codeMatch || nameMatch || alternatesMatch;
+        }).slice(0, 15); // Limit to 15 results
+
+        if (autocompleteResults.length === 0) {
+            hideAutocomplete();
+            return;
+        }
+
+        // Mark these as owner results for selectAutocompleteItem
+        autocompleteResults.forEach(r => r._type = 'owner');
+
+        // Render results
+        autocompleteEl.innerHTML = autocompleteResults.map((owner, index) => {
+            const isSelected = index === autocompleteSelectedIndex;
+            const alternates = owner.alternates && owner.alternates.length > 0
+                ? `Also known as: ${owner.alternates.join(', ')}`
+                : '';
+            return `
+                <div class="autocomplete-item ${isSelected ? 'selected' : ''}"
+                     data-index="${index}"
+                     style="padding: 10px 12px; cursor: pointer; border-bottom: 1px solid #eee; ${isSelected ? 'background: #e3f2fd;' : ''}">
+                    <div style="font-weight: 600; color: #333;">${owner.code} - ${owner.name}</div>
+                    <div style="font-size: 0.85em; color: #666;">${alternates || `Owner Code: ${owner.code}`}</div>
+                </div>
+            `;
+        }).join('');
+
+        // Add click handlers
+        autocompleteEl.querySelectorAll('.autocomplete-item').forEach(item => {
+            item.addEventListener('click', function() {
+                selectAutocompleteItem(parseInt(this.dataset.index));
+            });
+            item.addEventListener('mouseenter', function() {
+                autocompleteSelectedIndex = parseInt(this.dataset.index);
+                updateAutocompleteSelection();
+            });
+        });
+
+        autocompleteEl.style.display = 'block';
+        autocompleteSelectedIndex = -1;
+    }
+
+    /**
      * Show strain autocomplete suggestions
+     * Filters by selected owner if one is chosen
      * @param {string} query - User input to filter strains
      */
     function showStrainAutocomplete(query) {
@@ -297,9 +376,32 @@ window.ContainerInitiator = (function() {
             return;
         }
 
-        const allStrains = window.InventoryLookupService.getAllStrains();
+        // Get the selected owner to filter strains
+        const selectedOwner = StateManager.getState('initiatorState.owner');
+
+        // Get strains - filtered by owner if one is selected
+        let allStrains;
+        if (selectedOwner) {
+            // Get only strains belonging to the selected owner
+            allStrains = window.InventoryLookupService.getStrainsByOwner(selectedOwner);
+            console.log(`Filtering strains for owner ${selectedOwner}: found ${allStrains.length} strains`);
+        } else {
+            // No owner selected, show all strains
+            allStrains = window.InventoryLookupService.getAllStrains();
+        }
+
         if (!allStrains || allStrains.length === 0) {
-            hideAutocomplete();
+            // Show "no strains" message if owner has no strains
+            if (selectedOwner) {
+                autocompleteEl.innerHTML = `
+                    <div style="padding: 10px 12px; color: #666; font-style: italic;">
+                        No strains found for owner ${selectedOwner}
+                    </div>
+                `;
+                autocompleteEl.style.display = 'block';
+            } else {
+                hideAutocomplete();
+            }
             return;
         }
 
@@ -312,21 +414,34 @@ window.ContainerInitiator = (function() {
             return idMatch || nameMatch || abbrMatch;
         }).slice(0, 15); // Limit to 15 results
 
+        // Mark these as strain results for selectAutocompleteItem
+        autocompleteResults.forEach(r => r._type = 'strain');
+
         if (autocompleteResults.length === 0) {
-            hideAutocomplete();
+            // Show helpful message when no matches
+            autocompleteEl.innerHTML = `
+                <div style="padding: 10px 12px; color: #666; font-style: italic;">
+                    No matching strains found${selectedOwner ? ` for owner ${selectedOwner}` : ''}
+                </div>
+            `;
+            autocompleteEl.style.display = 'block';
             return;
         }
 
-        // Render results
+        // Render results with owner info
         autocompleteEl.innerHTML = autocompleteResults.map((strain, index) => {
             const abbr = strain.abbreviation ? `[${strain.abbreviation}]` : '';
+            const owners = strain.owners && strain.owners.length > 0 ? strain.owners.join(', ') : 'No owner';
             const isSelected = index === autocompleteSelectedIndex;
             return `
                 <div class="autocomplete-item ${isSelected ? 'selected' : ''}"
                      data-index="${index}"
                      style="padding: 10px 12px; cursor: pointer; border-bottom: 1px solid #eee; ${isSelected ? 'background: #e3f2fd;' : ''}">
                     <div style="font-weight: 600; color: #333;">#${strain.id} - ${strain.name}</div>
-                    <div style="font-size: 0.85em; color: #666;">${abbr || 'No abbreviation'}</div>
+                    <div style="font-size: 0.85em; color: #666;">
+                        ${abbr || 'No abbreviation'}
+                        <span style="color: #059669; margin-left: 8px;">Owner: ${owners}</span>
+                    </div>
                 </div>
             `;
         }).join('');
@@ -380,20 +495,30 @@ window.ContainerInitiator = (function() {
 
     /**
      * Select an autocomplete item and fill the input
+     * Handles both owner and strain selections based on item type
      * @param {number} index - Index of selected item
      */
     function selectAutocompleteItem(index) {
         if (index < 0 || index >= autocompleteResults.length) return;
 
-        const strain = autocompleteResults[index];
+        const item = autocompleteResults[index];
         const input = document.getElementById('initiatorInput');
-        if (input && strain) {
-            // Fill with the strain ID (or abbreviation if user prefers)
-            input.value = strain.id;
+        if (!input || !item) return;
+
+        // Check the type of result (owner or strain)
+        if (item._type === 'owner') {
+            // Owner selection
+            input.value = item.code;
+            hideAutocomplete();
+            showFeedback(`Selected owner: ${item.code} (${item.name})`, 'success');
+        } else {
+            // Strain selection (default)
+            input.value = item.id;
             hideAutocomplete();
             // Show feedback with full strain info
-            const abbr = strain.abbreviation ? ` [${strain.abbreviation}]` : '';
-            showFeedback(`Selected: #${strain.id} ${strain.name}${abbr}`, 'success');
+            const abbr = item.abbreviation ? ` [${item.abbreviation}]` : '';
+            const owners = item.owners && item.owners.length > 0 ? ` | Owners: ${item.owners.join(', ')}` : '';
+            showFeedback(`Selected: #${item.id} ${item.name}${abbr}${owners}`, 'success');
         }
     }
 
@@ -1250,11 +1375,11 @@ window.ContainerInitiator = (function() {
                 break;
             case 'owner':
                 prompt.textContent = 'Enter Owner ID:';
-                hint.textContent = 'Type the owner identifier (e.g., LW, JR)';
+                hint.textContent = 'Start typing to search owners by code or name';
                 break;
             case 'strain':
                 prompt.textContent = 'Enter Strain ID:';
-                hint.textContent = 'Type the strain number (e.g., 00001)';
+                hint.textContent = 'Start typing to search strains (filtered by selected owner)';
                 break;
             case 'media':
                 prompt.textContent = 'Enter Media Type (optional):';
