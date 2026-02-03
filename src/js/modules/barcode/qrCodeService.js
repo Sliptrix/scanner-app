@@ -152,8 +152,10 @@ window.QRCodeService = {
         }
 
         try {
-            // Read a large range of rows (up to 100) to find blank ones
-            const allRows = await window.OneDriveSync.readContainerIdsForRows(3, 100);
+            // Read enough rows to find blank ones (at least 2x requested, minimum 500)
+            // This ensures we can find enough blank rows even if many are already filled
+            const rowsToRead = Math.max(maxCount * 2, 500);
+            const allRows = await window.OneDriveSync.readContainerIdsForRows(3, rowsToRead);
             if (!allRows || allRows.length === 0) return [];
 
             const pool = this._loadPool();

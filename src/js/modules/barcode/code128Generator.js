@@ -398,14 +398,29 @@ window.Code128BarcodeGenerator = {
     },
     
     /**
-     * Look up strain name from app state  
-     * @param {String} strainId - Strain ID
+     * Look up strain name from app state
+     * @param {String} strainId - Strain ID (may be padded like "00013" or unpadded like "13")
      * @returns {String} Strain name or default
      */
     lookupStrainName: function(strainId) {
+        // Use InventoryLookupService if available (handles all formats)
+        if (window.InventoryLookupService && window.InventoryLookupService.resolveStrainName) {
+            const name = window.InventoryLookupService.resolveStrainName(strainId);
+            if (name) return name;
+        }
+
+        // Fallback to direct lookup
         if (window.appState && window.appState.strainsTable) {
             const paddedId = strainId.toString().padStart(5, '0');
-            return window.appState.strainsTable[paddedId] || `Strain ${paddedId}`;
+            // Try padded ID first
+            if (window.appState.strainsTable[paddedId]) {
+                return window.appState.strainsTable[paddedId];
+            }
+            // Try unpadded ID (remove leading zeros)
+            const unpaddedId = String(parseInt(strainId, 10));
+            if (window.appState.strainsTable[unpaddedId]) {
+                return window.appState.strainsTable[unpaddedId];
+            }
         }
         return `Strain ${strainId}`;
     },

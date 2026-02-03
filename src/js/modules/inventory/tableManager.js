@@ -27,6 +27,7 @@ window.InventoryTableManager = (function() {
         setupTableHeaders();
         setupSearchAndFilter();
         rebuildTable();
+        populateLocationFilter();
     }
 
     // Setup table headers with sorting
@@ -92,6 +93,10 @@ window.InventoryTableManager = (function() {
                         <button class="filter-btn" onclick="InventoryTableManager.quickFilter('today')">Today</button>
                         <button class="filter-btn" onclick="InventoryTableManager.quickFilter('week')">This Week</button>
                         <button class="filter-btn" onclick="InventoryTableManager.quickFilter('split')">Split Origins</button>
+                        <button class="filter-btn" onclick="InventoryTableManager.quickFilter('noLocation')">📍 No Location</button>
+                        <select id="locationFilterSelect" onchange="InventoryTableManager.quickFilter('location', this.value)" style="padding: 4px 8px; border: 1px solid #ced4da; border-radius: 4px; font-size: 0.85rem; cursor: pointer;">
+                            <option value="">📍 By Location</option>
+                        </select>
                         <button class="filter-btn" onclick="InventoryTableManager.clearFilter()">Clear</button>
                     </div>
                 </div>
@@ -140,7 +145,7 @@ window.InventoryTableManager = (function() {
 
     // Handle header click for sorting
     function handleHeaderClick(header, columnIndex) {
-        const columns = ['containerId', 'lineage', 'barcode', 'strain', 'owner', 'stage', 'media', 'tissueCount', 'date', 'status'];
+        const columns = ['containerId', 'lineage', 'barcode', 'strain', 'owner', 'stage', 'media', 'location', 'tissueCount', 'date', 'status', 'notes'];
         const column = columns[columnIndex];
         
         if (!column) return;
@@ -169,7 +174,7 @@ window.InventoryTableManager = (function() {
         });
 
         const headers = document.querySelectorAll('.inventory-table thead th');
-        const columns = ['containerId', 'lineage', 'barcode', 'strain', 'owner', 'stage', 'media', 'tissueCount', 'date', 'status'];
+        const columns = ['containerId', 'lineage', 'barcode', 'strain', 'owner', 'stage', 'media', 'location', 'tissueCount', 'date', 'status', 'notes'];
         const columnIndex = columns.indexOf(currentSort.column);
         
         if (columnIndex !== -1 && headers[columnIndex]) {
@@ -191,38 +196,55 @@ window.InventoryTableManager = (function() {
     }
 
     // Quick filter functions
-    function quickFilter(type) {
+    function quickFilter(type, value) {
         // Clear previous filter buttons
         document.querySelectorAll('.filter-btn').forEach(btn => btn.classList.remove('active'));
-        
+
         const inventory = StateManager.getState('inventory') || [];
         let filteredData;
 
         switch (type) {
             case 'today':
                 const today = new Date().toDateString();
-                filteredData = inventory.filter(item => 
+                filteredData = inventory.filter(item =>
                     new Date(item.date).toDateString() === today
                 );
-                document.querySelector('.filter-btn[onclick*="today"]').classList.add('active');
+                document.querySelector('.filter-btn[onclick*="today"]')?.classList.add('active');
                 break;
-                
+
             case 'week':
                 const weekAgo = new Date();
                 weekAgo.setDate(weekAgo.getDate() - 7);
-                filteredData = inventory.filter(item => 
+                filteredData = inventory.filter(item =>
                     new Date(item.date) >= weekAgo
                 );
-                document.querySelector('.filter-btn[onclick*="week"]').classList.add('active');
+                document.querySelector('.filter-btn[onclick*="week"]')?.classList.add('active');
                 break;
-                
+
             case 'split':
-                filteredData = inventory.filter(item => 
+                filteredData = inventory.filter(item =>
                     item.transferType === 'split' || item.transferSource
                 );
-                document.querySelector('.filter-btn[onclick*="split"]').classList.add('active');
+                document.querySelector('.filter-btn[onclick*="split"]')?.classList.add('active');
                 break;
-                
+
+            case 'noLocation':
+                filteredData = inventory.filter(item =>
+                    !item.location || item.location.trim() === ''
+                );
+                document.querySelector('.filter-btn[onclick*="noLocation"]')?.classList.add('active');
+                break;
+
+            case 'location':
+                if (value) {
+                    filteredData = inventory.filter(item =>
+                        item.location && item.location.toLowerCase() === value.toLowerCase()
+                    );
+                } else {
+                    filteredData = inventory;
+                }
+                break;
+
             default:
                 filteredData = inventory;
         }
@@ -236,7 +258,46 @@ window.InventoryTableManager = (function() {
         currentFilter = '';
         document.getElementById('inventorySearch').value = '';
         document.querySelectorAll('.filter-btn').forEach(btn => btn.classList.remove('active'));
+
+        // Reset location filter dropdown
+        const locationSelect = document.getElementById('locationFilterSelect');
+        if (locationSelect) locationSelect.value = '';
+
         rebuildTable();
+    }
+
+    // Populate location filter dropdown with unique locations from inventory
+    function populateLocationFilter() {
+        const locationSelect = document.getElementById('locationFilterSelect');
+        if (!locationSelect) return;
+
+        const inventory = StateManager.getState('inventory') || [];
+
+        // Get unique locations from inventory
+        const uniqueLocations = new Set();
+        inventory.forEach(item => {
+            if (item.location && item.location.trim()) {
+                uniqueLocations.add(item.location);
+            }
+        });
+
+        // Also add locations from HQ workbook
+        let hqLocations = [];
+        if (window.InventoryLookupService && window.InventoryLookupService.isInitialized()) {
+            hqLocations = window.InventoryLookupService.getAllLocations();
+        } else if (window.appState.locationsTable && window.appState.locationsTable.length > 0) {
+            hqLocations = window.appState.locationsTable;
+        }
+        hqLocations.forEach(loc => uniqueLocations.add(loc));
+
+        // Build options
+        let optionsHtml = '<option value="">📍 By Location</option>';
+        const sortedLocations = Array.from(uniqueLocations).sort();
+        sortedLocations.forEach(loc => {
+            optionsHtml += `<option value="${UIUtils.sanitize(loc)}">${UIUtils.sanitize(loc)}</option>`;
+        });
+
+        locationSelect.innerHTML = optionsHtml;
     }
 
     // Rebuild the entire table
@@ -281,6 +342,9 @@ window.InventoryTableManager = (function() {
 
         buildTableFromData(processedData);
         updateFilterStats(processedData.length, inventory.length);
+
+        // Refresh location filter options when data changes
+        populateLocationFilter();
     }
 
     // Build table from processed data
@@ -297,7 +361,7 @@ window.InventoryTableManager = (function() {
         if (data.length === 0) {
             const emptyRow = document.createElement('tr');
             emptyRow.innerHTML = `
-                <td colspan="10" style="text-align: center; padding: 30px; color: #6c757d; font-style: italic;">
+                <td colspan="12" style="text-align: center; padding: 30px; color: #6c757d; font-style: italic;">
                     ${currentFilter ? 'No entries match your search criteria' : 'No inventory data available'}
                 </td>
             `;
@@ -340,6 +404,10 @@ window.InventoryTableManager = (function() {
 
         // SECURITY FIX: Sanitize all user data before innerHTML
         const s = UIUtils.sanitize;
+
+        // Build location display
+        const locationDisplay = buildLocationDisplay(item);
+
         row.innerHTML = `
             <td style="font-weight: 600; color: #495057;">${s(item.containerId)}</td>
             <td>${lineageDisplay}</td>
@@ -352,9 +420,11 @@ window.InventoryTableManager = (function() {
             <td>${s(item.owner) || 'Unknown'}</td>
             <td>${s(item.stage) || 'Unknown'}</td>
             <td>${s(item.media) || 'Unknown'}</td>
+            <td>${locationDisplay}</td>
             <td style="text-align: center; font-weight: 600;">${typeof item.tissueCount === 'number' ? item.tissueCount : (item.tissueCount === 'Unknown' ? 'Unknown' : (item.tissueCount || 1))}</td>
             <td style="font-size: 0.85rem; color: #6c757d;">${dateDisplay}</td>
             <td>${statusDisplay}</td>
+            <td style="font-family: monospace; font-size: 0.8rem; max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${s(item.notes) || ''}">${s(item.notes) || '-'}</td>
         `;
 
         return row;
@@ -395,6 +465,17 @@ window.InventoryTableManager = (function() {
         }
     }
 
+    // Build location display
+    function buildLocationDisplay(item) {
+        const s = UIUtils.sanitize;
+        if (item.location) {
+            return `<span style="background: #fef3c7; color: #92400e; padding: 2px 8px; border-radius: 12px; font-size: 0.8rem;">
+                📍 ${s(item.location)}
+            </span>`;
+        }
+        return '<span style="color: #adb5bd; font-size: 0.8rem;">Not set</span>';
+    }
+
     // Show detailed information for a row
     function showRowDetails(item) {
         const lineage = StateManager.getState('containerLineage') || {};
@@ -416,16 +497,24 @@ window.InventoryTableManager = (function() {
                     <strong>Owner:</strong> ${item.owner || 'Unknown'}<br>
                     <strong>Stage:</strong> ${item.stage || 'Unknown'}<br>
                     <strong>Media:</strong> ${item.media || 'Unknown'}<br>
+                    <strong>Location:</strong> ${item.location || 'Not set'}<br>
                     <strong>Tissue Count:</strong> ${item.tissueCount || 1}<br>
                     <strong>Date Created:</strong> ${new Date(item.date).toLocaleString()}<br>
+                    <strong>Notes:</strong> <code style="font-size: 0.85rem; word-break: break-all;">${item.notes || 'None'}</code><br>
                     ${item.transferSource ? `<strong>Transfer Source:</strong> Container ${item.transferSource}<br>` : ''}
                     ${item.transferType ? `<strong>Transfer Type:</strong> ${item.transferType}<br>` : ''}
                 </div>
                 ${lineageInfo ? `<div style="margin: 15px 0;"><strong>Lineage History:</strong><br>${lineageInfo}</div>` : ''}
-                <button onclick="this.parentElement.parentElement.remove()" 
-                        style="background: #007bff; color: white; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer;">
-                    Close
-                </button>
+                <div style="display: flex; gap: 10px; margin-top: 15px;">
+                    <button onclick="InventoryTableManager.showLocationEditor('${item.containerId}')"
+                            style="background: #f59e0b; color: white; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer;">
+                        📍 Change Location
+                    </button>
+                    <button onclick="this.closest('[style*=\\"position: fixed\\"]').remove()"
+                            style="background: #007bff; color: white; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer;">
+                        Close
+                    </button>
+                </div>
             </div>
         `;
 
@@ -448,9 +537,195 @@ window.InventoryTableManager = (function() {
     function updateFilterStats(filteredCount, totalCount) {
         const filteredElement = document.getElementById('filteredCount');
         const totalElement = document.getElementById('totalCount');
-        
+
         if (filteredElement) filteredElement.textContent = filteredCount;
         if (totalElement) totalElement.textContent = totalCount;
+    }
+
+    // Show location editor modal for a container
+    function showLocationEditor(containerId) {
+        // Close the details modal first
+        const existingModal = document.querySelector('[style*="position: fixed"][style*="z-index: 1000"]');
+        if (existingModal) existingModal.remove();
+
+        // Get current container data
+        const inventory = StateManager.getState('inventory') || [];
+        const container = inventory.find(item => item.containerId === containerId);
+
+        if (!container) {
+            if (window.NotificationSystem) {
+                NotificationSystem.error(`Container ${containerId} not found`);
+            }
+            return;
+        }
+
+        // Get all available locations
+        let locations = [];
+        if (window.InventoryLookupService && window.InventoryLookupService.isInitialized()) {
+            locations = window.InventoryLookupService.getAllLocations();
+        } else if (window.appState.locationsTable && window.appState.locationsTable.length > 0) {
+            locations = window.appState.locationsTable;
+        }
+
+        // Build location options
+        const locationOptions = locations.map(loc => {
+            const selected = container.location === loc ? 'selected' : '';
+            return `<option value="${UIUtils.sanitize(loc)}" ${selected}>${UIUtils.sanitize(loc)}</option>`;
+        }).join('');
+
+        const modalContent = `
+            <div style="max-width: 400px; background: white; padding: 25px; border-radius: 12px; box-shadow: 0 8px 25px rgba(0,0,0,0.3);">
+                <h3 style="margin-top: 0; color: #2c3e50; text-align: center;">📍 Update Location</h3>
+                <p style="color: #6b7280; text-align: center; margin-bottom: 20px;">
+                    Container <strong>${containerId}</strong>
+                </p>
+
+                <div style="margin-bottom: 20px;">
+                    <label style="display: block; margin-bottom: 8px; font-weight: 600; color: #374151;">
+                        Current Location:
+                    </label>
+                    <p style="color: #92400e; background: #fef3c7; padding: 8px 12px; border-radius: 6px; margin: 0;">
+                        ${container.location || 'Not set'}
+                    </p>
+                </div>
+
+                <div style="margin-bottom: 20px;">
+                    <label style="display: block; margin-bottom: 8px; font-weight: 600; color: #374151;">
+                        New Location:
+                    </label>
+                    ${locations.length > 0 ? `
+                        <select id="newLocationSelect" style="width: 100%; padding: 10px; border: 2px solid #d1d5db; border-radius: 8px; font-size: 1rem;">
+                            <option value="">-- Select Location --</option>
+                            ${locationOptions}
+                        </select>
+                        <p style="margin: 8px 0 0; font-size: 0.85rem; color: #6b7280;">
+                            Or enter a custom location:
+                        </p>
+                    ` : ''}
+                    <input type="text" id="newLocationInput"
+                           placeholder="Enter location (e.g., Tent 1, 231 Top Shelf)"
+                           value="${container.location || ''}"
+                           style="width: 100%; padding: 10px; border: 2px solid #d1d5db; border-radius: 8px; font-size: 1rem; margin-top: 8px; box-sizing: border-box;">
+                </div>
+
+                <div style="display: flex; gap: 10px; justify-content: flex-end;">
+                    <button onclick="this.closest('[style*=\\"position: fixed\\"]').remove()"
+                            style="background: #6c757d; color: white; border: none; padding: 10px 20px; border-radius: 6px; cursor: pointer;">
+                        Cancel
+                    </button>
+                    <button onclick="InventoryTableManager.saveLocation('${containerId}')"
+                            style="background: #059669; color: white; border: none; padding: 10px 20px; border-radius: 6px; cursor: pointer;">
+                        💾 Save Location
+                    </button>
+                </div>
+            </div>
+        `;
+
+        // Create modal overlay
+        const modal = document.createElement('div');
+        modal.style.cssText = `
+            position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center;
+            z-index: 1001;
+        `;
+        modal.innerHTML = modalContent;
+        modal.addEventListener('click', (e) => {
+            if (e.target === modal) modal.remove();
+        });
+
+        document.body.appendChild(modal);
+
+        // Sync select and input
+        const select = document.getElementById('newLocationSelect');
+        const input = document.getElementById('newLocationInput');
+        if (select && input) {
+            select.addEventListener('change', () => {
+                if (select.value) {
+                    input.value = select.value;
+                }
+            });
+        }
+    }
+
+    // Save location for a container
+    async function saveLocation(containerId) {
+        const selectEl = document.getElementById('newLocationSelect');
+        const inputEl = document.getElementById('newLocationInput');
+
+        // Prefer input field, fallback to select
+        const newLocation = (inputEl?.value?.trim()) || (selectEl?.value?.trim()) || '';
+
+        if (!newLocation) {
+            if (window.NotificationSystem) {
+                NotificationSystem.warning('Please enter or select a location');
+            }
+            return;
+        }
+
+        // Update the container in inventory
+        const inventory = StateManager.getState('inventory') || [];
+        let updated = false;
+
+        // Update all entries for this container (in case of multiple samples)
+        inventory.forEach(item => {
+            if (item.containerId === containerId) {
+                item.location = newLocation;
+                item.locationUpdatedAt = new Date().toISOString();
+                updated = true;
+            }
+        });
+
+        if (updated) {
+            StateManager.setState('inventory', inventory);
+
+            // Rebuild table to show update
+            rebuildTable();
+
+            // Save to localStorage
+            if (window.InventoryManager && typeof window.InventoryManager.saveToLocalStorage === 'function') {
+                window.InventoryManager.saveToLocalStorage();
+            }
+
+            // Sync to cloud
+            if (window.OneDriveSync && window.OneDriveSync.updateRowByContainerId) {
+                try {
+                    console.log(`InventoryTableManager: Syncing location update to cloud for ${containerId}`);
+                    const result = await window.OneDriveSync.updateRowByContainerId(containerId, {
+                        location: newLocation
+                    });
+                    if (result.success) {
+                        console.log(`InventoryTableManager: Cloud sync successful for ${containerId} location`);
+                    } else {
+                        console.warn(`InventoryTableManager: Cloud sync failed for ${containerId} location`);
+                    }
+                } catch (err) {
+                    console.error('InventoryTableManager: Error syncing location to cloud:', err);
+                }
+            }
+
+            // Close modal
+            const modal = document.querySelector('[style*="position: fixed"][style*="z-index: 1001"]');
+            if (modal) modal.remove();
+
+            if (window.NotificationSystem) {
+                NotificationSystem.success(`Location updated for container ${containerId}: ${newLocation}`);
+            }
+        } else {
+            if (window.NotificationSystem) {
+                NotificationSystem.error(`Container ${containerId} not found in inventory`);
+            }
+        }
+    }
+
+    // Filter by location
+    function filterByLocation(location) {
+        const inventory = StateManager.getState('inventory') || [];
+        const filteredData = inventory.filter(item =>
+            item.location && item.location.toLowerCase().includes(location.toLowerCase())
+        );
+
+        buildTableFromData(filteredData);
+        updateFilterStats(filteredData.length, inventory.length);
     }
 
     // Get current table data (for export)
@@ -477,7 +752,11 @@ window.InventoryTableManager = (function() {
         quickFilter,
         clearFilter,
         getCurrentTableData,
-        buildTableFromData
+        buildTableFromData,
+        showLocationEditor,
+        saveLocation,
+        filterByLocation,
+        populateLocationFilter
     };
 
 })();

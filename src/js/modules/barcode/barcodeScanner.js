@@ -240,9 +240,9 @@ window.BarcodeScanner = {
             const month = parseInt(dateString.substr(4, 2));
             const day = parseInt(dateString.substr(6, 2));
             
-            // Basic range checks
-            if (year < 2020 || year > 2030) {
-                return {valid: false, error: 'Year out of expected range (2020-2030)'};
+            // Basic range checks - extended to 2099 for long-term use
+            if (year < 2020 || year > 2099) {
+                return {valid: false, error: 'Year out of expected range (2020-2099)'};
             }
             
             if (month < 1 || month > 12) {
@@ -309,12 +309,27 @@ window.BarcodeScanner = {
     
     /**
      * Look up strain name from app state
-     * @param {String} strainId - Strain ID
+     * @param {String} strainId - Strain ID (may be padded like "00013" or unpadded like "13")
      * @returns {String} Strain name or default
      */
     lookupStrainName: function(strainId) {
+        // Use InventoryLookupService if available (handles all formats)
+        if (window.InventoryLookupService && window.InventoryLookupService.resolveStrainName) {
+            const name = window.InventoryLookupService.resolveStrainName(strainId);
+            if (name) return name;
+        }
+
+        // Fallback to direct lookup
         if (window.appState && window.appState.strainsTable) {
-            return window.appState.strainsTable[strainId] || `Strain ${strainId}`;
+            // Try padded ID first
+            if (window.appState.strainsTable[strainId]) {
+                return window.appState.strainsTable[strainId];
+            }
+            // Try unpadded ID (remove leading zeros)
+            const unpaddedId = String(parseInt(strainId, 10));
+            if (window.appState.strainsTable[unpaddedId]) {
+                return window.appState.strainsTable[unpaddedId];
+            }
         }
         return `Strain ${strainId}`;
     },

@@ -15,6 +15,8 @@ window.OneDriveSync = {
     // Excel table names (configurable via init options)
     inventoryTableName: 'tblActiveInventory',      // Active_Inventory table
     strainMappingTableName: 'tblStrainMapping',    // Reference strain/owner table
+    recipeTableName: 'tblRecipes',                 // Media recipes table
+    batchTableName: 'tblMediaBatches',             // Media batch tracking table
 
     // State
     refreshInterval: null,
@@ -55,6 +57,12 @@ window.OneDriveSync = {
         }
         if (options.strainMappingTableName) {
             this.strainMappingTableName = options.strainMappingTableName;
+        }
+        if (options.recipeTableName) {
+            this.recipeTableName = options.recipeTableName;
+        }
+        if (options.batchTableName) {
+            this.batchTableName = options.batchTableName;
         }
 
         if (!this.shareUrl) {
@@ -166,6 +174,31 @@ window.OneDriveSync = {
 
             // Update app state
             this.updateAppState(mapping);
+
+            // Also parse Config sheet for strain reference data
+            try {
+                this.parseConfigSheetForStrains(arrayBuffer);
+            } catch (configError) {
+                console.warn('OneDriveSync: Could not parse Config sheet for strains:', configError.message);
+            }
+
+            // Also try to parse dedicated reference sheets (Strains, Owners, etc.)
+            try {
+                this.parseReferenceSheets(arrayBuffer);
+            } catch (refError) {
+                console.warn('OneDriveSync: Could not parse reference sheets:', refError.message);
+            }
+
+            // Rebuild InventoryLookupService with updated strain data
+            if (window.InventoryLookupService) {
+                if (window.InventoryLookupService.isInitialized()) {
+                    window.InventoryLookupService.rebuild();
+                    console.log('OneDriveSync: InventoryLookupService rebuilt after manual sync');
+                } else {
+                    window.InventoryLookupService.initialize();
+                    console.log('OneDriveSync: InventoryLookupService initialized after manual sync');
+                }
+            }
 
             // Record success
             this.lastSync = new Date().toISOString();
@@ -413,15 +446,20 @@ window.OneDriveSync = {
         // Read workbook
         const workbook = XLSX.read(new Uint8Array(arrayBuffer), { type: 'array' });
 
-        // Find target sheet (prefer "strain_owner_mapping", else first sheet)
+        // Find target sheet - look for strain_owner_mapping or Config sheet
+        // Do NOT fall back to first sheet as it may have incompatible structure
+        const sheetNameOptions = ['strain_owner_mapping', 'config', 'strains', 'strain_mapping'];
         let targetSheetName = workbook.SheetNames.find(name =>
-            name.toLowerCase() === 'strain_owner_mapping'
+            sheetNameOptions.includes(name.toLowerCase())
         );
 
         if (!targetSheetName) {
-            targetSheetName = workbook.SheetNames[0];
-            console.log(`OneDriveSync: Sheet "strain_owner_mapping" not found, using first sheet: ${targetSheetName}`);
+            console.log('OneDriveSync: No strain_owner_mapping or Config sheet found. Available sheets:', workbook.SheetNames);
+            console.log('OneDriveSync: Skipping strain-owner mapping parsing (will rely on Config sheet parsing instead)');
+            return {}; // Return empty mapping instead of using incompatible first sheet
         }
+
+        console.log(`OneDriveSync: Using sheet "${targetSheetName}" for strain-owner mapping`);
 
         const sheet = workbook.Sheets[targetSheetName];
         if (!sheet) {
@@ -438,10 +476,16 @@ window.OneDriveSync = {
         // Parse rows into mapping object
         const mapping = {};
         const headerSynonyms = {
-            strain: ['strain', 'strain_id', 'id'],
-            owner: ['owner', 'owner_name', 'owner email', 'email']
+            strain: ['strain', 'strain_id', 'strainid', 'strain id', 'id'],
+            owner: ['owner', 'owner_name', 'ownername', 'owner name', 'owner email', 'email', 'owner_code']
         };
 
+        // Log available columns for debugging
+        if (rows.length > 0) {
+            console.log('OneDriveSync: Available columns in sheet:', Object.keys(rows[0]));
+        }
+
+        let foundValidRow = false;
         rows.forEach((row, index) => {
             // Find strain value using synonyms (case-insensitive)
             let strainValue = null;
@@ -470,13 +514,16 @@ window.OneDriveSync = {
 
                 if (strain && owner) {
                     mapping[strain] = owner;
+                    foundValidRow = true;
                 }
-            } else if (index === 0) {
-                // Only throw error on first row (header mismatch)
-                throw new Error('Excel schema error: Missing required columns. Expected "strain" and "owner" (or synonyms)');
             }
-            // Otherwise, silently skip empty rows
+            // Skip rows without both columns - don't throw error
         });
+
+        if (!foundValidRow && rows.length > 0) {
+            console.warn('OneDriveSync: No valid strain-owner mappings found in sheet. Expected columns: strain/strain_id AND owner/owner_name');
+            console.warn('OneDriveSync: Found columns:', Object.keys(rows[0]));
+        }
 
         console.log(`OneDriveSync: Parsed ${Object.keys(mapping).length} strain-owner mappings`);
 
@@ -642,7 +689,23 @@ window.OneDriveSync = {
 
             const containerId = String(rawIdNumeric).padStart(6, '0');
 
-            const strainName = getField(row, ['strain_name', 'strain', 'strain id']);
+            // Extract strain ID and name separately (HQ workbook may have both columns)
+            // Include common variations with underscores, spaces, and different capitalizations
+            const strainIdValue = getField(row, ['strain_id', 'strainid', 'strain id', 'strain-id']);
+            const strainNameValue = getField(row, ['strain_name', 'strain name', 'strainname', 'strain']);
+            // Use strain name if available, otherwise fall back to strain ID
+            const strainName = strainNameValue || strainIdValue;
+
+            // DEBUG: Log first few rows to see strain data extraction
+            if (inventory.length < 3) {
+                console.log(`OneDriveSync: Row ${inventory.length} strain debug:`, {
+                    rawRowKeys: Object.keys(row),
+                    strainIdValue,
+                    strainNameValue,
+                    resolvedStrainName: strainName,
+                    rawRow: row
+                });
+            }
             const ownerName = getField(row, ['owner', 'owner_name', 'owner name']);
             const stage = getField(row, ['stage']);
             const location = getField(row, ['location', 'room', 'rack']);
@@ -663,6 +726,7 @@ window.OneDriveSync = {
             const invEntry = {
                 containerId: containerId,
                 strain: strainName || '',
+                strainId: strainIdValue ? String(strainIdValue).trim() : null,
                 owner: ownerName || '',
                 stage: stage || '',
                 media: media || '',
@@ -701,6 +765,519 @@ window.OneDriveSync = {
 
         console.log(`OneDriveSync: Parsed ${inventory.length} inventory rows from Active_Inventory`);
         return inventory;
+    },
+
+    /**
+     * Parse Config sheet for strain reference data and populate window.appState.strainsTable
+     * This extracts strain ID → name mappings from the Config sheet
+     * @param {ArrayBuffer} arrayBuffer - Excel file data
+     */
+    parseConfigSheetForStrains(arrayBuffer) {
+        console.log('OneDriveSync: Parsing Config sheet for strain reference data...');
+
+        if (typeof XLSX === 'undefined') {
+            throw new Error('XLSX library not loaded');
+        }
+
+        const workbook = XLSX.read(new Uint8Array(arrayBuffer), { type: 'array' });
+
+        // Find Config sheet (case-insensitive)
+        const configSheetName = workbook.SheetNames.find(name =>
+            name.toLowerCase() === 'config'
+        );
+
+        if (!configSheetName) {
+            console.log('OneDriveSync: No Config sheet found, skipping strain reference parsing');
+            return;
+        }
+
+        const sheet = workbook.Sheets[configSheetName];
+        if (!sheet) {
+            console.log('OneDriveSync: Config sheet is empty');
+            return;
+        }
+
+        // Parse sheet to JSON
+        const rows = XLSX.utils.sheet_to_json(sheet);
+        if (rows.length === 0) {
+            console.log('OneDriveSync: Config sheet has no data rows');
+            return;
+        }
+
+        // Ensure appState exists
+        if (!window.appState) {
+            window.appState = {};
+        }
+
+        // CLEAR existing tables to ensure cloud data takes precedence over cached data
+        console.log('OneDriveSync: Clearing cached reference data to load fresh from cloud');
+        console.log('  Previous strainsTable had:', Object.keys(window.appState.strainsTable || {}).length, 'entries');
+
+        const strainsTable = {}; // Clear and rebuild from cloud
+        const ownersTable = {}; // Clear and rebuild from cloud
+        const stagesTable = {}; // Clear and rebuild from cloud
+        const mediaTypesTable = {}; // Clear and rebuild from cloud
+
+        let strainsCount = 0;
+        let ownersCount = 0;
+        let stagesCount = 0;
+        let mediaCount = 0;
+
+        // Helper to get field value case-insensitively
+        const getField = (row, candidates) => {
+            for (const key of Object.keys(row)) {
+                const normalizedKey = key.toLowerCase().trim();
+                if (candidates.includes(normalizedKey)) {
+                    return row[key];
+                }
+            }
+            return undefined;
+        };
+
+        rows.forEach(row => {
+            // Try to extract strain data (include common column name variations)
+            const strainId = getField(row, ['strain_id', 'strainid', 'strain id', 'strain-id', 'id']);
+            const strainName = getField(row, ['strain_name', 'strain name', 'strainname', 'strain', 'name']);
+
+            if (strainId !== undefined && strainId !== null && strainId !== '') {
+                const id = String(strainId).trim();
+                const name = strainName ? String(strainName).trim() : id;
+                if (!strainsTable[id]) {
+                    strainsTable[id] = name;
+                    strainsCount++;
+                }
+            }
+
+            // Try to extract owner data
+            const ownerId = getField(row, ['owner_id', 'ownerid', 'owner id', 'owner_code', 'ownercode', 'owner code', 'id', 'owner-id', '#']);
+            const ownerName = getField(row, ['owner_name', 'owner name', 'ownername', 'owner', 'name']);
+
+            if (ownerId !== undefined && ownerId !== null && ownerId !== '') {
+                const id = String(ownerId).trim();
+                const name = ownerName ? String(ownerName).trim() : id;
+                if (!ownersTable[id]) {
+                    ownersTable[id] = name;
+                    ownersCount++;
+                }
+            }
+
+            // Try to extract stage data
+            const stageId = getField(row, ['stage_id', 'stageid', 'stage id']);
+            const stageName = getField(row, ['stage_name', 'stage', 'stage name']);
+
+            if (stageId !== undefined && stageId !== null && stageId !== '') {
+                const id = String(stageId).trim();
+                const name = stageName ? String(stageName).trim() : id;
+                if (!stagesTable[id]) {
+                    stagesTable[id] = name;
+                    stagesCount++;
+                }
+            }
+
+            // Try to extract media type data
+            const mediaCode = getField(row, ['media_code', 'media_id', 'media code']);
+            const mediaName = getField(row, ['media_name', 'media', 'media type']);
+
+            if (mediaCode !== undefined && mediaCode !== null && mediaCode !== '') {
+                const code = String(mediaCode).trim();
+                const name = mediaName ? String(mediaName).trim() : code;
+                if (!mediaTypesTable[code]) {
+                    mediaTypesTable[code] = name;
+                    mediaCount++;
+                }
+            }
+        });
+
+        // Update appState
+        window.appState.strainsTable = strainsTable;
+        window.appState.ownersTable = ownersTable;
+        window.appState.stagesTable = stagesTable;
+        window.appState.mediaTypesTable = mediaTypesTable;
+        window.appState.isDataLoaded = true;
+
+        console.log(`OneDriveSync: Parsed Config sheet - Strains: ${strainsCount}, Owners: ${ownersCount}, Stages: ${stagesCount}, Media: ${mediaCount}`);
+    },
+
+    /**
+     * Parse dedicated reference sheets (Strains, Owners, Stages, Media_Types) if they exist
+     * @param {ArrayBuffer} arrayBuffer - Excel file data
+     */
+    parseReferenceSheets(arrayBuffer) {
+        console.log('OneDriveSync: Looking for dedicated reference sheets...');
+
+        if (typeof XLSX === 'undefined') {
+            throw new Error('XLSX library not loaded');
+        }
+
+        const workbook = XLSX.read(new Uint8Array(arrayBuffer), { type: 'array' });
+
+        // Log all available sheet names for debugging
+        console.log('OneDriveSync: Available sheets in workbook:', workbook.SheetNames);
+
+        // Ensure appState exists
+        if (!window.appState) {
+            window.appState = {};
+        }
+
+        const strainsTable = window.appState.strainsTable || {};
+
+        // Helper to get field value case-insensitively
+        const getField = (row, candidates) => {
+            for (const key of Object.keys(row)) {
+                const normalizedKey = key.toLowerCase().trim();
+                if (candidates.includes(normalizedKey)) {
+                    return row[key];
+                }
+            }
+            return undefined;
+        };
+
+        // Try to find and parse a Strains reference sheet (expanded matching)
+        // Added 'ref_strains' for HQ workbook format
+        const strainsSheetNames = ['strains', 'strain', 'strain_reference', 'strains_ref', 'strain_list', 'varieties', 'cultivars', 'genetics', 'ref_strains'];
+        const strainsSheetName = workbook.SheetNames.find(name =>
+            strainsSheetNames.includes(name.toLowerCase()) ||
+            name.toLowerCase().includes('strain') ||
+            name.toLowerCase().includes('variet')
+        );
+
+        if (strainsSheetName) {
+            console.log(`OneDriveSync: Found Strains reference sheet: ${strainsSheetName}`);
+            const sheet = workbook.Sheets[strainsSheetName];
+
+            // HQ workbook Ref_ sheets have a title row (e.g., "STRAIN REFERENCE") in row 0
+            // followed by column headers in row 1. We need to skip the title row.
+            const isRefSheet = strainsSheetName.toLowerCase().startsWith('ref_');
+            let rows;
+            if (isRefSheet) {
+                // Get the sheet range and skip the first row (title row)
+                const range = XLSX.utils.decode_range(sheet['!ref'] || 'A1');
+                range.s.r = 1; // Start from row 1 (0-indexed), skipping title row
+                const newRange = XLSX.utils.encode_range(range);
+                rows = XLSX.utils.sheet_to_json(sheet, { range: newRange });
+                console.log(`OneDriveSync: Ref_ sheet detected, skipped title row. Parsing from row 2.`);
+            } else {
+                rows = XLSX.utils.sheet_to_json(sheet);
+            }
+
+            console.log(`OneDriveSync: Strains sheet has ${rows.length} rows`);
+            console.log('OneDriveSync: Strains sheet sample row:', rows[0]);
+
+            // Initialize strain abbreviations table if not exists
+            if (!window.appState.strainAbbreviations) {
+                window.appState.strainAbbreviations = {};
+            }
+
+            let count = 0;
+            rows.forEach(row => {
+                // Expanded column matching for strain ID, name, and abbreviation
+                const id = getField(row, ['strain_id', 'strainid', 'strain id', 'id', 'strain-id', 'variety_id', 'varietyid', 'cultivar_id', 'genetic_id', '#', 'no', 'number']);
+                const name = getField(row, ['strain_name', 'strain name', 'strainname', 'strain', 'name', 'variety', 'cultivar', 'genetic', 'variety_name', 'cultivar_name']);
+                const abbreviation = getField(row, ['abr', 'abbr', 'abbreviation', 'code', 'short_name', 'shortname', 'short']);
+
+                if (id !== undefined && id !== null && id !== '') {
+                    const strainId = String(id).trim();
+                    const strainName = name ? String(name).trim() : strainId;
+                    const strainAbbr = abbreviation ? String(abbreviation).trim() : null;
+
+                    if (!strainsTable[strainId]) {
+                        strainsTable[strainId] = strainName;
+                        count++;
+                        console.log(`OneDriveSync: Added strain from ref sheet: ${strainId} = "${strainName}" (ABR: ${strainAbbr || 'none'})`);
+                    }
+
+                    // Store abbreviation separately for InventoryLookupService
+                    if (strainAbbr) {
+                        window.appState.strainAbbreviations[strainId] = strainAbbr;
+                    }
+                }
+            });
+
+            console.log(`OneDriveSync: Added ${count} strains from ${strainsSheetName} sheet`);
+            console.log(`OneDriveSync: Loaded ${Object.keys(window.appState.strainAbbreviations).length} strain abbreviations`);
+        } else {
+            console.log('OneDriveSync: No dedicated Strains reference sheet found');
+        }
+
+        // Parse Ref_Owners sheet
+        const ownersTable = window.appState.ownersTable || {};
+        const ownersSheetName = workbook.SheetNames.find(name =>
+            name.toLowerCase() === 'ref_owners' ||
+            name.toLowerCase() === 'owners' ||
+            name.toLowerCase().includes('owner')
+        );
+
+        if (ownersSheetName) {
+            console.log(`OneDriveSync: Found Owners reference sheet: ${ownersSheetName}`);
+            const sheet = workbook.Sheets[ownersSheetName];
+            const isRefSheet = ownersSheetName.toLowerCase().startsWith('ref_');
+            let rows;
+            if (isRefSheet) {
+                const range = XLSX.utils.decode_range(sheet['!ref'] || 'A1');
+                range.s.r = 1;
+                const newRange = XLSX.utils.encode_range(range);
+                rows = XLSX.utils.sheet_to_json(sheet, { range: newRange });
+            } else {
+                rows = XLSX.utils.sheet_to_json(sheet);
+            }
+
+            let count = 0;
+            rows.forEach(row => {
+                const id = getField(row, ['owner_id', 'ownerid', 'owner id', 'owner_code', 'ownercode', 'owner code', 'id', 'owner-id', '#']);
+                const name = getField(row, ['owner_name', 'owner name', 'ownername', 'owner', 'name']);
+
+                if (id !== undefined && id !== null && id !== '') {
+                    const ownerId = String(id).trim();
+                    const ownerName = name ? String(name).trim() : ownerId;
+                    if (!ownersTable[ownerId]) {
+                        ownersTable[ownerId] = ownerName;
+                        count++;
+                    }
+                }
+            });
+            console.log(`OneDriveSync: Added ${count} owners from ${ownersSheetName} sheet`);
+        }
+        window.appState.ownersTable = ownersTable;
+
+        // Parse Ref_Stages sheet
+        const stagesTable = window.appState.stagesTable || {};
+        const stagesSheetName = workbook.SheetNames.find(name =>
+            name.toLowerCase() === 'ref_stages' ||
+            name.toLowerCase() === 'stages' ||
+            name.toLowerCase().includes('stage')
+        );
+
+        if (stagesSheetName) {
+            console.log(`OneDriveSync: Found Stages reference sheet: ${stagesSheetName}`);
+            const sheet = workbook.Sheets[stagesSheetName];
+            const isRefSheet = stagesSheetName.toLowerCase().startsWith('ref_');
+            let rows;
+            if (isRefSheet) {
+                const range = XLSX.utils.decode_range(sheet['!ref'] || 'A1');
+                range.s.r = 1;
+                const newRange = XLSX.utils.encode_range(range);
+                rows = XLSX.utils.sheet_to_json(sheet, { range: newRange });
+            } else {
+                rows = XLSX.utils.sheet_to_json(sheet);
+            }
+
+            let count = 0;
+            rows.forEach(row => {
+                const id = getField(row, ['stage_id', 'stageid', 'stage id', 'id', 'stage-id', '#', 'code']);
+                const name = getField(row, ['stage_name', 'stage name', 'stagename', 'stage', 'name', 'description']);
+
+                if (id !== undefined && id !== null && id !== '') {
+                    const stageId = String(id).trim();
+                    const stageName = name ? String(name).trim() : stageId;
+                    if (!stagesTable[stageId]) {
+                        stagesTable[stageId] = stageName;
+                        count++;
+                    }
+                }
+            });
+            console.log(`OneDriveSync: Added ${count} stages from ${stagesSheetName} sheet`);
+        }
+        window.appState.stagesTable = stagesTable;
+
+        // Parse Ref_Locations sheet
+        const locationsTable = window.appState.locationsTable || [];
+        const locationsSheetName = workbook.SheetNames.find(name =>
+            name.toLowerCase() === 'ref_locations' ||
+            name.toLowerCase() === 'locations' ||
+            name.toLowerCase().includes('location')
+        );
+
+        if (locationsSheetName) {
+            console.log(`OneDriveSync: Found Locations reference sheet: ${locationsSheetName}`);
+            const sheet = workbook.Sheets[locationsSheetName];
+            const isRefSheet = locationsSheetName.toLowerCase().startsWith('ref_');
+            let rows;
+            if (isRefSheet) {
+                const range = XLSX.utils.decode_range(sheet['!ref'] || 'A1');
+                range.s.r = 1;
+                const newRange = XLSX.utils.encode_range(range);
+                rows = XLSX.utils.sheet_to_json(sheet, { range: newRange });
+            } else {
+                rows = XLSX.utils.sheet_to_json(sheet);
+            }
+
+            rows.forEach(row => {
+                const name = getField(row, ['location_name', 'location name', 'locationname', 'location', 'name', 'room', 'area']);
+                if (name && !locationsTable.includes(String(name).trim())) {
+                    locationsTable.push(String(name).trim());
+                }
+            });
+            console.log(`OneDriveSync: Added locations from ${locationsSheetName} sheet. Total: ${locationsTable.length}`);
+        }
+        window.appState.locationsTable = locationsTable;
+
+        // Parse Ref_Media_Types sheet
+        const mediaTypesTable = window.appState.mediaTypesTable || {};
+        const mediaSheetName = workbook.SheetNames.find(name =>
+            name.toLowerCase() === 'ref_media_types' ||
+            name.toLowerCase() === 'media_types' ||
+            name.toLowerCase() === 'mediatypes' ||
+            name.toLowerCase().includes('media')
+        );
+
+        if (mediaSheetName) {
+            console.log(`OneDriveSync: Found Media Types reference sheet: ${mediaSheetName}`);
+            const sheet = workbook.Sheets[mediaSheetName];
+            const isRefSheet = mediaSheetName.toLowerCase().startsWith('ref_');
+            let rows;
+            if (isRefSheet) {
+                const range = XLSX.utils.decode_range(sheet['!ref'] || 'A1');
+                range.s.r = 1;
+                const newRange = XLSX.utils.encode_range(range);
+                rows = XLSX.utils.sheet_to_json(sheet, { range: newRange });
+            } else {
+                rows = XLSX.utils.sheet_to_json(sheet);
+            }
+
+            let count = 0;
+            rows.forEach(row => {
+                const code = getField(row, ['media_code', 'mediacode', 'media code', 'code', 'type_id', 'typeid', 'id', '#']);
+                const name = getField(row, ['media_name', 'media name', 'medianame', 'media', 'name', 'type', 'description']);
+
+                if (code !== undefined && code !== null && code !== '') {
+                    const mediaCode = String(code).trim();
+                    const mediaName = name ? String(name).trim() : mediaCode;
+                    if (!mediaTypesTable[mediaCode]) {
+                        mediaTypesTable[mediaCode] = mediaName;
+                        count++;
+                    }
+                }
+            });
+            console.log(`OneDriveSync: Added ${count} media types from ${mediaSheetName} sheet`);
+        }
+        window.appState.mediaTypesTable = mediaTypesTable;
+
+        // Update appState
+        window.appState.strainsTable = strainsTable;
+        window.appState.isDataLoaded = true;
+
+        console.log(`OneDriveSync: After parsing reference sheets:`);
+        console.log(`  - strainsTable: ${Object.keys(strainsTable).length} entries`);
+        console.log(`  - ownersTable: ${Object.keys(ownersTable).length} entries`);
+        console.log(`  - stagesTable: ${Object.keys(stagesTable).length} entries`);
+        console.log(`  - locationsTable: ${locationsTable.length} entries`);
+        console.log(`  - mediaTypesTable: ${Object.keys(mediaTypesTable).length} entries`);
+
+        // Dispatch event to notify listeners that reference data has been updated
+        const event = new CustomEvent('referenceData:updated', {
+            detail: {
+                source: 'cloud',
+                ts: Date.now(),
+                counts: {
+                    strains: Object.keys(strainsTable).length,
+                    owners: Object.keys(ownersTable).length,
+                    stages: Object.keys(stagesTable).length,
+                    locations: locationsTable.length,
+                    mediaTypes: Object.keys(mediaTypesTable).length
+                }
+            }
+        });
+        window.dispatchEvent(event);
+        console.log('OneDriveSync: Dispatched referenceData:updated event');
+    },
+
+    /**
+     * Extract unique strains from inventory data and populate window.appState.strainsTable
+     * This allows InventoryLookupService to resolve strains by ID or name
+     * @param {Array<Object>} inventory - Parsed inventory entries
+     */
+    populateStrainsTableFromInventory(inventory) {
+        console.log('=== populateStrainsTableFromInventory DEBUG ===');
+        console.log('Inventory array length:', inventory?.length);
+
+        if (!inventory || !Array.isArray(inventory)) {
+            console.warn('OneDriveSync: No inventory data to extract strains from');
+            return;
+        }
+
+        // DEBUG: Log sample inventory items to see strain data structure
+        console.log('Sample inventory items (first 5):');
+        inventory.slice(0, 5).forEach((item, idx) => {
+            console.log(`  Item ${idx}:`, {
+                strain: item.strain,
+                strainId: item.strainId,
+                containerId: item.containerId
+            });
+        });
+
+        // Ensure appState exists
+        if (!window.appState) {
+            window.appState = {};
+        }
+
+        // Add to existing strainsTable (Config sheet was already parsed and cleared old data)
+        // This adds any strains found in inventory that weren't in the Config sheet
+        const strainsTable = window.appState.strainsTable || {};
+        console.log('Adding to strainsTable - current count:', Object.keys(strainsTable).length);
+        let newStrainsCount = 0;
+
+        inventory.forEach(item => {
+            // Get strain name (required)
+            const strainValue = item.strain ? String(item.strain).trim() : '';
+            if (!strainValue) return;
+
+            let strainId = null;
+            let strainName = strainValue;
+
+            // Priority 1: Use explicit strainId field if available
+            if (item.strainId) {
+                const idValue = String(item.strainId).trim();
+                const idNum = parseInt(idValue, 10);
+                if (!isNaN(idNum)) {
+                    strainId = String(idNum);
+                    // If strainValue is different from strainId, use it as the name
+                    if (strainValue !== idValue) {
+                        strainName = strainValue;
+                    }
+                }
+            }
+
+            // Priority 2: Try to parse strain value if no explicit ID
+            // Could be: "82", "Blue Dream", or "82 - Blue Dream"
+            if (!strainId) {
+                const numberMatch = strainValue.match(/^(\d+)(?:\s*[-:]\s*(.+))?$/);
+                if (numberMatch) {
+                    strainId = numberMatch[1];
+                    strainName = numberMatch[2] ? numberMatch[2].trim() : strainValue;
+                }
+            }
+
+            // Add to strainsTable
+            if (strainId) {
+                // Have an ID - map ID to name
+                if (!strainsTable[strainId]) {
+                    strainsTable[strainId] = strainName;
+                    newStrainsCount++;
+                    console.log(`OneDriveSync: Discovered strain ID ${strainId} = "${strainName}"`);
+                }
+                // Also add name as key for name-based lookups
+                const nameLower = strainName.toLowerCase();
+                if (!strainsTable[nameLower] && nameLower !== strainId) {
+                    strainsTable[nameLower] = strainName;
+                }
+            } else {
+                // No ID found - use the name as both key and value
+                const nameKey = strainValue.toLowerCase();
+                if (!strainsTable[nameKey]) {
+                    strainsTable[nameKey] = strainValue;
+                    newStrainsCount++;
+                    console.log(`OneDriveSync: Discovered strain by name: "${strainValue}"`);
+                }
+            }
+        });
+
+        // Update appState
+        window.appState.strainsTable = strainsTable;
+        window.appState.isDataLoaded = true;
+
+        console.log(`OneDriveSync: Strains table now has ${Object.keys(strainsTable).length} entries (${newStrainsCount} new from inventory)`);
+        console.log('Final strainsTable:', strainsTable);
+        console.log('StrainsTable keys:', Object.keys(strainsTable));
     },
 
     /**
@@ -802,6 +1379,44 @@ window.OneDriveSync = {
             return !isNaN(num) && num > max ? num : max;
         }, 0);
         window.StateManager.setState('highestContainerId', maxId);
+
+        // FIRST: Parse Config sheet and reference sheets for strain data
+        // This loads strain IDs and names from the reference tables
+        try {
+            this.parseConfigSheetForStrains(arrayBuffer);
+        } catch (err) {
+            console.warn('OneDriveSync: Could not parse Config sheet:', err.message);
+        }
+
+        try {
+            this.parseReferenceSheets(arrayBuffer);
+        } catch (err) {
+            console.warn('OneDriveSync: Could not parse reference sheets:', err.message);
+        }
+
+        // THEN: Extract strains from inventory (adds any strains not in reference sheets)
+        this.populateStrainsTableFromInventory(inventory);
+
+        // Save the updated strain data to localStorage for persistence
+        if (window.DataUtils && typeof window.DataUtils.saveExcelData === 'function') {
+            try {
+                window.DataUtils.saveExcelData('Cloud HQ Workbook');
+                console.log('OneDriveSync: Saved updated strain data to localStorage');
+            } catch (err) {
+                console.warn('OneDriveSync: Could not save to localStorage:', err.message);
+            }
+        }
+
+        // Rebuild InventoryLookupService with updated strain data
+        if (window.InventoryLookupService) {
+            if (window.InventoryLookupService.isInitialized()) {
+                window.InventoryLookupService.rebuild();
+                console.log('OneDriveSync: InventoryLookupService rebuilt with cloud strain data');
+            } else {
+                window.InventoryLookupService.initialize();
+                console.log('OneDriveSync: InventoryLookupService initialized with cloud strain data');
+            }
+        }
 
         // Rebuild UI
         if (window.InventoryTableManager) {
@@ -1294,6 +1909,364 @@ window.OneDriveSync = {
             }
             return { success: false, error: error.message };
         }
+    },
+
+    /**
+     * Append or update a media recipe to the tblRecipes table in the cloud workbook.
+     * Syncs recipe data including ingredients, preparation steps, and metadata.
+     * @param {Object} recipeData - Recipe object from RecipeStorage
+     * @returns {Promise<{success: boolean, error?: string}>}
+     */
+    async appendRecipeToCloud(recipeData) {
+        try {
+            if (!recipeData) {
+                throw new Error('No recipe data provided');
+            }
+
+            if (!this.shareUrl) {
+                throw new Error('No shareUrl configured for OneDriveSync');
+            }
+
+            if (!this.recipeTableName) {
+                console.warn('OneDriveSync: recipeTableName not configured, skipping recipe sync');
+                return { success: false, error: 'Recipe table not configured' };
+            }
+
+            // Ensure drive/item IDs are resolved
+            if (!this.driveId || !this.itemId) {
+                await this.resolveDriveItemFromShareUrl(this.shareUrl);
+            }
+
+            const token = await this.acquireToken();
+            const baseUrl = `https://graph.microsoft.com/v1.0/drives/${this.driveId}/items/${this.itemId}/workbook`;
+
+            const headers = {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            };
+
+            // Format pre-autoclave ingredients as a string
+            const preAutoclaveStr = [
+                recipeData.preAutoclave?.gamborgVitamin ? `Gamborg Vitamin: ${recipeData.preAutoclave.gamborgVitamin}g` : '',
+                recipeData.preAutoclave?.sucrose ? `Sucrose: ${recipeData.preAutoclave.sucrose}g` : '',
+                recipeData.preAutoclave?.ppm ? `PPM: ${recipeData.preAutoclave.ppm}mL` : ''
+            ].filter(Boolean).join('; ');
+
+            // Format post-autoclave ingredients as a string
+            const postAutoclaveStr = Array.isArray(recipeData.postAutoclave)
+                ? recipeData.postAutoclave.map(item =>
+                    `${item.name || 'Unknown'}: ${item.amount || 0}${item.unit || ''}`
+                ).join('; ')
+                : '';
+
+            // Format the row data - columns should match Excel table headers
+            // Expected columns: Recipe_ID, Recipe_Name, Media_Type, Volume, Basal_Salt_Type, Basal_Salt_Amount,
+            //                   Gelling_Agent_Type, Gelling_Agent_Amount, Pre_Autoclave, Post_Autoclave,
+            //                   Target_pH, Created_Date, Created_By, Notes
+            const rowPayload = {
+                values: [[
+                    recipeData.id || '',
+                    recipeData.name || 'Unnamed Recipe',
+                    recipeData.mediaType || '',
+                    recipeData.volume || '1L',
+                    recipeData.basalSalt?.type || '',
+                    recipeData.basalSalt?.amount || 0,
+                    recipeData.gellingAgent?.type || '',
+                    recipeData.gellingAgent?.amount || 0,
+                    preAutoclaveStr,
+                    postAutoclaveStr,
+                    recipeData.targetPh || '5.7-6.0',
+                    recipeData.createdAt ? new Date(recipeData.createdAt).toLocaleDateString() : new Date().toLocaleDateString(),
+                    recipeData.createdBy || '',
+                    recipeData.notes || ''
+                ]]
+            };
+
+            // First, check if recipe already exists (by Recipe_ID) and update instead of append
+            try {
+                const existingRow = await this.findRecipeRowById(recipeData.id);
+                if (existingRow) {
+                    // Update existing row
+                    const updateResult = await this.updateRecipeRow(existingRow, rowPayload.values[0]);
+                    if (updateResult.success) {
+                        console.log(`OneDriveSync: Updated existing recipe row for ${recipeData.name}`);
+                        if (window.NotificationSystem) {
+                            NotificationSystem.success(`📤 Recipe "${recipeData.name}" synced to cloud`);
+                        }
+                        return { success: true, updated: true };
+                    }
+                }
+            } catch (findError) {
+                console.log('OneDriveSync: Recipe not found, will append new row');
+            }
+
+            // Append new row
+            const resp = await fetch(`${baseUrl}/tables('${this.recipeTableName}')/rows/add`, {
+                method: 'POST',
+                headers,
+                body: JSON.stringify(rowPayload)
+            });
+
+            if (!resp.ok) {
+                const text = await resp.text();
+                throw new Error(`Failed to append recipe row: ${resp.status} ${text}`);
+            }
+
+            console.log(`OneDriveSync: Appended recipe "${recipeData.name}" to cloud`);
+            if (window.NotificationSystem) {
+                NotificationSystem.success(`📤 Recipe "${recipeData.name}" synced to cloud`);
+            }
+
+            return { success: true };
+        } catch (error) {
+            console.error('OneDriveSync: Failed to sync recipe to cloud:', error);
+            if (window.NotificationSystem) {
+                NotificationSystem.warning(`Recipe saved locally but failed to sync to cloud: ${error.message}`);
+            }
+            return { success: false, error: error.message };
+        }
+    },
+
+    /**
+     * Find a recipe row by Recipe_ID in the cloud workbook
+     * @param {string} recipeId - The recipe ID to find
+     * @returns {Promise<number|null>} Excel row number or null if not found
+     */
+    async findRecipeRowById(recipeId) {
+        if (!recipeId || !this.recipeTableName) return null;
+
+        const token = await this.acquireToken();
+        const baseUrl = `https://graph.microsoft.com/v1.0/drives/${this.driveId}/items/${this.itemId}/workbook`;
+        const headers = { 'Authorization': `Bearer ${token}` };
+
+        // Fetch table columns
+        const colResp = await fetch(`${baseUrl}/tables('${this.recipeTableName}')/columns`, { headers });
+        if (!colResp.ok) return null;
+        const colJson = await colResp.json();
+        const columns = colJson.value || [];
+
+        const normalize = (name) => name ? name.toLowerCase().trim().replace(/[_\s]/g, '') : '';
+        const idColIndex = columns.findIndex(col => {
+            const n = normalize(col.name);
+            return ['recipeid', 'recipe_id', 'id'].includes(n);
+        });
+        if (idColIndex === -1) return null;
+
+        // Fetch rows
+        const rowsResp = await fetch(`${baseUrl}/tables('${this.recipeTableName}')/rows`, { headers });
+        if (!rowsResp.ok) return null;
+        const rowsJson = await rowsResp.json();
+        const rows = rowsJson.value || [];
+
+        for (let i = 0; i < rows.length; i++) {
+            const cellValue = rows[i].values && rows[i].values[0] ? String(rows[i].values[0][idColIndex]) : '';
+            if (cellValue === recipeId) {
+                return i + 3; // Account for title + header rows
+            }
+        }
+
+        return null;
+    },
+
+    /**
+     * Update an existing recipe row in the cloud workbook
+     * @param {number} excelRow - The Excel row number to update
+     * @param {Array} rowValues - The values to write
+     * @returns {Promise<{success: boolean}>}
+     */
+    async updateRecipeRow(excelRow, rowValues) {
+        const token = await this.acquireToken();
+        const baseUrl = `https://graph.microsoft.com/v1.0/drives/${this.driveId}/items/${this.itemId}/workbook`;
+        const headers = {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+        };
+
+        // Get column count
+        const colResp = await fetch(`${baseUrl}/tables('${this.recipeTableName}')/columns`, { headers });
+        if (!colResp.ok) return { success: false };
+        const colJson = await colResp.json();
+        const columns = colJson.value || [];
+        const colLetter = String.fromCharCode(65 + columns.length - 1);
+
+        // PATCH the row
+        const rangeAddress = `Recipes!A${excelRow}:${colLetter}${excelRow}`;
+        const patchResp = await fetch(`${baseUrl}/worksheets('Recipes')/range(address='${rangeAddress}')`, {
+            method: 'PATCH',
+            headers,
+            body: JSON.stringify({ values: [rowValues] })
+        });
+
+        return { success: patchResp.ok };
+    },
+
+    /**
+     * Append or update a media batch to the tblMediaBatches table in the cloud workbook.
+     * Syncs batch data including recipe reference, prep details, and container tracking.
+     * @param {Object} batchData - Batch object from MediaBatchManager
+     * @returns {Promise<{success: boolean, error?: string}>}
+     */
+    async appendBatchToCloud(batchData) {
+        try {
+            if (!batchData) {
+                throw new Error('No batch data provided');
+            }
+
+            if (!this.shareUrl) {
+                throw new Error('No shareUrl configured for OneDriveSync');
+            }
+
+            if (!this.batchTableName) {
+                console.warn('OneDriveSync: batchTableName not configured, skipping batch sync');
+                return { success: false, error: 'Batch table not configured' };
+            }
+
+            // Ensure drive/item IDs are resolved
+            if (!this.driveId || !this.itemId) {
+                await this.resolveDriveItemFromShareUrl(this.shareUrl);
+            }
+
+            const token = await this.acquireToken();
+            const baseUrl = `https://graph.microsoft.com/v1.0/drives/${this.driveId}/items/${this.itemId}/workbook`;
+
+            const headers = {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            };
+
+            // Format completed prep steps
+            const completedSteps = batchData.prepSteps
+                ? batchData.prepSteps.filter(s => s.completed).map(s => s.name).join('; ')
+                : '';
+
+            // Format the row data - columns should match Excel table headers
+            // Expected columns: Batch_ID, Recipe_ID, Recipe_Name, Media_Type, Volume,
+            //                   Prepared_By, Prep_Date, Expiry_Date, Total_Containers,
+            //                   Available_Containers, Status, Completed_Steps, Notes
+            const rowPayload = {
+                values: [[
+                    batchData.id || '',
+                    batchData.recipeId || '',
+                    batchData.recipeName || '',
+                    batchData.mediaType || '',
+                    batchData.volume || '',
+                    batchData.preparedBy || '',
+                    batchData.prepDate ? new Date(batchData.prepDate).toLocaleDateString() : '',
+                    batchData.expiryDate ? new Date(batchData.expiryDate).toLocaleDateString() : '',
+                    batchData.totalContainers || 0,
+                    batchData.availableContainers || 0,
+                    batchData.status || 'in_prep',
+                    completedSteps,
+                    batchData.notes || ''
+                ]]
+            };
+
+            // Check if batch already exists (by Batch_ID) and update instead of append
+            try {
+                const existingRow = await this.findBatchRowById(batchData.id);
+                if (existingRow) {
+                    // Update existing row
+                    const updateResult = await this.updateBatchRow(existingRow, rowPayload.values[0]);
+                    if (updateResult.success) {
+                        console.log(`OneDriveSync: Updated existing batch row for ${batchData.id}`);
+                        return { success: true, updated: true };
+                    }
+                }
+            } catch (findError) {
+                console.log('OneDriveSync: Batch not found, will append new row');
+            }
+
+            // Append new row
+            const resp = await fetch(`${baseUrl}/tables('${this.batchTableName}')/rows/add`, {
+                method: 'POST',
+                headers,
+                body: JSON.stringify(rowPayload)
+            });
+
+            if (!resp.ok) {
+                const text = await resp.text();
+                throw new Error(`Failed to append batch row: ${resp.status} ${text}`);
+            }
+
+            console.log(`OneDriveSync: Appended batch "${batchData.id}" to cloud`);
+            return { success: true };
+        } catch (error) {
+            console.error('OneDriveSync: Failed to sync batch to cloud:', error);
+            return { success: false, error: error.message };
+        }
+    },
+
+    /**
+     * Find a batch row by Batch_ID in the cloud workbook
+     * @param {string} batchId - The batch ID to find
+     * @returns {Promise<number|null>} Excel row number or null if not found
+     */
+    async findBatchRowById(batchId) {
+        if (!batchId || !this.batchTableName) return null;
+
+        const token = await this.acquireToken();
+        const baseUrl = `https://graph.microsoft.com/v1.0/drives/${this.driveId}/items/${this.itemId}/workbook`;
+        const headers = { 'Authorization': `Bearer ${token}` };
+
+        // Fetch table columns
+        const colResp = await fetch(`${baseUrl}/tables('${this.batchTableName}')/columns`, { headers });
+        if (!colResp.ok) return null;
+        const colJson = await colResp.json();
+        const columns = colJson.value || [];
+
+        const normalize = (name) => name ? name.toLowerCase().trim().replace(/[_\s]/g, '') : '';
+        const idColIndex = columns.findIndex(col => {
+            const n = normalize(col.name);
+            return ['batchid', 'batch_id', 'id'].includes(n);
+        });
+        if (idColIndex === -1) return null;
+
+        // Fetch rows
+        const rowsResp = await fetch(`${baseUrl}/tables('${this.batchTableName}')/rows`, { headers });
+        if (!rowsResp.ok) return null;
+        const rowsJson = await rowsResp.json();
+        const rows = rowsJson.value || [];
+
+        for (let i = 0; i < rows.length; i++) {
+            const cellValue = rows[i].values && rows[i].values[0] ? String(rows[i].values[0][idColIndex]) : '';
+            if (cellValue === batchId) {
+                return i + 3; // Account for title + header rows
+            }
+        }
+
+        return null;
+    },
+
+    /**
+     * Update an existing batch row in the cloud workbook
+     * @param {number} excelRow - The Excel row number to update
+     * @param {Array} rowValues - The values to write
+     * @returns {Promise<{success: boolean}>}
+     */
+    async updateBatchRow(excelRow, rowValues) {
+        const token = await this.acquireToken();
+        const baseUrl = `https://graph.microsoft.com/v1.0/drives/${this.driveId}/items/${this.itemId}/workbook`;
+        const headers = {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+        };
+
+        // Get column count
+        const colResp = await fetch(`${baseUrl}/tables('${this.batchTableName}')/columns`, { headers });
+        if (!colResp.ok) return { success: false };
+        const colJson = await colResp.json();
+        const columns = colJson.value || [];
+        const colLetter = String.fromCharCode(65 + columns.length - 1);
+
+        // PATCH the row
+        const rangeAddress = `MediaBatches!A${excelRow}:${colLetter}${excelRow}`;
+        const patchResp = await fetch(`${baseUrl}/worksheets('MediaBatches')/range(address='${rangeAddress}')`, {
+            method: 'PATCH',
+            headers,
+            body: JSON.stringify({ values: [rowValues] })
+        });
+
+        return { success: patchResp.ok };
     },
 
     /**

@@ -12,7 +12,7 @@ window.ContainerInitiator = (function() {
     let initialized = false;
     
     // Ordered list of initiator steps for navigation
-    const STEPS = ['qr', 'owner', 'strain', 'media', 'stage', 'tissue', 'date'];
+    const STEPS = ['qr', 'owner', 'strain', 'media', 'stage', 'tissue', 'date', 'location'];
     
     /**
      * Initialize the container initiator
@@ -75,6 +75,7 @@ window.ContainerInitiator = (function() {
                 stage: null,
                 tissue: null,
                 date: null,
+                location: null,
                 // Marks whether the current container has been fully created
                 completed: false
             };
@@ -277,6 +278,10 @@ window.ContainerInitiator = (function() {
                 console.log('Processing date input...');
                 processDateInput();
                 break;
+            case 'location':
+                console.log('Processing location input...');
+                processLocationInput();
+                break;
             default:
                 console.log('Invalid step, resetting initiator');
                 // Reset to first step if invalid state
@@ -310,12 +315,12 @@ window.ContainerInitiator = (function() {
 
         const poolEntry = QRCodeService.lookupByRow(excelRow);
         if (!poolEntry) {
-            showFeedback(`QR code for row ${excelRow} not found in pool. Generate a batch first.`, 'error');
+            showFeedback(`QR code ID #${excelRow} not found in pool. Generate a batch first.`, 'error');
             return;
         }
 
         if (poolEntry.assignedContainerId) {
-            showFeedback(`QR code for row ${excelRow} is already assigned to container ${poolEntry.assignedContainerId}`, 'error');
+            showFeedback(`QR code ID #${excelRow} is already assigned to container ${poolEntry.assignedContainerId}`, 'error');
             return;
         }
 
@@ -328,8 +333,8 @@ window.ContainerInitiator = (function() {
         moveToStep('owner');
         updateInitiatorUI();
 
-        const idLabel = poolEntry.containerId ? ` (Container ${poolEntry.containerId})` : '';
-        showFeedback(`QR code row ${excelRow}${idLabel} selected`, 'success');
+        const displayId = poolEntry.containerId || `#${excelRow}`;
+        showFeedback(`QR code ID: ${displayId} selected`, 'success');
     }
 
     /**
@@ -395,20 +400,40 @@ window.ContainerInitiator = (function() {
             return;
         }
 
+        // DEBUG: Log current state of strain data
+        console.log('=== STRAIN LOOKUP DEBUG ===');
+        console.log('Input:', input);
+        console.log('appState.isDataLoaded:', window.appState?.isDataLoaded);
+        console.log('appState.strainsTable:', window.appState?.strainsTable);
+        console.log('strainsTable keys:', Object.keys(window.appState?.strainsTable || {}));
+        console.log('InventoryLookupService available:', !!window.InventoryLookupService);
+        console.log('InventoryLookupService initialized:', window.InventoryLookupService?.isInitialized?.());
+
+        // Get all strains from lookup service for debugging
+        if (window.InventoryLookupService && window.InventoryLookupService.isInitialized()) {
+            const allStrains = window.InventoryLookupService.getAllStrains();
+            console.log('All strains from LookupService:', allStrains);
+        }
+
         // Use InventoryLookupService if available
         let resolvedStrainId = null;
         let strainName = null;
 
         if (window.InventoryLookupService && window.InventoryLookupService.isInitialized()) {
             const strainData = window.InventoryLookupService.resolveStrain(input);
+            console.log('resolveStrain result for input "' + input + '":', strainData);
+
             if (strainData) {
                 resolvedStrainId = strainData.id;
                 strainName = strainData.name;
                 const abbr = strainData.abbreviation ? ` [${strainData.abbreviation}]` : '';
                 showFeedback(`Strain resolved: ${input} → #${strainData.id} ${strainData.name}${abbr}`, 'success');
             } else {
-                // Not found in lookup - BLOCK progression
-                showFeedback(`ERROR: Strain "${input}" not recognized. Please enter a valid strain ID, abbreviation (e.g., AC1), or exact name from the HQ workbook.`, 'error');
+                // Not found in lookup - show debug info and available strains
+                const allStrains = window.InventoryLookupService.getAllStrains();
+                const availableIds = allStrains.map(s => s.id).slice(0, 20).join(', ');
+                console.error(`Strain "${input}" not found. Available strain IDs (first 20):`, availableIds);
+                showFeedback(`ERROR: Strain "${input}" not recognized. Available IDs: ${availableIds || 'none loaded'}. Check console for details.`, 'error');
                 return; // Do not proceed
             }
         } else {
@@ -594,19 +619,56 @@ window.ContainerInitiator = (function() {
      */
     function processDateInput() {
         const input = document.getElementById('initiatorInput').value.trim();
-        
+
         if (!input) {
             showFeedback('Please enter a valid date', 'error');
             return;
         }
-        
+
         if (!input.match(/^\d{8}$/)) {
             showFeedback('Date must be in YYYYMMDD format', 'error');
             return;
         }
-        
+
         StateManager.setState('initiatorState.date', input);
-        
+
+        // Move to location step (optional step before container creation)
+        moveToStep('location');
+        updateInitiatorUI();
+        showFeedback(`Date set to: ${input}. Select a location below or skip, then click "Create Container".`, 'success');
+    }
+
+    /**
+     * Process location input
+     * Location is optional - user can skip by pressing Enter with empty input
+     */
+    function processLocationInput() {
+        const input = document.getElementById('initiatorInput').value.trim();
+
+        // Location is optional, so empty input is allowed
+        if (input) {
+            // Validate against known locations if lookup service is available
+            if (window.InventoryLookupService && window.InventoryLookupService.isInitialized()) {
+                const resolvedLocation = window.InventoryLookupService.resolveLocation(input);
+                if (resolvedLocation) {
+                    StateManager.setState('initiatorState.location', resolvedLocation);
+                    showFeedback(`Location resolved: ${input} → ${resolvedLocation}`, 'success');
+                } else {
+                    // Not found in lookup - use input as-is (custom location)
+                    StateManager.setState('initiatorState.location', input);
+                    showFeedback(`Custom location set: ${input}`, 'info');
+                }
+            } else {
+                // No lookup service - use input as-is
+                StateManager.setState('initiatorState.location', input);
+                showFeedback(`Location set to: ${input}`, 'success');
+            }
+        } else {
+            // Skip location - set to null
+            StateManager.setState('initiatorState.location', null);
+            showFeedback('Location skipped. Creating container...', 'info');
+        }
+
         // All fields collected - generate container and complete inventory entry
         generateContainer();
     }
@@ -652,7 +714,9 @@ window.ContainerInitiator = (function() {
         let ownerName = owner;
         let strainName = 'Unknown Strain';
         // For no-media containers, display N/A explicitly
-        let mediaName = hasNoMedia ? 'N/A' : null;
+        // Otherwise, start with the already-resolved name from state (set during media input or recipe selection)
+        const storedMediaName = StateManager.getState('initiatorState.mediaName');
+        let mediaName = hasNoMedia ? 'N/A' : (storedMediaName || null);
         
         // Look up owner name from reference data
         if (window.appState.isDataLoaded && window.appState.ownersTable) {
@@ -697,7 +761,10 @@ window.ContainerInitiator = (function() {
         const stage = StateManager.getState('initiatorState.stage');
         const tissue = StateManager.getState('initiatorState.tissue');
         const dateRaw = StateManager.getState('initiatorState.date');
-        
+        const location = StateManager.getState('initiatorState.location');
+        const recipeId = StateManager.getState('initiatorState.recipeId');
+        const recipeName = StateManager.getState('initiatorState.recipeName');
+
         if (!stage || !tissue || !dateRaw) {
             showFeedback('Missing required information (stage, tissue, date)', 'error');
             return;
@@ -766,9 +833,13 @@ window.ContainerInitiator = (function() {
             media: mediaName || 'Unknown',
             mediaType: mediaName || 'Unknown',
             mediaId: hasNoMedia ? null : mediaUpper,
+            recipeId: recipeId || null,
+            recipeName: recipeName || null,
+            location: location || null,
             tissueCount: tissue,
             date: formattedDate,
-            status: 'Complete'
+            status: 'Complete',
+            notes: barcodeString  // Store barcode in notes for preservation
         };
         
         // Add to inventory using StateManager to ensure proper tracking
@@ -812,10 +883,37 @@ window.ContainerInitiator = (function() {
         if (window.InventoryManager && typeof window.InventoryManager.saveToLocalStorage === 'function') {
             window.InventoryManager.saveToLocalStorage();
         }
-        
+
+        // Sync to cloud - update the pre-populated row with all metadata including location
+        if (window.OneDriveSync && window.OneDriveSync.updateRowByContainerId) {
+            (async () => {
+                try {
+                    console.log(`ContainerInitiator: Syncing new container ${currentContainerId} to cloud...`);
+                    const result = await window.OneDriveSync.updateRowByContainerId(currentContainerId, {
+                        strain: strainName,
+                        owner: ownerName,
+                        stage: stageName,
+                        location: location || '',
+                        media: mediaName || '',
+                        tissueCount: tissue,
+                        date: formattedDate,
+                        notes: barcodeString,
+                        status: 'Complete'
+                    });
+                    if (result.success) {
+                        console.log(`ContainerInitiator: Cloud sync successful for ${currentContainerId}`);
+                    } else {
+                        console.warn(`ContainerInitiator: Cloud sync failed for ${currentContainerId}`);
+                    }
+                } catch (err) {
+                    console.error('ContainerInitiator: Error syncing to cloud:', err);
+                }
+            })();
+        }
+
         // QR codes are pre-printed and assigned during the QR scan step.
         // No runtime QR generation needed.
-        
+
         // Show success message
         showFeedback(`Container ${currentContainerId} created successfully!`, 'success');
         
@@ -858,10 +956,11 @@ window.ContainerInitiator = (function() {
             const qrRow = StateManager.getState('initiatorState.qrExcelRow');
             if (qrRow) {
                 const poolEntry = window.QRCodeService ? window.QRCodeService.lookupByRow(qrRow) : null;
+                const displayId = poolEntry?.containerId || `#${qrRow}`;
                 qrEl.innerHTML = `
                     <div style="background: #d1fae5; border: 2px solid #059669; border-radius: 8px; padding: 12px; margin-top: 10px;">
                         <p style="margin: 0 0 4px 0; font-weight: 600; color: #065f46;">QR Code Assigned</p>
-                        <p style="margin: 0; font-size: 0.85rem; color: #047857;">Row ${qrRow}${poolEntry && poolEntry.containerId ? ` — ${poolEntry.containerId}` : ''}</p>
+                        <p style="margin: 0; font-size: 0.85rem; color: #047857;">ID: ${displayId}</p>
                     </div>
                 `;
             } else {
@@ -898,9 +997,17 @@ window.ContainerInitiator = (function() {
             backBtn.disabled = (currentStep === 'qr' || isCompleted);
         }
         
-        // Update primary button label based on completion state
+        // Update primary button label based on current step and completion state
         if (nextBtn) {
-            nextBtn.textContent = isCompleted ? 'Start New Container' : 'Next Step';
+            if (isCompleted) {
+                nextBtn.textContent = 'Start New Container';
+            } else if (currentStep === 'location') {
+                nextBtn.textContent = '✅ Create Container';
+                nextBtn.style.background = '#059669'; // Green to indicate final action
+            } else {
+                nextBtn.textContent = 'Next Step';
+                nextBtn.style.background = ''; // Reset to default
+            }
         }
         
         // Show quick date buttons only on the date step
@@ -923,6 +1030,18 @@ window.ContainerInitiator = (function() {
                 tomorrowBtn.textContent = formatDateYYYYMMDD(tomorrowDate);
             }
         }
+
+        // Show location picker only on the location step
+        const locationPicker = document.getElementById('initiatorLocationPicker');
+        if (locationPicker) {
+            const isLocationStep = currentStep === 'location';
+            locationPicker.style.display = isLocationStep ? 'block' : 'none';
+
+            // When entering location step, populate the dropdown
+            if (isLocationStep) {
+                populateLocationDropdown();
+            }
+        }
         
         // Update prompt and hint based on step
         switch (currentStep) {
@@ -940,7 +1059,7 @@ window.ContainerInitiator = (function() {
                 break;
             case 'media':
                 prompt.textContent = 'Enter Media Type (optional):';
-                hint.textContent = 'Type the media code, "N/A" if no media, or leave blank';
+                hint.textContent = 'Type media code, "N/A" for no media, or select a recipe below';
                 break;
             case 'stage':
                 prompt.textContent = 'Enter Stage (1-9):';
@@ -954,6 +1073,10 @@ window.ContainerInitiator = (function() {
                 prompt.textContent = 'Enter Date (YYYYMMDD):';
                 hint.textContent = 'Type the date in YYYYMMDD format, e.g., 20250106';
                 break;
+            case 'location':
+                prompt.textContent = 'Enter Location (optional):';
+                hint.textContent = 'Type location (e.g., Tent 1, 231 Top Shelf) or press Enter to skip';
+                break;
             default:
                 prompt.textContent = 'Enter value:';
                 hint.textContent = 'Type the required value and press Enter';
@@ -961,6 +1084,9 @@ window.ContainerInitiator = (function() {
         
         // Show QR batch picker when on QR step
         showQrBatchPicker(currentStep === 'qr');
+
+        // Show recipe picker when on media step
+        showRecipePicker(currentStep === 'media');
 
         // Focus on input
         input.focus();
@@ -975,23 +1101,29 @@ window.ContainerInitiator = (function() {
     function updateStatusSummary() {
         const summaryElement = document.getElementById('initiatorSummary');
         if (!summaryElement) return;
-        
-        const qrExcelRow = StateManager.getState('initiatorState.qrExcelRow') || '-';
+
+        const qrExcelRow = StateManager.getState('initiatorState.qrExcelRow');
+        const prePopulatedId = StateManager.getState('initiatorState.prePopulatedContainerId');
         const owner = StateManager.getState('initiatorState.owner') || '-';
         const strain = StateManager.getState('initiatorState.strain') || '-';
         const media = StateManager.getState('initiatorState.media') || '-';
         const stage = StateManager.getState('initiatorState.stage') || '-';
         const tissue = StateManager.getState('initiatorState.tissue') || '-';
         const date = StateManager.getState('initiatorState.date') || '-';
+        const location = StateManager.getState('initiatorState.location') || '-';
+
+        // Display container ID if available, otherwise show QR # format
+        const qrDisplayId = prePopulatedId || (qrExcelRow ? `#${qrExcelRow}` : '-');
 
         summaryElement.innerHTML = `
-            <div class="status-item">QR Row: <strong>${qrExcelRow}</strong></div>
+            <div class="status-item">QR ID: <strong>${qrDisplayId}</strong></div>
             <div class="status-item">Owner: <strong>${owner}</strong></div>
             <div class="status-item">Strain: <strong>${strain}</strong></div>
             <div class="status-item">Media: <strong>${media}</strong></div>
             <div class="status-item">Stage: <strong>${stage}</strong></div>
             <div class="status-item">Tissue: <strong>${tissue}</strong></div>
             <div class="status-item">Date: <strong>${date}</strong></div>
+            <div class="status-item">Location: <strong>${location}</strong></div>
             <div class="status-item">Next ID: <strong>${currentContainerId || '-'}</strong></div>
         `;
     }
@@ -1039,12 +1171,77 @@ window.ContainerInitiator = (function() {
             // Store in state so the summary reflects the selection
             StateManager.setState('initiatorState.date', formatted);
             updateStatusSummary();
-            showFeedback(`Date set to: ${formatted}. Press Next to create the container.`, 'info');
+            showFeedback(`Date set to: ${formatted}. Press Next to set location.`, 'info');
         } catch (error) {
             console.error('❌ Error selecting quick date:', error);
         }
     }
     
+    /**
+     * Populate the location dropdown with available locations from HQ workbook
+     */
+    function populateLocationDropdown() {
+        const select = document.getElementById('initiatorLocationSelect');
+        if (!select) return;
+
+        // Get locations from available sources
+        let locations = [];
+        if (window.InventoryLookupService && window.InventoryLookupService.isInitialized()) {
+            locations = window.InventoryLookupService.getAllLocations();
+        } else if (window.appState.locationsTable && window.appState.locationsTable.length > 0) {
+            locations = window.appState.locationsTable;
+        }
+
+        // Build options HTML
+        let optionsHtml = '<option value="">-- Select from HQ Locations --</option>';
+        optionsHtml += '<option value="_skip_">Skip (no location)</option>';
+
+        locations.forEach(loc => {
+            optionsHtml += `<option value="${loc}">${loc}</option>`;
+        });
+
+        select.innerHTML = optionsHtml;
+
+        // Pre-select current value if set
+        const currentLocation = StateManager.getState('initiatorState.location');
+        if (currentLocation) {
+            select.value = currentLocation;
+        }
+    }
+
+    /**
+     * Quick-select location from dropdown
+     * @param {string} location - Selected location value
+     */
+    function selectLocation(location) {
+        try {
+            const currentStep = StateManager.getState('initiatorState.currentStep');
+            if (currentStep !== 'location') {
+                // If somehow called on another step, force to location step first
+                moveToStep('location');
+                updateInitiatorUI();
+            }
+
+            const input = document.getElementById('initiatorInput');
+
+            if (location === '_skip_') {
+                // User chose to skip location
+                if (input) input.value = '';
+                StateManager.setState('initiatorState.location', null);
+                updateStatusSummary();
+                showFeedback('Location skipped. Click "Create Container" to finish.', 'info');
+            } else if (location) {
+                // User selected a location
+                if (input) input.value = location;
+                StateManager.setState('initiatorState.location', location);
+                updateStatusSummary();
+                showFeedback(`Location set to: ${location}. Click "Create Container" to finish.`, 'success');
+            }
+        } catch (error) {
+            console.error('❌ Error selecting location:', error);
+        }
+    }
+
     /**
      * Navigate to the previous step, allowing corrections
      */
@@ -1090,6 +1287,9 @@ window.ContainerInitiator = (function() {
                     break;
                 case 'date':
                     previousValue = StateManager.getState('initiatorState.date');
+                    break;
+                case 'location':
+                    previousValue = StateManager.getState('initiatorState.location');
                     break;
             }
 
@@ -1186,6 +1386,7 @@ window.ContainerInitiator = (function() {
             stage: null,
             tissue: null,
             date: null,
+            location: null,
             completed: false
         });
         
@@ -1287,6 +1488,241 @@ window.ContainerInitiator = (function() {
     }
 
     /**
+     * Show/hide a visual picker of available recipes.
+     * Allows the user to click a recipe to select it for media type.
+     */
+    function showRecipePicker(show) {
+        let picker = document.getElementById('recipePicker');
+
+        if (!show) {
+            if (picker) picker.style.display = 'none';
+            return;
+        }
+
+        // Get recipes from RecipeStorage
+        let recipes = [];
+        if (window.RecipeStorage) {
+            recipes = RecipeStorage.getAllRecipes() || [];
+        }
+
+        if (!picker) {
+            // Create the picker container
+            picker = document.createElement('div');
+            picker.id = 'recipePicker';
+            picker.style.cssText = 'margin-top: 12px; max-height: 300px; overflow-y: auto; border: 1px solid #e2e8f0; border-radius: 8px; padding: 10px; background: #f0fdf4;';
+
+            // Insert after the initiator input area
+            const inputArea = document.getElementById('initiatorInput');
+            if (inputArea && inputArea.parentElement) {
+                inputArea.parentElement.parentElement.appendChild(picker);
+            } else {
+                const initiatorSection = document.querySelector('.initiator-section, #containerInitiator');
+                if (initiatorSection) {
+                    initiatorSection.appendChild(picker);
+                }
+            }
+        }
+
+        picker.style.display = 'block';
+
+        if (recipes.length === 0) {
+            picker.innerHTML = `
+                <p style="color: #6b7280; font-size: 0.85rem; margin: 0;">
+                    📋 No recipes available. Create recipes in the Media Lab section.
+                </p>
+                <p style="color: #9ca3af; font-size: 0.75rem; margin: 8px 0 0 0;">
+                    Or type a media code manually above (e.g., "Initiation", "IA", "N/A")
+                </p>
+            `;
+            return;
+        }
+
+        // Group recipes by media type
+        const recipesByType = {};
+        recipes.forEach(recipe => {
+            const type = recipe.mediaType || 'Other';
+            if (!recipesByType[type]) recipesByType[type] = [];
+            recipesByType[type].push(recipe);
+        });
+
+        let html = '<p style="margin: 0 0 10px; font-size: 0.9rem; font-weight: 600; color: #166534;">🧪 Select a Recipe:</p>';
+
+        // Add "N/A - No Media" option at the top
+        html += `
+            <div class="recipe-picker-item" data-media-code="N/A" data-recipe-id=""
+                 style="display: flex; align-items: center; padding: 10px; margin-bottom: 8px; border: 2px solid #d1d5db; border-radius: 8px; background: #f3f4f6; cursor: pointer; transition: all 0.2s;"
+                 onmouseover="this.style.borderColor='#6b7280'; this.style.background='#e5e7eb';"
+                 onmouseout="this.style.borderColor='#d1d5db'; this.style.background='#f3f4f6';">
+                <div style="width: 40px; height: 40px; border-radius: 8px; background: #9ca3af; display: flex; align-items: center; justify-content: center; margin-right: 12px;">
+                    <span style="font-size: 18px;">⊘</span>
+                </div>
+                <div style="flex: 1;">
+                    <div style="font-weight: 600; color: #374151;">N/A - No Media</div>
+                    <div style="font-size: 0.75rem; color: #6b7280;">Skip media selection</div>
+                </div>
+            </div>
+        `;
+
+        // Add recipes grouped by type
+        Object.keys(recipesByType).forEach(mediaType => {
+            const typeRecipes = recipesByType[mediaType];
+            const typeColor = getMediaTypeColor(mediaType);
+
+            html += `<div style="margin-top: 12px; margin-bottom: 8px; font-size: 0.8rem; font-weight: 600; color: ${typeColor}; text-transform: uppercase; letter-spacing: 0.5px;">${mediaType}</div>`;
+
+            typeRecipes.forEach(recipe => {
+                // Get available batches for this recipe
+                let batchInfo = '';
+                let totalContainers = 0;
+                if (window.MediaBatchManager) {
+                    const batches = MediaBatchManager.getAvailableBatches(recipe.mediaType);
+                    const recipeBatches = batches.filter(b => b.recipeId === recipe.id);
+                    if (recipeBatches.length > 0) {
+                        totalContainers = recipeBatches.reduce((sum, b) => sum + (b.availableContainers || 0), 0);
+                        batchInfo = `${recipeBatches.length} batch(es), ${totalContainers} containers available`;
+                    }
+                }
+
+                html += `
+                    <div class="recipe-picker-item" data-media-code="${recipe.mediaType}" data-recipe-id="${recipe.id}" data-recipe-name="${recipe.name}"
+                         style="display: flex; align-items: center; padding: 10px; margin-bottom: 8px; border: 2px solid #e2e8f0; border-radius: 8px; background: white; cursor: pointer; transition: all 0.2s;"
+                         onmouseover="this.style.borderColor='${typeColor}'; this.style.background='#f0fdf4';"
+                         onmouseout="this.style.borderColor='#e2e8f0'; this.style.background='white';">
+                        <div style="width: 40px; height: 40px; border-radius: 8px; background: ${typeColor}; display: flex; align-items: center; justify-content: center; margin-right: 12px;">
+                            <span style="color: white; font-size: 14px; font-weight: bold;">${recipe.mediaType?.substring(0,2) || '??'}</span>
+                        </div>
+                        <div style="flex: 1;">
+                            <div style="font-weight: 600; color: #1f2937;">${recipe.name}</div>
+                            <div style="font-size: 0.75rem; color: #6b7280;">
+                                ${recipe.volume || '1L'} • ${recipe.basalSalt?.type || 'N/A'} base
+                                ${batchInfo ? ` • <span style="color: #059669;">${batchInfo}</span>` : ''}
+                            </div>
+                        </div>
+                        ${totalContainers > 0 ? `<div style="background: #dcfce7; color: #166534; padding: 4px 8px; border-radius: 12px; font-size: 0.7rem; font-weight: 600;">${totalContainers} avail</div>` : ''}
+                    </div>
+                `;
+            });
+        });
+
+        picker.innerHTML = html;
+
+        // Add click handlers
+        picker.querySelectorAll('.recipe-picker-item').forEach(item => {
+            item.addEventListener('click', function() {
+                const mediaCode = this.getAttribute('data-media-code');
+                const recipeId = this.getAttribute('data-recipe-id');
+                const recipeName = this.getAttribute('data-recipe-name');
+
+                selectRecipeForMedia(mediaCode, recipeId, recipeName);
+            });
+        });
+    }
+
+    /**
+     * Get color for media type (for recipe picker)
+     */
+    function getMediaTypeColor(mediaType) {
+        const colors = {
+            'Initiation': '#059669',
+            'Multiplication': '#2563eb',
+            'Rooting': '#7c3aed',
+            'IA': '#059669',
+            'MA': '#2563eb',
+            'RA': '#7c3aed'
+        };
+        return colors[mediaType] || '#6b7280';
+    }
+
+    /**
+     * Handle recipe selection from picker
+     */
+    function selectRecipeForMedia(mediaCode, recipeId, recipeName) {
+        const input = document.getElementById('initiatorInput');
+
+        if (mediaCode === 'N/A') {
+            // No media selected
+            if (input) input.value = 'N/A';
+            StateManager.setState('initiatorState.media', 'N/A');
+            StateManager.setState('initiatorState.mediaName', 'N/A');
+            StateManager.setState('initiatorState.recipeId', null);
+            StateManager.setState('initiatorState.recipeName', null);
+
+            // Hide the recipe picker
+            showRecipePicker(false);
+
+            moveToStep('stage');
+            updateInitiatorUI();
+            showFeedback('Media set to: N/A (no media)', 'success');
+            return;
+        }
+
+        // Resolve the recipe mediaType (e.g., "Initiation") to a proper code and name
+        // using InventoryLookupService, which maps names/codes to canonical {code, name}
+        let resolvedCode = mediaCode;
+        let resolvedName = mediaCode;
+
+        if (window.InventoryLookupService && window.InventoryLookupService.isInitialized()) {
+            const mediaData = InventoryLookupService.resolveMediaType(mediaCode);
+            if (mediaData) {
+                resolvedCode = mediaData.code;
+                resolvedName = mediaData.name;
+            }
+        } else if (window.appState.isDataLoaded && window.appState.mediaTypesTable) {
+            // Fallback: try direct lookup by code, then search by name
+            const table = window.appState.mediaTypesTable;
+            const upperCode = mediaCode.toUpperCase();
+            if (table[upperCode]) {
+                resolvedCode = upperCode;
+                const entry = table[upperCode];
+                resolvedName = typeof entry === 'string' ? entry : (entry && entry.name ? entry.name : mediaCode);
+            } else {
+                // Search by name match (e.g., "Initiation" -> find key "IA" with name "Initiation")
+                for (const [key, val] of Object.entries(table)) {
+                    const name = typeof val === 'string' ? val : (val && val.name ? val.name : '');
+                    if (name.toLowerCase() === mediaCode.toLowerCase()) {
+                        resolvedCode = key;
+                        resolvedName = name;
+                        break;
+                    }
+                }
+            }
+        }
+
+        // Set the input value
+        if (input) input.value = resolvedCode;
+
+        // Store the resolved media code and name, plus recipe info
+        StateManager.setState('initiatorState.media', resolvedCode);
+        StateManager.setState('initiatorState.mediaName', resolvedName);
+        StateManager.setState('initiatorState.recipeId', recipeId);
+        StateManager.setState('initiatorState.recipeName', recipeName);
+
+        // Check for available batches
+        if (window.MediaBatchManager && recipeId) {
+            const allBatches = MediaBatchManager.getAvailableBatches(resolvedCode);
+            const recipeBatches = allBatches.filter(b => b.recipeId === recipeId);
+
+            if (recipeBatches.length > 0) {
+                // Auto-select the first available batch for this recipe
+                StateManager.setState('initiatorState.mediaBatchId', recipeBatches[0].id);
+                const totalContainers = recipeBatches.reduce((sum, b) => sum + (b.availableContainers || 0), 0);
+                showFeedback(`Recipe: ${recipeName}. ${recipeBatches.length} batch(es) available with ${totalContainers} containers.`, 'success');
+            } else {
+                showFeedback(`Recipe: ${recipeName} selected. No prepared batches available.`, 'info');
+            }
+        } else {
+            showFeedback(`Media: ${resolvedCode} - ${resolvedName} (${recipeName || 'custom'})`, 'success');
+        }
+
+        // Hide the recipe picker
+        showRecipePicker(false);
+
+        // Move to next step
+        moveToStep('stage');
+        updateInitiatorUI();
+    }
+
+    /**
      * Refresh the QR batch picker (call after generating new QR codes)
      * Always refreshes if the picker element exists, regardless of current step
      */
@@ -1315,6 +1751,7 @@ window.ContainerInitiator = (function() {
         handleInitiatorInput: handleInitiatorInput,
         goToPreviousStep: goToPreviousStep,
         selectQuickDate: selectQuickDate,
+        selectLocation: selectLocation,
         refreshQrPicker: refreshQrPicker
     };
 })();

@@ -1371,7 +1371,7 @@ function cancelContainerEdit() {
 /**
  * Save container changes
  */
-function saveContainerChanges() {
+async function saveContainerChanges() {
     const container = window.currentEditingContainer;
     if (!container) return;
 
@@ -1398,6 +1398,31 @@ function saveContainerChanges() {
     // Save to localStorage
     if (window.InventoryManager && typeof window.InventoryManager.saveToLocalStorage === 'function') {
         window.InventoryManager.saveToLocalStorage();
+    }
+
+    // Sync to cloud
+    if (window.OneDriveSync && window.OneDriveSync.updateRowByContainerId) {
+        try {
+            console.log(`saveContainerChanges: Syncing updates for ${container.containerId} to cloud...`);
+            const result = await window.OneDriveSync.updateRowByContainerId(container.containerId, {
+                strain: container.strain || container.strainName || '',
+                owner: container.owner || container.ownerName || '',
+                stage: container.stage || container.stageName || '',
+                location: container.location || '',
+                media: container.media || container.mediaType || '',
+                tissueCount: container.tissueCount || container.quantity || '',
+                date: container.date || container.dateCreated || '',
+                notes: container.notes || '',
+                status: container.status || ''
+            });
+            if (result.success) {
+                console.log(`saveContainerChanges: Cloud sync successful for ${container.containerId}`);
+            } else {
+                console.warn(`saveContainerChanges: Cloud sync failed for ${container.containerId}`);
+            }
+        } catch (err) {
+            console.error('saveContainerChanges: Error syncing to cloud:', err);
+        }
     }
 
     // Refresh inventory table if visible
@@ -1527,11 +1552,11 @@ function viewQrPool() {
         html += '<h4 style="margin: 15px 0 10px;">Available (Unassigned)</h4>';
         html += '<div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px;">';
         unassigned.forEach(qr => {
+            const displayId = qr.containerId || `#${qr.excelRow}`;
             html += `
                 <div style="text-align: center; padding: 10px; border: 1px solid #e2e8f0; border-radius: 8px; background: white;">
-                    <img src="${qr.dataUrl}" alt="QR Row ${qr.excelRow}" style="width: 120px; height: 120px;" />
-                    <p style="margin: 6px 0 0; font-family: monospace; font-size: 0.85rem; font-weight: bold;">Row ${qr.excelRow}</p>
-                    ${qr.containerId ? `<p style="margin: 2px 0 0; font-size: 0.75rem; color: #059669;">ID: ${qr.containerId}</p>` : ''}
+                    <img src="${qr.dataUrl}" alt="QR ID ${displayId}" style="width: 120px; height: 120px;" />
+                    <p style="margin: 6px 0 0; font-family: monospace; font-size: 0.9rem; font-weight: bold; color: #059669;">ID: ${displayId}</p>
                 </div>`;
         });
         html += '</div>';
@@ -1541,11 +1566,12 @@ function viewQrPool() {
         html += '<h4 style="margin: 20px 0 10px;">Assigned</h4>';
         html += '<div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px;">';
         assigned.forEach(qr => {
+            const displayId = qr.containerId || `#${qr.excelRow}`;
             html += `
                 <div style="text-align: center; padding: 10px; border: 1px solid #10b981; border-radius: 8px; background: #f0fdf4;">
-                    <img src="${qr.dataUrl}" alt="QR Row ${qr.excelRow}" style="width: 120px; height: 120px;" />
-                    <p style="margin: 6px 0 0; font-family: monospace; font-size: 0.85rem; font-weight: bold;">Row ${qr.excelRow}</p>
-                    <p style="margin: 2px 0 0; font-size: 0.75rem; color: #059669;">Container: ${qr.assignedContainerId}</p>
+                    <img src="${qr.dataUrl}" alt="QR ID ${displayId}" style="width: 120px; height: 120px;" />
+                    <p style="margin: 6px 0 0; font-family: monospace; font-size: 0.9rem; font-weight: bold; color: #059669;">ID: ${displayId}</p>
+                    <p style="margin: 2px 0 0; font-size: 0.75rem; color: #047857;">→ ${qr.assignedContainerId}</p>
                 </div>`;
         });
         html += '</div>';
@@ -1601,35 +1627,57 @@ function initializeInventoryLookupService() {
                 });
             }
 
-            // Also populate appState tables if they're empty (fallback data source)
-            if (data.strainNameMapping && Object.keys(window.appState.strainsTable).length === 0) {
+            // Populate appState tables from JSON - prefer JSON if it has more data than cached
+            // This ensures updated JSON data takes priority over stale localStorage cache
+            const currentStrainsCount = Object.keys(window.appState.strainsTable || {}).length;
+            const jsonStrainsCount = Object.keys(data.strainNameMapping || {}).length;
+
+            if (data.strainNameMapping && jsonStrainsCount > currentStrainsCount) {
                 window.appState.strainsTable = data.strainNameMapping;
-                console.log(`  Loaded ${Object.keys(data.strainNameMapping).length} strains from lookup data`);
+                console.log(`  Loaded ${jsonStrainsCount} strains from lookup data (was ${currentStrainsCount})`);
+            } else if (data.strainNameMapping && currentStrainsCount === 0) {
+                window.appState.strainsTable = data.strainNameMapping;
+                console.log(`  Loaded ${jsonStrainsCount} strains from lookup data`);
             }
 
-            if (data.ownerNameMapping && Object.keys(window.appState.ownersTable).length === 0) {
+            const currentOwnersCount = Object.keys(window.appState.ownersTable || {}).length;
+            const jsonOwnersCount = Object.keys(data.ownerNameMapping || {}).length;
+
+            if (data.ownerNameMapping && (jsonOwnersCount > currentOwnersCount || currentOwnersCount === 0)) {
                 window.appState.ownersTable = data.ownerNameMapping;
-                console.log(`  Loaded ${Object.keys(data.ownerNameMapping).length} owners from lookup data`);
+                console.log(`  Loaded ${jsonOwnersCount} owners from lookup data`);
             }
 
-            if (data.stageNameMapping && Object.keys(window.appState.stagesTable).length === 0) {
+            const currentStagesCount = Object.keys(window.appState.stagesTable || {}).length;
+            const jsonStagesCount = Object.keys(data.stageNameMapping || {}).length;
+
+            if (data.stageNameMapping && (jsonStagesCount > currentStagesCount || currentStagesCount === 0)) {
                 window.appState.stagesTable = data.stageNameMapping;
-                console.log(`  Loaded ${Object.keys(data.stageNameMapping).length} stages from lookup data`);
+                console.log(`  Loaded ${jsonStagesCount} stages from lookup data`);
             }
 
-            if (data.mediaTypeMapping && Object.keys(window.appState.mediaTypesTable).length === 0) {
+            const currentMediaCount = Object.keys(window.appState.mediaTypesTable || {}).length;
+            const jsonMediaCount = Object.keys(data.mediaTypeMapping || {}).length;
+
+            if (data.mediaTypeMapping && (jsonMediaCount > currentMediaCount || currentMediaCount === 0)) {
                 window.appState.mediaTypesTable = data.mediaTypeMapping;
-                console.log(`  Loaded ${Object.keys(data.mediaTypeMapping).length} media types from lookup data`);
+                console.log(`  Loaded ${jsonMediaCount} media types from lookup data`);
             }
 
-            if (data.locationsList && window.appState.locationsTable.length === 0) {
+            const currentLocationsCount = (window.appState.locationsTable || []).length;
+            const jsonLocationsCount = (data.locationsList || []).length;
+
+            if (data.locationsList && (jsonLocationsCount > currentLocationsCount || currentLocationsCount === 0)) {
                 window.appState.locationsTable = data.locationsList;
-                console.log(`  Loaded ${data.locationsList.length} locations from lookup data`);
+                console.log(`  Loaded ${jsonLocationsCount} locations from lookup data`);
             }
 
-            if (data.strainOwnerMapping && Object.keys(window.appState.strainOwnerMapping || {}).length === 0) {
+            const currentMappingsCount = Object.keys(window.appState.strainOwnerMapping || {}).length;
+            const jsonMappingsCount = Object.keys(data.strainOwnerMapping || {}).length;
+
+            if (data.strainOwnerMapping && (jsonMappingsCount > currentMappingsCount || currentMappingsCount === 0)) {
                 window.appState.strainOwnerMapping = data.strainOwnerMapping;
-                console.log(`  Loaded ${Object.keys(data.strainOwnerMapping).length} strain-owner mappings from lookup data`);
+                console.log(`  Loaded ${jsonMappingsCount} strain-owner mappings from lookup data`);
             }
 
             // Initialize the lookup service
@@ -1639,6 +1687,12 @@ function initializeInventoryLookupService() {
             window.appState.isDataLoaded = true;
 
             console.log('✅ Inventory Lookup Service initialized successfully');
+            console.log(`   Final strain count: ${Object.keys(window.appState.strainsTable).length}`);
+
+            // Refresh UI to show updated counts
+            if (window.UIUtils && window.UIUtils.updateDataStatus) {
+                window.UIUtils.updateDataStatus(true, 'inventory_lookup_data.json', false);
+            }
 
             // Notify other modules that data is available
             if (window.DataUtils && window.DataUtils.triggerDataLoadedCallbacks) {

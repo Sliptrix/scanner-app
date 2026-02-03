@@ -89,10 +89,20 @@ window.InventoryLookupService = (function() {
     function buildStrainMap() {
         const strainsTable = window.appState.strainsTable || {};
 
+        // Merge abbreviations from appState (from cloud sync) with locally loaded ones
+        const cloudAbbreviations = window.appState.strainAbbreviations || {};
+        const mergedAbbreviations = { ...strainAbbreviations, ...cloudAbbreviations };
+
+        console.log('=== InventoryLookupService.buildStrainMap DEBUG ===');
+        console.log('strainsTable source:', strainsTable);
+        console.log('strainsTable keys:', Object.keys(strainsTable));
+        console.log('strainsTable entries count:', Object.keys(strainsTable).length);
+        console.log('strainAbbreviations count:', Object.keys(mergedAbbreviations).length);
+
         Object.entries(strainsTable).forEach(([id, name]) => {
             const strainId = String(id);
             const strainName = typeof name === 'object' ? name.name : String(name);
-            const abbreviation = strainAbbreviations[strainId] || generateDefaultAbbreviation(strainName, strainId);
+            const abbreviation = mergedAbbreviations[strainId] || generateDefaultAbbreviation(strainName, strainId);
 
             const strainData = {
                 id: strainId,
@@ -100,8 +110,17 @@ window.InventoryLookupService = (function() {
                 abbreviation: abbreviation
             };
 
-            // Map by ID (as string)
+            // Map by ID (as string, unpadded)
             strainMap.set(strainId, strainData);
+
+            // Also map by padded ID (e.g., "00013" for ID 13) for barcode compatibility
+            const numericId = parseInt(strainId, 10);
+            if (!isNaN(numericId)) {
+                const paddedId = String(numericId).padStart(5, '0');
+                if (paddedId !== strainId) {
+                    strainMap.set(paddedId, strainData);
+                }
+            }
 
             // Map by abbreviation (case-insensitive)
             if (abbreviation) {
@@ -111,6 +130,9 @@ window.InventoryLookupService = (function() {
             // Map by full name (case-insensitive)
             strainMap.set(strainName.toLowerCase(), strainData);
         });
+
+        console.log('strainMap built with', strainMap.size, 'entries');
+        console.log('Sample strainMap entries (first 10):', Array.from(strainMap.entries()).slice(0, 10));
     }
 
     /**
@@ -288,6 +310,12 @@ window.InventoryLookupService = (function() {
             buildLookupMaps();
         });
 
+        // Listen for reference data updates from cloud sync
+        window.addEventListener('referenceData:updated', (event) => {
+            console.log('🔍 Reference data updated from cloud, rebuilding lookup maps...', event.detail);
+            buildLookupMaps();
+        });
+
         // Also rebuild when Excel data is loaded
         if (window.DataUtils && window.DataUtils.onDataLoaded) {
             window.DataUtils.onDataLoaded(() => {
@@ -333,8 +361,36 @@ window.InventoryLookupService = (function() {
             buildLookupMaps();
         }
 
-        const key = String(input).toLowerCase();
-        return strainMap.get(key) || null;
+        const key = String(input).toLowerCase().trim();
+
+        // Try direct lookup first
+        let found = strainMap.get(key);
+        if (found) {
+            return found;
+        }
+
+        // If input looks numeric, also try unpadded version (e.g., "00013" -> "13")
+        const numericId = parseInt(input, 10);
+        if (!isNaN(numericId) && numericId > 0) {
+            const unpaddedKey = String(numericId);
+            found = strainMap.get(unpaddedKey);
+            if (found) {
+                return found;
+            }
+        }
+
+        // If not found in map but input is a valid numeric ID, accept it as a new/unknown strain
+        // This allows newer strains that haven't been synced yet to still work
+        if (!isNaN(numericId) && numericId > 0 && String(numericId) === String(input).trim()) {
+            console.log(`InventoryLookupService: Strain ID ${numericId} not in reference data, accepting as valid numeric ID`);
+            return {
+                id: String(numericId),
+                name: `Strain #${numericId}`,
+                abbreviation: null
+            };
+        }
+
+        return null;
     }
 
     /**
