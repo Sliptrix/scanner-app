@@ -63,7 +63,7 @@ window.appState = {
     
     // Container Initiator state (now full container+barcode wizard)
     initiatorState: {
-        // Steps: owner -> strain -> media -> stage -> tissue -> date
+        // Steps: owner -> strain -> media -> stage -> tissue -> date -> location
         currentStep: 'owner',
         owner: null,
         strain: null,
@@ -71,6 +71,7 @@ window.appState = {
         stage: null,
         tissue: null,
         date: null,
+        location: null,
         // Marks whether the current initiator flow has created a container
         completed: false
     }
@@ -149,6 +150,7 @@ window.StateManager = {
             stage: null,
             tissue: null,
             date: null,
+            location: null,
             completed: false
         };
         console.log('Initiator state reset');

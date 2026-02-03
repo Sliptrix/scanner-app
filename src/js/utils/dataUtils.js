@@ -289,9 +289,10 @@ window.DataUtils = {
             const alternates = {};
 
             data.forEach(row => {
-                // Try different column name variations
-                const ownerCode = row['Owner ID'] || row['Owner_ID'] || row['OwnerID'] || row['Owner Code'];
-                const alt1 = row['Alternate_names'] || row['Alt1'] || row['Alternate1'];
+                // Try different column name variations (including HQ workbook format)
+                const ownerCode = row['Owner ID'] || row['Owner_ID'] || row['OwnerID'] || row['Owner Code'] || row['Owner_Code'] || row['owner_code'];
+                // FIX: Added 'Alternate_name' (singular) to match HQ workbook format
+                const alt1 = row['Alternate_names'] || row['Alternate_name'] || row['Alt1'] || row['Alternate1'] || row['alternate_name'];
                 const alt2 = row['Alt2'] || row['Alternate2'];
 
                 if (ownerCode) {

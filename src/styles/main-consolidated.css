@@ -1437,3 +1437,31 @@ body {
     0%, 100% { opacity: 1; }
     50% { opacity: 0.7; }
 }
+
+/* Collapsible Details/Summary for Reference Data */
+.reference-section details summary {
+    list-style: none;
+}
+
+.reference-section details summary::-webkit-details-marker {
+    display: none;
+}
+
+.reference-section details[open] summary span:first-child {
+    transform: rotate(90deg);
+}
+
+.reference-section details summary span:first-child {
+    display: inline-block;
+    transition: transform 0.2s ease;
+}
+
+.reference-section details summary:hover {
+    color: #475569;
+}
+
+/* Cloud sync panel hover effect */
+.reference-section .btn-primary:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+}

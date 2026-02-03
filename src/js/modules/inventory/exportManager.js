@@ -362,13 +362,15 @@ window.DataExportManager = (function() {
     // Create inventory worksheet
     function createInventoryWorksheet(data) {
         const headers = [
-            'Container ID', 'Barcode', 'Strain', 'Owner', 'Stage', 'Media', 
-            'Tissue Count', 'Date Created', 'Transfer Source', 'Transfer Type', 'Status'
+            'Container ID', 'Barcode', 'Strain', 'Owner', 'Stage', 'Media',
+            'Location', 'Tissue Count', 'Date Created', 'Transfer Source', 'Transfer Type', 'Status', 'Notes'
         ];
-        
+
         const wsData = [headers];
-        
+
         data.forEach(item => {
+            // For notes, use the stored notes field, or fall back to barcode for preservation
+            const notes = item.notes || item.barcode || '';
             wsData.push([
                 item.containerId,
                 item.barcode || '',
@@ -376,12 +378,14 @@ window.DataExportManager = (function() {
                 item.owner || '',
                 item.stage || '',
                 item.media || '',
+                item.location || '',
                 item.tissueCount || 1,
                 item.date,
                 item.transferSource || '',
                 item.transferType || '',
-                item.transferType === 'split' ? 'Split' : 
-                item.transferSource ? 'Transferred' : 'Original'
+                item.transferType === 'split' ? 'Split' :
+                item.transferSource ? 'Transferred' : 'Original',
+                notes
             ]);
         });
 

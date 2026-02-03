@@ -156,22 +156,70 @@ window.ContainerInitiator = (function() {
     /**
      * Set up event listeners for the initiator
      */
+    // Autocomplete state
+    let autocompleteSelectedIndex = -1;
+    let autocompleteResults = [];
+
     function setupEventListeners() {
         console.log('🔧 Setting up Container Initiator event listeners...');
-        
+
         const initiatorInput = document.getElementById('initiatorInput');
         if (initiatorInput) {
             console.log('✅ Found initiatorInput element, adding keypress listener');
             initiatorInput.addEventListener('keypress', function(e) {
                 console.log('🔵 Keypress detected:', e.key);
                 if (e.key === 'Enter') {
+                    // If autocomplete is open and an item is selected, use that
+                    if (autocompleteSelectedIndex >= 0 && autocompleteResults.length > 0) {
+                        selectAutocompleteItem(autocompleteSelectedIndex);
+                        e.preventDefault();
+                        return;
+                    }
                     console.log('🔵 Enter key pressed, calling handleInitiatorInput');
                     handleInitiatorInput();
+                }
+            });
+
+            // Add input event for autocomplete (strain lookup)
+            initiatorInput.addEventListener('input', function(e) {
+                const currentStep = StateManager.getState('initiatorState.currentStep');
+                if (currentStep === 'strain') {
+                    showStrainAutocomplete(e.target.value);
+                } else {
+                    hideAutocomplete();
+                }
+            });
+
+            // Handle arrow keys for autocomplete navigation
+            initiatorInput.addEventListener('keydown', function(e) {
+                const autocompleteEl = document.getElementById('strainAutocomplete');
+                if (!autocompleteEl || autocompleteEl.style.display === 'none') return;
+
+                if (e.key === 'ArrowDown') {
+                    e.preventDefault();
+                    autocompleteSelectedIndex = Math.min(autocompleteSelectedIndex + 1, autocompleteResults.length - 1);
+                    updateAutocompleteSelection();
+                } else if (e.key === 'ArrowUp') {
+                    e.preventDefault();
+                    autocompleteSelectedIndex = Math.max(autocompleteSelectedIndex - 1, 0);
+                    updateAutocompleteSelection();
+                } else if (e.key === 'Escape') {
+                    hideAutocomplete();
+                }
+            });
+
+            // Hide autocomplete when clicking outside
+            document.addEventListener('click', function(e) {
+                if (!e.target.closest('#initiatorInput') && !e.target.closest('#strainAutocomplete')) {
+                    hideAutocomplete();
                 }
             });
         } else {
             console.error('❌ initiatorInput element not found!');
         }
+
+        // Create autocomplete container if it doesn't exist
+        createAutocompleteContainer();
         
         const initiateBtn = document.getElementById('initiateBtn');
         if (initiateBtn) {
@@ -197,7 +245,158 @@ window.ContainerInitiator = (function() {
         
         console.log('🔧 Container Initiator event listeners setup complete');
     }
-    
+
+    /**
+     * Create the autocomplete dropdown container
+     */
+    function createAutocompleteContainer() {
+        if (document.getElementById('strainAutocomplete')) return;
+
+        const inputGroup = document.querySelector('#initiatorInput')?.parentElement;
+        if (!inputGroup) return;
+
+        // Make the parent position relative for absolute positioning
+        inputGroup.style.position = 'relative';
+
+        const autocompleteDiv = document.createElement('div');
+        autocompleteDiv.id = 'strainAutocomplete';
+        autocompleteDiv.className = 'strain-autocomplete';
+        autocompleteDiv.style.cssText = `
+            position: absolute;
+            top: 100%;
+            left: 0;
+            right: 0;
+            max-height: 300px;
+            overflow-y: auto;
+            background: #fff;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+            z-index: 1000;
+            display: none;
+        `;
+        inputGroup.appendChild(autocompleteDiv);
+    }
+
+    /**
+     * Show strain autocomplete suggestions
+     * @param {string} query - User input to filter strains
+     */
+    function showStrainAutocomplete(query) {
+        const autocompleteEl = document.getElementById('strainAutocomplete');
+        if (!autocompleteEl) return;
+
+        if (!query || query.length < 1) {
+            hideAutocomplete();
+            return;
+        }
+
+        // Get all strains from lookup service
+        if (!window.InventoryLookupService || !window.InventoryLookupService.isInitialized()) {
+            hideAutocomplete();
+            return;
+        }
+
+        const allStrains = window.InventoryLookupService.getAllStrains();
+        if (!allStrains || allStrains.length === 0) {
+            hideAutocomplete();
+            return;
+        }
+
+        // Filter strains by query (match ID, name, or abbreviation)
+        const queryLower = query.toLowerCase();
+        autocompleteResults = allStrains.filter(strain => {
+            const idMatch = strain.id && strain.id.toString().includes(queryLower);
+            const nameMatch = strain.name && strain.name.toLowerCase().includes(queryLower);
+            const abbrMatch = strain.abbreviation && strain.abbreviation.toLowerCase().includes(queryLower);
+            return idMatch || nameMatch || abbrMatch;
+        }).slice(0, 15); // Limit to 15 results
+
+        if (autocompleteResults.length === 0) {
+            hideAutocomplete();
+            return;
+        }
+
+        // Render results
+        autocompleteEl.innerHTML = autocompleteResults.map((strain, index) => {
+            const abbr = strain.abbreviation ? `[${strain.abbreviation}]` : '';
+            const isSelected = index === autocompleteSelectedIndex;
+            return `
+                <div class="autocomplete-item ${isSelected ? 'selected' : ''}"
+                     data-index="${index}"
+                     style="padding: 10px 12px; cursor: pointer; border-bottom: 1px solid #eee; ${isSelected ? 'background: #e3f2fd;' : ''}">
+                    <div style="font-weight: 600; color: #333;">#${strain.id} - ${strain.name}</div>
+                    <div style="font-size: 0.85em; color: #666;">${abbr || 'No abbreviation'}</div>
+                </div>
+            `;
+        }).join('');
+
+        // Add click handlers
+        autocompleteEl.querySelectorAll('.autocomplete-item').forEach(item => {
+            item.addEventListener('click', function() {
+                selectAutocompleteItem(parseInt(this.dataset.index));
+            });
+            item.addEventListener('mouseenter', function() {
+                autocompleteSelectedIndex = parseInt(this.dataset.index);
+                updateAutocompleteSelection();
+            });
+        });
+
+        autocompleteEl.style.display = 'block';
+        autocompleteSelectedIndex = -1;
+    }
+
+    /**
+     * Hide the autocomplete dropdown
+     */
+    function hideAutocomplete() {
+        const autocompleteEl = document.getElementById('strainAutocomplete');
+        if (autocompleteEl) {
+            autocompleteEl.style.display = 'none';
+            autocompleteEl.innerHTML = '';
+        }
+        autocompleteSelectedIndex = -1;
+        autocompleteResults = [];
+    }
+
+    /**
+     * Update the visual selection in autocomplete
+     */
+    function updateAutocompleteSelection() {
+        const autocompleteEl = document.getElementById('strainAutocomplete');
+        if (!autocompleteEl) return;
+
+        autocompleteEl.querySelectorAll('.autocomplete-item').forEach((item, index) => {
+            if (index === autocompleteSelectedIndex) {
+                item.classList.add('selected');
+                item.style.background = '#e3f2fd';
+                item.scrollIntoView({ block: 'nearest' });
+            } else {
+                item.classList.remove('selected');
+                item.style.background = '';
+            }
+        });
+    }
+
+    /**
+     * Select an autocomplete item and fill the input
+     * @param {number} index - Index of selected item
+     */
+    function selectAutocompleteItem(index) {
+        if (index < 0 || index >= autocompleteResults.length) return;
+
+        const strain = autocompleteResults[index];
+        const input = document.getElementById('initiatorInput');
+        if (input && strain) {
+            // Fill with the strain ID (or abbreviation if user prefers)
+            input.value = strain.id;
+            hideAutocomplete();
+            // Show feedback with full strain info
+            const abbr = strain.abbreviation ? ` [${strain.abbreviation}]` : '';
+            showFeedback(`Selected: #${strain.id} ${strain.name}${abbr}`, 'success');
+        }
+    }
+
     /**
      * Disable initiator inputs while data is loading
      */

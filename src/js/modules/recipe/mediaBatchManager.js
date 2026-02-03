@@ -135,18 +135,54 @@ window.MediaBatchManager = (function() {
             batches.push(batch);
             localStorage.setItem(STORAGE_KEY, JSON.stringify(batches));
 
-            if (window.UIUtils) {
-                UIUtils.showNotification(`Batch ${batch.id} created for ${recipeData.name}`, 'success');
+            console.log('Batch saved to localStorage:', batch.id);
+
+            // Show notification (don't let this block the return)
+            try {
+                if (window.UIUtils && UIUtils.showNotification) {
+                    UIUtils.showNotification(`Batch ${batch.id} created for ${recipeData.name}`, 'success');
+                }
+            } catch (notifyError) {
+                console.log('Notification failed but batch was created:', notifyError);
+            }
+
+            // Sync batch to cloud HQ workbook (async, don't block)
+            if (window.OneDriveSync &&
+                typeof OneDriveSync.appendBatchToCloud === 'function' &&
+                OneDriveSync.isAuthenticated &&
+                OneDriveSync.isAuthenticated()) {
+                OneDriveSync.appendBatchToCloud(batch)
+                    .then(result => {
+                        if (result.success) {
+                            console.log('Batch synced to cloud:', batch.id);
+                            if (window.NotificationSystem) {
+                                NotificationSystem.success(`📤 Batch ${batch.id} synced to cloud`);
+                            }
+                        } else {
+                            console.warn('Batch cloud sync failed:', result.error);
+                        }
+                    })
+                    .catch(err => {
+                        console.warn('Batch cloud sync error:', err);
+                    });
+            } else {
+                console.log('OneDriveSync not available, not authenticated, or appendBatchToCloud not available - batch saved locally only');
             }
 
             // Release lock before returning
             createLock = false;
+            console.log('Returning batch:', batch.id);
             return batch;
 
         } catch (error) {
             console.error('Failed to create batch:', error);
-            if (window.UIUtils) {
-                UIUtils.showNotification(`Failed to create batch: ${error.message}`, 'error');
+            // Try to show notification but don't let it prevent error propagation
+            try {
+                if (window.UIUtils && UIUtils.showNotification) {
+                    UIUtils.showNotification(`Failed to create batch: ${error.message}`, 'error');
+                }
+            } catch (notifyError) {
+                console.error('Failed to show error notification:', notifyError);
             }
             throw error;
         } finally {
@@ -228,7 +264,7 @@ window.MediaBatchManager = (function() {
                 batch.status = BatchStatus.READY;
             }
 
-            updateBatch(batchId, {
+            const updatedBatch = updateBatch(batchId, {
                 prepSteps: batch.prepSteps,
                 status: batch.status
             });
@@ -237,7 +273,22 @@ window.MediaBatchManager = (function() {
                 UIUtils.showNotification(`Step "${step.name}" completed`, 'success');
             }
 
-            return batch;
+            // Sync batch to cloud when status changes to READY (all steps complete)
+            if (allComplete &&
+                window.OneDriveSync &&
+                typeof OneDriveSync.appendBatchToCloud === 'function' &&
+                OneDriveSync.isAuthenticated &&
+                OneDriveSync.isAuthenticated()) {
+                OneDriveSync.appendBatchToCloud(updatedBatch)
+                    .then(result => {
+                        if (result.success) {
+                            console.log('Batch synced to cloud (now READY):', batchId);
+                        }
+                    })
+                    .catch(err => console.warn('Batch cloud sync error:', err));
+            }
+
+            return updatedBatch;
 
         } catch (error) {
             console.error('Failed to complete step:', error);

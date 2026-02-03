@@ -288,7 +288,15 @@ window.MediaLabUI = (function() {
         const notes = document.getElementById('batchNotes')?.value?.trim() || '';
 
         if (!recipeId) {
-            UIUtils.showNotification('Please select a recipe', 'warning');
+            try {
+                if (window.UIUtils && UIUtils.showNotification) {
+                    UIUtils.showNotification('Please select a recipe', 'warning');
+                } else {
+                    alert('Please select a recipe');
+                }
+            } catch (e) {
+                alert('Please select a recipe');
+            }
             return;
         }
 
@@ -318,30 +326,62 @@ window.MediaLabUI = (function() {
 
         // Helper to show success
         function showSuccess(batch) {
+            console.log('showSuccess called with batch:', batch?.id);
+
+            // Get fresh reference to button (in case DOM changed)
+            const currentBtn = document.getElementById('startBatchBtn');
+            console.log('Current button found:', !!currentBtn, 'Original button:', !!startBtn);
+
             // Update button to show success briefly
-            if (startBtn) {
+            if (currentBtn) {
+                console.log('Updating currentBtn to Created!');
+                currentBtn.disabled = true;
+                currentBtn.textContent = '✅ Created!';
+                currentBtn.style.background = '#28a745';
+            } else if (startBtn) {
+                // Fallback to original reference
+                console.log('Updating startBtn (fallback) to Created!');
+                startBtn.disabled = true;
                 startBtn.textContent = '✅ Created!';
                 startBtn.style.background = '#28a745';
+            } else {
+                console.warn('No button found to update!');
             }
 
-            // Show success notification
-            UIUtils.showNotification(`✅ Batch ${batch.id} created successfully!`, 'success');
+            console.log('Batch created successfully:', batch.id);
+
+            // Show success notification (with fallback)
+            try {
+                if (window.UIUtils && UIUtils.showNotification) {
+                    UIUtils.showNotification(`✅ Batch ${batch.id} created successfully!`, 'success');
+                }
+            } catch (e) {
+                console.log('Notification failed, but batch was created:', batch.id);
+            }
 
             // Close modal after brief delay to show success
             setTimeout(() => {
+                console.log('Closing modal and refreshing...');
                 closeModal();
                 refreshBatchStats();
                 refreshBatchList();
                 isProcessing = false;
+                console.log('isProcessing reset to false');
 
-                // Ask if they want to start the prep flow
-                if (confirm('Batch created! Would you like to start the preparation workflow?')) {
-                    continuePrepFlow(batch.id);
-                }
+                // Show a prompt to start prep flow (using setTimeout to ensure modal is fully closed)
+                setTimeout(() => {
+                    console.log('Showing prep flow confirm...');
+                    // Ask if they want to start the prep flow
+                    if (confirm('Batch created! Would you like to start the preparation workflow?')) {
+                        continuePrepFlow(batch.id);
+                    }
+                }, 100);
             }, 500);
         }
 
         try {
+            console.log('Creating batch with recipeId:', recipeId, 'options:', { preparedBy, containerCount, expiryDays, notes });
+
             const batch = MediaBatchManager.createBatch(recipeId, {
                 preparedBy,
                 containerCount,
@@ -349,7 +389,10 @@ window.MediaLabUI = (function() {
                 notes
             });
 
+            console.log('Batch creation returned:', batch);
+
             if (batch) {
+                console.log('Calling showSuccess...');
                 showSuccess(batch);
             } else {
                 throw new Error('Batch creation returned empty result');
@@ -357,8 +400,20 @@ window.MediaLabUI = (function() {
 
         } catch (error) {
             console.error('Failed to create batch:', error);
-            UIUtils.showNotification('Failed to create batch: ' + error.message, 'error');
+            console.log('Calling resetButton...');
+            // Reset button FIRST to ensure UI is responsive
             resetButton();
+            // Then try to show notification (may fail if UIUtils not available)
+            try {
+                if (window.UIUtils && UIUtils.showNotification) {
+                    UIUtils.showNotification('Failed to create batch: ' + error.message, 'error');
+                } else {
+                    alert('Failed to create batch: ' + error.message);
+                }
+            } catch (notifyError) {
+                console.error('Failed to show notification:', notifyError);
+                alert('Failed to create batch: ' + error.message);
+            }
         }
     }
 

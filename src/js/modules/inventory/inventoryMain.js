@@ -64,17 +64,24 @@ window.InventoryManager = (function() {
     function setupDataValidation() {
         // Monitor inventory changes
         const originalSetState = StateManager.setState;
+        let isProcessingInventoryUpdate = false; // Recursion guard
+
         StateManager.setState = function(path, value) {
             // Call original method
             originalSetState.call(this, path, value);
-            
-            // If inventory was updated, validate and process
-            if (path === 'inventory') {
-                validateInventoryData(value);
-                updateStats();
-                
-                if (window.InventoryTableManager) {
-                    InventoryTableManager.rebuildTable();
+
+            // If inventory was updated, validate and process (with recursion guard)
+            if (path === 'inventory' && !isProcessingInventoryUpdate) {
+                isProcessingInventoryUpdate = true;
+                try {
+                    validateInventoryData(value);
+                    updateStats();
+
+                    if (window.InventoryTableManager) {
+                        InventoryTableManager.rebuildTable();
+                    }
+                } finally {
+                    isProcessingInventoryUpdate = false;
                 }
             }
         };
@@ -229,16 +236,28 @@ window.InventoryManager = (function() {
             const savedData = localStorage.getItem('labInventoryData');
             if (savedData) {
                 const state = JSON.parse(savedData);
-                
+
                 // Update appState directly to ensure all modules see the changes
                 window.appState.inventory = state.inventory || [];
                 window.appState.transferHistory = state.transferHistory || [];
                 window.appState.containerLineage = state.containerLineage || {};
                 window.appState.highestContainerId = state.highestContainerId || 0;
-                
+
+                // Migration: populate notes from barcode for existing containers
+                let migratedCount = 0;
+                window.appState.inventory.forEach(item => {
+                    if (!item.notes && item.barcode) {
+                        item.notes = item.barcode;
+                        migratedCount++;
+                    }
+                });
+                if (migratedCount > 0) {
+                    console.log(`Migrated ${migratedCount} containers: added notes from barcode`);
+                }
+
                 console.log('Loaded inventory data from localStorage');
                 console.log(`Restored: ${state.inventory.length} inventory entries, highest container ID: ${state.highestContainerId}`);
-                
+
                 if (state.inventory.length > 0) {
                     NotificationSystem.info(`Loaded ${state.inventory.length} inventory entries from previous session`);
                 }

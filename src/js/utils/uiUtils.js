@@ -246,7 +246,7 @@ window.UIUtils = {
             }
 
             if (dataStatsEl) {
-                dataStatsEl.style.display = 'inline';
+                dataStatsEl.style.display = 'block';
                 const strainsCountEl = document.getElementById('strainsCount');
                 const ownersCountEl = document.getElementById('ownersCount');
                 const mediaCountEl = document.getElementById('mediaCount');

@@ -832,6 +832,28 @@ window.RecipeManager = (function() {
                 loadRecipeList();
             }
 
+            // Sync recipe to cloud HQ workbook (async, don't block UI)
+            if (window.OneDriveSync &&
+                typeof OneDriveSync.appendRecipeToCloud === 'function' &&
+                OneDriveSync.isAuthenticated &&
+                OneDriveSync.isAuthenticated()) {
+                // Add the ID to the recipe data for cloud sync
+                const recipeWithId = { ...recipeData, id: recipeId };
+                OneDriveSync.appendRecipeToCloud(recipeWithId)
+                    .then(result => {
+                        if (result.success) {
+                            console.log('Recipe synced to cloud:', recipeId);
+                        } else {
+                            console.warn('Recipe cloud sync failed:', result.error);
+                        }
+                    })
+                    .catch(err => {
+                        console.warn('Recipe cloud sync error:', err);
+                    });
+            } else {
+                console.log('OneDriveSync not available, not authenticated, or appendRecipeToCloud not available - recipe saved locally only');
+            }
+
             // Reset button after 2 seconds
             setTimeout(() => {
                 if (saveBtn) {

@@ -184,49 +184,82 @@
                     <h2>Reference Data Management</h2>
 
                     <!-- Data Loading Status Banner -->
-                    <div class="data-loading-banner" id="dataLoadingBanner" style="background: #fef3c7; border: 2px solid #f59e0b; border-radius: 12px; padding: 20px; margin-bottom: 24px; display: none;">
+                    <div class="data-loading-banner" id="dataLoadingBanner" style="background: #dbeafe; border: 2px solid #3b82f6; border-radius: 12px; padding: 20px; margin-bottom: 24px; display: none;">
                         <div style="display: flex; align-items: start; gap: 16px;">
-                            <div style="font-size: 2rem;">⚠️</div>
+                            <div style="font-size: 2rem;">☁️</div>
                             <div style="flex: 1;">
-                                <h3 style="margin: 0 0 8px 0; color: #92400e; font-size: 1.1rem;">No Reference Data Loaded</h3>
-                                <p style="margin: 0 0 12px 0; color: #78350f;">You need to load reference data before using most features. Choose one of the options below:</p>
-                                <div style="display: flex; gap: 10px; flex-wrap: wrap;">
-                                    <button class="btn btn-primary" onclick="document.getElementById('fileInput').click()">📄 Load Excel File</button>
-                                    <button class="btn btn-primary" id="cloud-sync-quick-btn" onclick="quickCloudSync()">☁️ Sync from Cloud</button>
-                                </div>
+                                <h3 style="margin: 0 0 8px 0; color: #1e40af; font-size: 1.1rem;">Sync Required</h3>
+                                <p style="margin: 0 0 12px 0; color: #1e3a8a;">Connect to the HQ workbook to load the latest reference data.</p>
+                                <button class="btn btn-primary" id="cloud-sync-quick-btn" onclick="quickCloudSync()" style="font-size: 1rem; padding: 12px 24px;">
+                                    ☁️ Sync from HQ Workbook
+                                </button>
                             </div>
                         </div>
                     </div>
 
-                    <div class="upload-area" onclick="document.getElementById('fileInput').click()">
-                        <h3>📄 Load Your Excel Data File</h3>
-                        <p>Click here or drag your "barcode test.xlsx" file to load all reference tables</p>
-                    </div>
-
-                    <div class="data-status" id="dataStatus">
+                    <!-- Primary: Cloud Sync Panel -->
+                    <div style="background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%); border: 2px solid #3b82f6; border-radius: 12px; padding: 24px; margin-bottom: 20px;">
                         <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 16px;">
-                            <span id="dataStatusText">❌ Excel data not loaded</span>
-                            <div id="dataStats" style="display: none; font-size: 0.85rem; color: #10b981; font-weight: 600;">
-                                <span id="strainsCount">0</span> strains •
-                                <span id="ownersCount">0</span> owners •
-                                <span id="mediaCount">0</span> media types
+                            <span style="font-size: 1.5rem;">☁️</span>
+                            <div>
+                                <h3 style="margin: 0; color: #1e40af; font-size: 1.1rem;">HQ Workbook Sync</h3>
+                                <p style="margin: 4px 0 0 0; color: #3b82f6; font-size: 0.85rem;">Recommended — Always use the latest data from headquarters</p>
                             </div>
                         </div>
 
-                        <div style="margin-bottom: 20px;">
-                            <h4 style="margin: 0 0 10px 0; font-size: 0.95rem; color: #475569;">Local File Options</h4>
-                            <button class="btn btn-secondary" onclick="document.getElementById('fileInput').click()">Load Excel File</button>
-                            <button class="btn btn-info" onclick="document.getElementById('importInput').click()" style="margin-left: 10px;">📥 Import Data</button>
+                        <div style="display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 16px;">
+                            <button class="btn btn-primary" id="cloud-sync-btn" style="flex: 1; min-width: 200px; padding: 14px 20px; font-size: 1rem;">
+                                🔄 Sync All Reference Data
+                            </button>
                         </div>
 
-                        <div>
-                            <h4 style="margin: 0 0 10px 0; font-size: 0.95rem; color: #475569;">Cloud Sync Options</h4>
-                            <button class="btn btn-primary" id="cloud-sync-btn" style="margin-bottom: 10px;">🔄 Sync Owners & Strains (Cloud)</button>
-                            <button class="btn btn-secondary" id="inventory-sync-from-cloud-btn" onclick="syncInventoryFromCloud()" style="margin-bottom: 10px;">📥 Pull Inventory From Cloud</button>
-                            <button class="btn btn-secondary" id="inventory-sync-to-cloud-btn" onclick="syncInventoryToCloud()">📤 Push Inventory To Cloud</button>
-                            <div id="cloud-sync-status" style="margin-top: 12px; padding-top: 12px; border-top: 1px solid #e2e8f0; font-size: 0.85rem; color: #666;">☁️ Cloud sync: Not synced</div>
-                            <div id="inventory-sync-status" style="margin-top: 8px; font-size: 0.85rem; color: #666;">📦 Inventory sync: —</div>
+                        <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+                            <button class="btn btn-secondary" id="inventory-sync-from-cloud-btn" onclick="syncInventoryFromCloud()" style="flex: 1;">
+                                📥 Pull Inventory
+                            </button>
+                            <button class="btn btn-secondary" id="inventory-sync-to-cloud-btn" onclick="syncInventoryToCloud()" style="flex: 1;">
+                                📤 Push Inventory
+                            </button>
                         </div>
+
+                        <div style="margin-top: 16px; padding-top: 12px; border-top: 1px solid #bfdbfe;">
+                            <div id="cloud-sync-status" style="font-size: 0.9rem; color: #1e40af; font-weight: 500;">☁️ Cloud sync: Not synced</div>
+                            <div id="inventory-sync-status" style="margin-top: 6px; font-size: 0.85rem; color: #64748b;">📦 Inventory sync: —</div>
+                        </div>
+
+                        <!-- Sync Status Indicator -->
+                        <div id="dataStats" style="display: none; margin-top: 12px; padding: 10px; background: #dcfce7; border-radius: 8px; font-size: 0.9rem; color: #166534;">
+                            ✅ <span id="strainsCount">0</span> strains • <span id="ownersCount">0</span> owners • <span id="mediaCount">0</span> media types loaded
+                        </div>
+                    </div>
+
+                    <!-- Secondary: Local Options (Collapsed) -->
+                    <details style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px 16px;">
+                        <summary style="cursor: pointer; color: #64748b; font-size: 0.9rem; font-weight: 500; list-style: none; display: flex; align-items: center; gap: 8px;">
+                            <span style="transition: transform 0.2s;">▶</span>
+                            Advanced: Local File Options
+                        </summary>
+                        <div style="margin-top: 16px; padding-top: 16px; border-top: 1px solid #e2e8f0;">
+                            <p style="margin: 0 0 12px 0; font-size: 0.85rem; color: #64748b;">
+                                Use these options only if you need to work offline or with a local Excel file.
+                            </p>
+                            <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+                                <button class="btn btn-secondary" onclick="document.getElementById('fileInput').click()" style="font-size: 0.85rem;">
+                                    📄 Load Excel File
+                                </button>
+                                <button class="btn btn-secondary" onclick="document.getElementById('importInput').click()" style="font-size: 0.85rem;">
+                                    📥 Import JSON Backup
+                                </button>
+                            </div>
+                            <div class="upload-area" onclick="document.getElementById('fileInput').click()" style="margin-top: 12px; padding: 16px; background: #fff; border: 2px dashed #cbd5e1;">
+                                <p style="margin: 0; font-size: 0.85rem; color: #64748b;">Drop Excel file here or click to browse</p>
+                            </div>
+                        </div>
+                    </details>
+
+                    <!-- Hidden status text for compatibility -->
+                    <div id="dataStatus" style="display: none;">
+                        <span id="dataStatusText">❌ Excel data not loaded</span>
                     </div>
                 </div>
             </div>
@@ -727,6 +760,15 @@
                     <button type="button" id="initiatorDateTomorrowBtn" class="btn" onclick="ContainerInitiator.selectQuickDate(1)" style="background: #6b7280; color: white; flex: 1;">Tomorrow</button>
                 </div>
 
+                <!-- Location picker (shown only on location step) -->
+                <div id="initiatorLocationPicker" style="display: none; margin-bottom: 15px;">
+                    <label style="display: block; margin-bottom: 8px; font-weight: 600; color: #374151;">Quick Select Location:</label>
+                    <select id="initiatorLocationSelect" onchange="ContainerInitiator.selectLocation(this.value)" style="width: 100%; padding: 10px; border: 2px solid #d1d5db; border-radius: 8px; font-size: 1rem; margin-bottom: 8px;">
+                        <option value="">-- Select from HQ Locations --</option>
+                    </select>
+                    <p style="margin: 0; font-size: 0.85rem; color: #6b7280;">Or type a custom location in the input above</p>
+                </div>
+
                 <div class="scan-feedback" id="initiatorFeedback">Ready to initiate a new container</div>
 
                 <!-- Action buttons -->
@@ -743,6 +785,7 @@
                     <div class="status-item">Stage: <strong>-</strong></div>
                     <div class="status-item">Tissue: <strong>-</strong></div>
                     <div class="status-item">Date: <strong>-</strong></div>
+                    <div class="status-item">Location: <strong>-</strong></div>
                     <div class="status-item">Next ID: <strong>-</strong></div>
                 </div>
 
@@ -976,9 +1019,11 @@
                                 <th>Owner</th>
                                 <th>Stage</th>
                                 <th>Media</th>
+                                <th>Location</th>
                                 <th>Count</th>
                                 <th>Date</th>
                                 <th>Status</th>
+                                <th>Notes</th>
                             </tr>
                         </thead>
                         <tbody id="inventoryTableBody">
@@ -1052,7 +1097,7 @@
     <script src="src/js/modules/transfer/transferProcessor.js"></script>
     <script src="src/js/modules/transfer/transferMain.js"></script>
     <!-- Inventory Module -->
-    <script src="src/js/modules/inventory/inventoryLookupService.js"></script>
+    <script src="src/js/modules/inventory/inventoryLookupService.js?v=2.2"></script>
     <script src="src/js/modules/inventory/enhancedDataLayer.js"></script>
     <script src="src/js/modules/inventory/dataLayerBridge.js"></script>
     <script src="src/js/modules/inventory/qrInventoryEditor.js"></script>
@@ -1070,7 +1115,7 @@
     <!-- Authentication Module -->
     <script src="src/js/modules/auth/authManager.js"></script>
     <!-- Cloud Sync Module -->
-    <script src="src/js/modules/cloud/oneDriveSync.js"></script>
+    <script src="src/js/modules/cloud/oneDriveSync.js?v=2.3"></script>
     <!-- Email Service Module -->
     <script src="src/js/modules/email/emailService.js"></script>
     <!-- Dashboard Module -->

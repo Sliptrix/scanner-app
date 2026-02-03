@@ -5,6 +5,13 @@
 window.LabelPrintService = (function() {
     'use strict';
 
+    // Safe notification helper to avoid crashes if NotificationSystem not loaded
+    const notify = {
+        error: (msg) => window.NotificationSystem ? NotificationSystem.error(msg) : console.error(msg),
+        success: (msg) => window.NotificationSystem ? NotificationSystem.success(msg) : console.log(msg),
+        info: (msg) => window.NotificationSystem ? NotificationSystem.info(msg) : console.log(msg)
+    };
+
     const config = {
         // Zebra GX420T at 203 DPI
         dpi: 203,
@@ -56,7 +63,7 @@ window.LabelPrintService = (function() {
     // Each container: { containerId, qrUrl }
     async function printLabels(containers) {
         if (!containers || containers.length === 0) {
-            NotificationSystem.error('No containers selected for printing');
+            notify.error('No containers selected for printing');
             return false;
         }
 
@@ -75,7 +82,7 @@ window.LabelPrintService = (function() {
             if (response.ok) {
                 const result = await response.json();
                 if (result.success) {
-                    NotificationSystem.success(`Printed ${containers.length} label(s) (${labels.length} sticker${labels.length > 1 ? 's' : ''})`);
+                    notify.success(`Printed ${containers.length} label(s) (${labels.length} sticker${labels.length > 1 ? 's' : ''})`);
                     return true;
                 }
             }
@@ -113,7 +120,7 @@ window.LabelPrintService = (function() {
     async function printUnassigned() {
         const pool = window.QRCodeService ? QRCodeService.getUnassigned() : [];
         if (pool.length === 0) {
-            NotificationSystem.info('No unassigned QR codes to print');
+            notify.info('No unassigned QR codes to print');
             return false;
         }
 
@@ -129,7 +136,7 @@ window.LabelPrintService = (function() {
     async function printNewAssignments() {
         const pool = window.QRCodeService ? QRCodeService.getAssigned() : [];
         if (pool.length === 0) {
-            NotificationSystem.info('No assigned QR codes to print');
+            notify.info('No assigned QR codes to print');
             return false;
         }
 
@@ -177,12 +184,12 @@ window.LabelPrintService = (function() {
     function copyZPL() {
         if (window._lastZPL) {
             navigator.clipboard.writeText(window._lastZPL).then(() => {
-                NotificationSystem.success('ZPL copied to clipboard');
+                notify.success('ZPL copied to clipboard');
             }).catch(() => {
                 // Fallback: select textarea
                 const ta = document.getElementById('zplOutput');
                 if (ta) { ta.select(); document.execCommand('copy'); }
-                NotificationSystem.success('ZPL copied');
+                notify.success('ZPL copied');
             });
         }
     }
@@ -196,7 +203,7 @@ window.LabelPrintService = (function() {
             a.download = `labels_${new Date().toISOString().slice(0, 10)}.zpl`;
             a.click();
             URL.revokeObjectURL(url);
-            NotificationSystem.success('ZPL file downloaded');
+            notify.success('ZPL file downloaded');
         }
     }
 

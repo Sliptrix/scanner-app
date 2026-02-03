@@ -162,7 +162,14 @@ window.InventoryLookupService = (function() {
         Object.entries(ownersTable).forEach(([code, nameOrObj]) => {
             const ownerCode = String(code);
             const ownerName = typeof nameOrObj === 'object' ? nameOrObj.name : String(nameOrObj);
-            const alternates = ownerAlternates[ownerCode] || [];
+            // FIX: Ensure alternates is always an array (could be string, array, or undefined)
+            let alternates = ownerAlternates[ownerCode];
+            if (!alternates) {
+                alternates = [];
+            } else if (!Array.isArray(alternates)) {
+                // Convert single value to array
+                alternates = [alternates];
+            }
 
             const ownerData = {
                 code: ownerCode,
@@ -336,7 +343,16 @@ window.InventoryLookupService = (function() {
         }
 
         if (data.ownerAlternates) {
-            ownerAlternates = data.ownerAlternates;
+            // FIX: Ensure all values are arrays to prevent forEach errors
+            ownerAlternates = {};
+            Object.entries(data.ownerAlternates).forEach(([key, value]) => {
+                if (Array.isArray(value)) {
+                    ownerAlternates[key] = value;
+                } else if (value) {
+                    // Convert single value to array
+                    ownerAlternates[key] = [value];
+                }
+            });
             console.log(`Loaded ${Object.keys(ownerAlternates).length} owner alternate names`);
         }
 
