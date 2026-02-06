@@ -1261,6 +1261,14 @@ window.OneDriveSync = {
         console.log(`OneDriveSync: Strains table now has ${Object.keys(strainsTable).length} entries (${newStrainsCount} new from inventory)`);
         console.log('Final strainsTable:', strainsTable);
         console.log('StrainsTable keys:', Object.keys(strainsTable));
+	// po added this to code:
+	//Dispatch event to notify InventoryLookupService to rebuild its lookup maps
+        // This ensures autocomplete works correctly after new containers are created
+        const event = new CustomEvent('referenceData:updated', {
+            detail: { source: 'inventory-sync', ts: Date.now() }
+        });
+        window.dispatchEvent(event);
+        console.log('OneDriveSync: Dispatched referenceData:updated event for lookup service');
     },
 
     /**

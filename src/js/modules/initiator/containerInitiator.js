@@ -1239,21 +1239,30 @@ window.ContainerInitiator = (function() {
         // No runtime QR generation needed.
 
         // Show success message
-        showFeedback(`Container ${currentContainerId} created successfully!`, 'success');
+	showFeedback(`Container ${currentContainerId} created successfully! Resetting for next container...`, 'success');
+        //showFeedback(`Container ${currentContainerId} created successfully!`, 'success');
         
-        // Mark this initiator run as completed so additional "Next" presses
+        // po changing this:
+	//Mark this initiator run as completed so additional "Next" presses
         // don't create more containers with the same metadata. The next
         // invocation of handleInitiatorInput() will reset the initiator to
         // start a fresh container.
+	// so that app does this:
+	// Mark this initiator run as completed temporarily
         try {
             StateManager.setState('initiatorState.completed', true);
         } catch (e) {
             console.warn('Failed to mark initiator state as completed:', e);
         }
-        
+        //po changed this because we don't need an additional click but can remove if a problem 
         // NOTE: Do not immediately reset the initiator so the user can see the QR/confirmation.
         // The user can start a new initiation explicitly when ready (pressing
         // Next again will reset for a new container instead of duplicating).
+	// Auto-reset after 2 seconds to allow user to see confirmation, then prepare for next container
+        setTimeout(() => {
+            console.log('🔄 Auto-resetting initiator for next container...');
+            resetInitiator();
+        }, 2000);
     }
     
     /**
