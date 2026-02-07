@@ -1,6 +1,33 @@
 // Core Application State Management
 // Lab Barcode Builder & Transfer System
 
+// Debug mode flag - set to true for verbose logging
+window.DEBUG_MODE = localStorage.getItem('labScanner_debugMode') === 'true';
+
+// Logger utility - respects debug mode
+window.Logger = {
+    debug: function(...args) {
+        if (window.DEBUG_MODE) {
+            console.log('[DEBUG]', ...args);
+        }
+    },
+    info: function(...args) {
+        console.log('[INFO]', ...args);
+    },
+    warn: function(...args) {
+        console.warn('[WARN]', ...args);
+    },
+    error: function(...args) {
+        console.error('[ERROR]', ...args);
+    },
+    // Toggle debug mode
+    setDebugMode: function(enabled) {
+        window.DEBUG_MODE = enabled;
+        localStorage.setItem('labScanner_debugMode', enabled ? 'true' : 'false');
+        console.log(`Debug mode ${enabled ? 'enabled' : 'disabled'}`);
+    }
+};
+
 // Global application state
 window.appState = {
     // Basic app state
@@ -102,7 +129,7 @@ window.StateManager = {
         }
         
         target[lastKey] = value;
-        console.log(`State updated: ${path} =`, value);
+        Logger.debug(`State updated: ${path} =`, value);
     },
     
     // Reset specific state sections
@@ -128,7 +155,7 @@ window.StateManager = {
                 recipeName: null
             }
         };
-        console.log('Builder state reset');
+        Logger.debug('Builder state reset');
     },
     
     resetTransferState: function() {
@@ -138,7 +165,7 @@ window.StateManager = {
             sourceContainer: null,
             destContainer: null
         };
-        console.log('Transfer state reset');
+        Logger.debug('Transfer state reset');
     },
     
     resetInitiatorState: function() {
@@ -153,7 +180,7 @@ window.StateManager = {
             location: null,
             completed: false
         };
-        console.log('Initiator state reset');
+        Logger.debug('Initiator state reset');
     },
     
     // Initialize state from existing inventory
@@ -165,6 +192,6 @@ window.StateManager = {
                 window.appState.highestContainerId = containerId;
             }
         });
-        console.log('State initialized from inventory');
+        Logger.debug('State initialized from inventory');
     }
 };

@@ -3,13 +3,13 @@
 
 // Application initialization
 document.addEventListener('DOMContentLoaded', function() {
-    console.log('Lab Scanner System - Phase 3 Core Infrastructure loaded');
+    Logger.debug('Lab Scanner System - Phase 3 Core Infrastructure loaded');
     initializeApp();
 });
 
 // Main application initialization
 function initializeApp() {
-    console.log('Initializing Lab Scanner System...');
+    Logger.debug('Initializing Lab Scanner System...');
     
     // Initialize state from any existing inventory
     StateManager.initializeFromInventory();
@@ -19,13 +19,13 @@ function initializeApp() {
     
     // If no Excel data loaded, try JSON fallback
     if (!window.appState.isDataLoaded) {
-        console.log('No Excel data found, trying JSON fallback...');
+        Logger.debug('No Excel data found, trying JSON fallback...');
         DataUtils.loadJSONFallbackData();
         
         // If still no data after JSON attempt, immediately load minimal fallback
         setTimeout(() => {
             if (!window.appState.isDataLoaded) {
-                console.log('JSON fallback not available, loading minimal data...');
+                Logger.debug('JSON fallback not available, loading minimal data...');
                 DataUtils.loadMinimalFallbackData();
             }
         }, 1000); // Give JSON loading 1 second to complete
@@ -93,13 +93,13 @@ function initializeApp() {
 
         // Start auto-refresh if authenticated
         if (AuthManager.isSignedIn()) {
-            console.log('User authenticated, enabling cloud sync auto-refresh...');
+            Logger.debug('User authenticated, enabling cloud sync auto-refresh...');
             OneDriveSync.startAutoRefresh();
 
             // Attempt initial cloud sync (non-blocking)
             DataUtils.loadStrainOwnerMappingWithCloud({ nonBlocking: true })
                 .then(result => {
-                    console.log(`Initial data loaded from: ${result.source}`);
+                    Logger.debug(`Initial data loaded from: ${result.source}`);
                 })
                 .catch(error => {
                     console.warn('Initial cloud sync failed:', error);
@@ -120,13 +120,13 @@ function initializeApp() {
         RecipeManager.initialize();
         // Force setup of recipe UI
         RecipeManager.setupRecipeUI();
-        console.log('✅ RecipeManager initialized with UI setup');
+        Logger.debug('RecipeManager initialized with UI setup');
     }
 
     // Initialize media lab UI (batch tracking)
     if (window.MediaLabUI) {
         MediaLabUI.initialize();
-        console.log('✅ MediaLabUI initialized');
+        Logger.debug('MediaLabUI initialized');
     }
 
     // Show initial status
@@ -135,7 +135,7 @@ function initializeApp() {
     // Check for QR code scan (URL parameter ?c=shortCode)
     handleQRCodeScan();
 
-    console.log('Lab Scanner System initialized successfully');
+    Logger.info('Lab Scanner System initialized successfully');
 }
 
 // Setup all event listeners
@@ -184,7 +184,7 @@ function setupEventListeners() {
         });
     }
     
-    console.log('Event listeners setup complete');
+    Logger.debug('Event listeners setup complete');
 }
 
 // Setup import event listener
@@ -221,7 +221,7 @@ function handleFileImport(event) {
                 
                 restoreDataToAppState(data);
                 NotificationSystem.success(`Data imported successfully from ${file.name}!`);
-                console.log('Data imported:', data);
+                Logger.debug('Data imported:', data);
                 
                 // Update UI after import
                 updateUIAfterImport();
@@ -314,7 +314,7 @@ function restoreDataToAppState(data) {
             window.appState.strainOwnerMapping = importedAppState.strainOwnerMapping;
         }
         
-        console.log('AppState restored successfully from imported data');
+        Logger.debug('AppState restored successfully from imported data');
         
         // Log import statistics
         console.log('=== DATA IMPORT SUMMARY ===');
@@ -354,7 +354,7 @@ function updateUIAfterImport() {
             UIUtils.focusBuilderInput();
         }
         
-        console.log('UI updated after import');
+        Logger.debug('UI updated after import');
     } catch (error) {
         console.error('Error updating UI after import:', error);
     }
@@ -401,9 +401,9 @@ function loadSavedExcelDataOnStartup() {
             UIUtils.focusBuilderInput();
         }
         
-        console.log('Startup: Using cached Excel data');
+        Logger.debug('Startup: Using cached Excel data');
     } else {
-        console.log('Startup: No cached Excel data found, user will need to load file');
+        Logger.debug('Startup: No cached Excel data found, user will need to load file');
     }
 }
 
@@ -522,7 +522,7 @@ async function syncInventoryFromCloud() {
         if (result && result.success) {
             if (window.ContainerInitiator && typeof ContainerInitiator.updateNextAvailableId === 'function') {
                 ContainerInitiator.updateNextAvailableId();
-                console.log('✅ Updated next available container ID after cloud sync');
+                Logger.debug('Updated next available container ID after cloud sync');
             }
         }
 
@@ -639,7 +639,7 @@ async function quickCloudSync() {
         // Update next container ID after cloud sync to prevent overwrites
         if (window.ContainerInitiator && typeof ContainerInitiator.updateNextAvailableId === 'function') {
             ContainerInitiator.updateNextAvailableId();
-            console.log('✅ Updated next available container ID after quick cloud sync');
+            Logger.debug('Updated next available container ID after quick cloud sync');
         }
     } catch (error) {
         console.error('Quick cloud sync error:', error);
@@ -665,7 +665,7 @@ function useGeneratedBarcode() {
     // Check if barcode has already been saved (primary duplicate prevention)
     if (window.appState.currentBarcodeIsSaved) {
         NotificationSystem.warning('This barcode has already been saved to inventory.');
-        console.log('Save blocked - barcode already saved:', window.appState.currentContainer);
+        Logger.debug('Save blocked - barcode already saved:', window.appState.currentContainer);
         return;
     }
     
@@ -686,7 +686,7 @@ function useGeneratedBarcode() {
         
         if (existingContainer) {
             NotificationSystem.warning(`Container ${window.appState.currentContainer} already exists in inventory. Cannot save duplicate container.`);
-            console.log('Duplicate container save prevented:', {
+            Logger.debug('Duplicate container save prevented:', {
                 attempted: window.appState.currentContainer,
                 existing: existingContainer
             });
@@ -740,7 +740,7 @@ function selectTransferMode(mode) {
     } else {
         // Fallback for legacy support
         StateManager.setState('transferState.mode', mode);
-        console.log('Transfer mode set to:', mode);
+        Logger.debug('Transfer mode set to:', mode);
     }
 }
 
@@ -797,8 +797,8 @@ function adjustDiscardCount(change) {
 }
 
 function processTransfer() {
-    console.log('🔍 MAIN.JS: processTransfer() called');
-    console.log('🔍 Call stack:', new Error().stack);
+    Logger.debug('processTransfer() called');
+    Logger.debug('processTransfer call stack:', new Error().stack);
     
     // Disable button during processing to prevent double-clicks
     const transferBtn = document.getElementById('transferBtn');
