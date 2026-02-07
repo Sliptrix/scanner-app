@@ -99,6 +99,9 @@ logs/
 # Excel temporary files
 ~$*.xlsx
 ~$*.xls
+~$*.txt
+~$*.docx
+.~lock.*#
 
 # Package files
 *.7z
