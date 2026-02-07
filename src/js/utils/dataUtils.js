@@ -136,12 +136,12 @@ window.DataUtils = {
                 window.appState.strainOwnerMapping = data.strainOwnerMapping || {};
                 window.appState.isDataLoaded = true;
 
-                console.log('=== EXCEL DATA LOADED FROM CACHE ===');
-                console.log(`File: ${metadata.fileName || 'Unknown'}`);
-                console.log(`Loaded: ${metadata.loadDate ? new Date(metadata.loadDate).toLocaleString() : 'Unknown'}`);
-                console.log(`Strains: ${Object.keys(window.appState.strainsTable).length}`);
-                console.log(`Owners: ${Object.keys(window.appState.ownersTable).length}`);
-                console.log(`Stages: ${Object.keys(window.appState.stagesTable).length}`);
+                Logger.debug('=== EXCEL DATA LOADED FROM CACHE ===');
+                Logger.debug(`File: ${metadata.fileName || 'Unknown'}`);
+                Logger.debug(`Loaded: ${metadata.loadDate ? new Date(metadata.loadDate).toLocaleString() : 'Unknown'}`);
+                Logger.debug(`Strains: ${Object.keys(window.appState.strainsTable).length}`);
+                Logger.debug(`Owners: ${Object.keys(window.appState.ownersTable).length}`);
+                Logger.debug(`Stages: ${Object.keys(window.appState.stagesTable).length}`);
 
                 return {
                     success: true,
@@ -184,7 +184,7 @@ window.DataUtils = {
             localStorage.setItem(this.STORAGE_KEYS.EXCEL_DATA, JSON.stringify(dataToSave));
             localStorage.setItem(this.STORAGE_KEYS.EXCEL_METADATA, JSON.stringify(metadata));
             
-            console.log('Excel data saved to localStorage');
+            Logger.debug('Excel data saved to localStorage');
             return true;
         } catch (error) {
             console.error('Error saving Excel data:', error);
@@ -196,7 +196,7 @@ window.DataUtils = {
     clearSavedExcelData: function() {
         localStorage.removeItem(this.STORAGE_KEYS.EXCEL_DATA);
         localStorage.removeItem(this.STORAGE_KEYS.EXCEL_METADATA);
-        console.log('Saved Excel data cleared');
+        Logger.debug('Saved Excel data cleared');
     },
     
     // Get saved Excel metadata
@@ -230,19 +230,19 @@ window.DataUtils = {
             // Save to localStorage for future use
             this.saveExcelData(fileName);
 
-            console.log('=== EXCEL DATA LOADED ===');
-            console.log(`Strains: ${Object.keys(window.appState.strainsTable).length}`);
-            console.log(`Owners: ${Object.keys(window.appState.ownersTable).length}`);
-            console.log(`Stages: ${Object.keys(window.appState.stagesTable).length}`);
-            console.log(`Strain-Owner Mappings: ${Object.keys(window.appState.strainOwnerMapping || {}).length}`);
+            Logger.debug('=== EXCEL DATA LOADED ===');
+            Logger.debug(`Strains: ${Object.keys(window.appState.strainsTable).length}`);
+            Logger.debug(`Owners: ${Object.keys(window.appState.ownersTable).length}`);
+            Logger.debug(`Stages: ${Object.keys(window.appState.stagesTable).length}`);
+            Logger.debug(`Strain-Owner Mappings: ${Object.keys(window.appState.strainOwnerMapping || {}).length}`);
 
             // Rebuild InventoryLookupService with new data
             if (window.InventoryLookupService && window.InventoryLookupService.isInitialized()) {
                 window.InventoryLookupService.rebuild();
-                console.log('🔍 InventoryLookupService rebuilt with new Excel data');
+                Logger.debug('InventoryLookupService rebuilt with new Excel data');
             } else if (window.InventoryLookupService) {
                 window.InventoryLookupService.initialize();
-                console.log('🔍 InventoryLookupService initialized with Excel data');
+                Logger.debug('InventoryLookupService initialized with Excel data');
             }
 
             return true;
@@ -274,7 +274,7 @@ window.DataUtils = {
                 window.InventoryLookupService.loadAbbreviationData({
                     strainAbbreviations: abbreviations
                 });
-                console.log(`Loaded ${Object.keys(abbreviations).length} strain abbreviations`);
+                Logger.debug(`Loaded ${Object.keys(abbreviations).length} strain abbreviations`);
             }
         } catch (error) {
             console.warn('Could not load strain abbreviations:', error.message);
@@ -308,7 +308,7 @@ window.DataUtils = {
                 window.InventoryLookupService.loadAbbreviationData({
                     ownerAlternates: alternates
                 });
-                console.log(`Loaded ${Object.keys(alternates).length} owner alternate names`);
+                Logger.debug(`Loaded ${Object.keys(alternates).length} owner alternate names`);
             }
         } catch (error) {
             console.warn('Could not load owner alternates:', error.message);
@@ -364,12 +364,12 @@ window.DataUtils = {
     // Load strain-to-owner mapping data
     loadStrainOwnerMapping: function(sheet) {
         if (!sheet) {
-            console.log('No strain-owner mapping sheet found, using demo data');
+            Logger.debug('No strain-owner mapping sheet found, using demo data');
             this.loadDemoStrainOwnerMapping();
             return;
         }
         
-        console.log('Loading strain-to-owner mapping from Excel sheet');
+        Logger.debug('Loading strain-to-owner mapping from Excel sheet');
         const data = XLSX.utils.sheet_to_json(sheet);
         
         window.appState.strainOwnerMapping = {};
@@ -384,7 +384,7 @@ window.DataUtils = {
             }
         });
         
-        console.log('Strain-Owner mapping loaded:', window.appState.strainOwnerMapping);
+        Logger.debug('Strain-Owner mapping loaded:', window.appState.strainOwnerMapping);
     },
     
     // Load demo strain-to-owner mapping for testing
@@ -430,7 +430,7 @@ window.DataUtils = {
                     // Load strain-owner mapping
                     if (data.strainOwnerMapping) {
                         window.appState.strainOwnerMapping = data.strainOwnerMapping;
-                        console.log('Strain-Owner mapping loaded from JSON:', Object.keys(data.strainOwnerMapping).length, 'entries');
+                        Logger.debug('Strain-Owner mapping loaded from JSON:', Object.keys(data.strainOwnerMapping).length, 'entries');
                     }
                     
                     // Load strain names if available
@@ -621,7 +621,7 @@ window.DataUtils = {
                     // Load strain-owner mapping
                     if (data.strainOwnerMapping) {
                         window.appState.strainOwnerMapping = data.strainOwnerMapping;
-                        console.log('Strain-Owner mapping loaded from JSON:', Object.keys(data.strainOwnerMapping).length, 'entries');
+                        Logger.debug('Strain-Owner mapping loaded from JSON:', Object.keys(data.strainOwnerMapping).length, 'entries');
                     }
 
                     // Load strain names if available

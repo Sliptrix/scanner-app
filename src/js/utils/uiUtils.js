@@ -44,19 +44,19 @@ window.UIUtils = {
 
     // Mode switching functionality
     switchMode: function(mode) {
-        console.log('🔄 SWITCHING MODE:', window.appState.mode, '→', mode);
+        Logger.debug('Switching mode:', window.appState.mode, '→', mode);
         
         // Clear any cross-contamination before switching
         if (mode === 'builder') {
-            console.log('🏗️ Entering BUILDER mode - Transfer and Initiator functions disabled');
+            Logger.debug('Entering BUILDER mode - Transfer and Initiator functions disabled');
             // Clear any transfer state that might cause conflicts
             StateManager.resetTransferState();
             StateManager.resetInitiatorState();
         } else if (mode === 'transfer') {
-            console.log('🔄 Entering TRANSFER mode - Builder and Initiator functions disabled');
+            Logger.debug('Entering TRANSFER mode - Builder and Initiator functions disabled');
             // Clear any builder state that might cause conflicts
             if (window.appState.currentContainer) {
-                console.log('⚠️ Clearing builder state before entering transfer mode');
+                Logger.debug('Clearing builder state before entering transfer mode');
                 window.appState.currentContainer = null;
                 window.appState.currentSample = null;
                 window.appState.currentMetadata = null;
@@ -65,10 +65,10 @@ window.UIUtils = {
             }
             StateManager.resetInitiatorState();
         } else if (mode === 'initiator') {
-            console.log('✨ Entering INITIATOR mode - Builder and Transfer functions disabled');
+            Logger.debug('Entering INITIATOR mode - Builder and Transfer functions disabled');
             // Clear any builder or transfer state that might cause conflicts
             if (window.appState.currentContainer) {
-                console.log('⚠️ Clearing builder state before entering initiator mode');
+                Logger.debug('Clearing builder state before entering initiator mode');
                 window.appState.currentContainer = null;
                 window.appState.currentSample = null;
                 window.appState.currentMetadata = null;
@@ -78,7 +78,7 @@ window.UIUtils = {
             StateManager.resetTransferState();
             StateManager.resetInitiatorState();
         } else if (mode === 'intake') {
-            console.log('📥 Entering INTAKE mode - Other functions disabled');
+            Logger.debug('Entering INTAKE mode - Other functions disabled');
             // Clear any state from other modes
             if (window.appState.currentContainer) {
                 window.appState.currentContainer = null;
@@ -90,21 +90,21 @@ window.UIUtils = {
             StateManager.resetTransferState();
             StateManager.resetInitiatorState();
         } else if (mode === 'recipes') {
-            console.log('🧪 Entering RECIPE MANAGER mode - Recipe creation and management');
+            Logger.debug('Entering RECIPE MANAGER mode - Recipe creation and management');
             // Initialize recipe manager if needed
             if (window.RecipeManager && window.RecipeManager.initializeStandalone) {
                 window.RecipeManager.initializeStandalone();
             }
         } else if (mode === 'dashboard') {
-            console.log('📊 Entering DASHBOARD mode - Overview display');
+            Logger.debug('Entering DASHBOARD mode - Overview display');
             // Update dashboard metrics
             if (window.DashboardManager) {
                 window.DashboardManager.updateDashboard();
             }
         } else if (mode === 'reference') {
-            console.log('📋 Entering REFERENCE DATA mode - Data management');
+            Logger.debug('Entering REFERENCE DATA mode - Data management');
         } else if (mode === 'builder') {
-            console.log('🏗️ Returning to BUILDER mode - Refreshing recipe dropdown');
+            Logger.debug('Returning to BUILDER mode - Refreshing recipe dropdown');
             // Refresh recipe dropdown when returning from Recipe Manager
             setTimeout(() => {
                 if (window.BuilderStepManager && window.BuilderStepManager.refreshRecipeDropdown) {
@@ -198,7 +198,7 @@ window.UIUtils = {
             currentModeElement.textContent = modeText;
         }
         
-        console.log(`Mode switched to: ${mode}`);
+        Logger.debug(`Mode switched to: ${mode}`);
     },
     
     // Stats grid updates
@@ -257,7 +257,7 @@ window.UIUtils = {
             }
 
             // Notify other modules that data is available
-            console.log('✅ Reference data loaded:', { strainsCount, ownersCount, mediaCount });
+            Logger.debug('Reference data loaded:', { strainsCount, ownersCount, mediaCount });
         } else {
             const dataStatusText = document.getElementById('dataStatusText');
             const dataStatsEl = document.getElementById('dataStats');
@@ -377,7 +377,7 @@ window.UIUtils = {
     setupFocusManagement: function() {
         // Remove aggressive focus management that causes cursor jumping
         // Only focus on user-initiated actions, not automatic intervals
-        console.log('Focus management setup - using manual focus only');
+        Logger.debug('Focus management setup - using manual focus only');
     },
     
     // Rebuild inventory table (Phase 6 compatibility)
@@ -386,7 +386,7 @@ window.UIUtils = {
             window.InventoryTableManager.rebuildTable();
         } else {
             // Fallback for basic table rebuild
-            console.log('InventoryTableManager not available, using fallback');
+            Logger.debug('InventoryTableManager not available, using fallback');
         }
     }
 };
