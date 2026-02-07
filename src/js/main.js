@@ -481,6 +481,9 @@ function resetBuilder() {
 
 // Cloud inventory sync controls
 async function syncInventoryFromCloud() {
+    const btn = document.getElementById('inventory-sync-from-cloud-btn');
+    if (btn && btn.disabled) return; // Prevent double-click
+    
     try {
         if (!window.AuthManager || !AuthManager.isSignedIn()) {
             if (window.NotificationSystem) {
@@ -493,6 +496,13 @@ async function syncInventoryFromCloud() {
                 NotificationSystem.error('Cloud sync module is not initialized.');
             }
             return;
+        }
+
+        // Disable button during operation
+        if (btn) {
+            btn.disabled = true;
+            btn._originalText = btn.textContent;
+            btn.textContent = '⏳ Syncing...';
         }
 
         const result = await OneDriveSync.syncActiveInventoryToApp();
@@ -526,10 +536,20 @@ async function syncInventoryFromCloud() {
         if (window.NotificationSystem) {
             NotificationSystem.error('Error syncing inventory from cloud: ' + error.message);
         }
+    } finally {
+        // Re-enable button
+        const btn = document.getElementById('inventory-sync-from-cloud-btn');
+        if (btn) {
+            btn.disabled = false;
+            btn.textContent = btn._originalText || '⬇️ Pull from Cloud';
+        }
     }
 }
 
 async function syncInventoryToCloud() {
+    const btn = document.getElementById('inventory-sync-to-cloud-btn');
+    if (btn && btn.disabled) return; // Prevent double-click
+    
     try {
         if (!window.AuthManager || !AuthManager.isSignedIn()) {
             if (window.NotificationSystem) {
@@ -542,6 +562,13 @@ async function syncInventoryToCloud() {
                 NotificationSystem.error('Cloud sync module is not initialized.');
             }
             return;
+        }
+
+        // Disable button during operation
+        if (btn) {
+            btn.disabled = true;
+            btn._originalText = btn.textContent;
+            btn.textContent = '⏳ Syncing...';
         }
 
         const result = await OneDriveSync.appendNewInventoryRowsToCloud();
@@ -567,11 +594,21 @@ async function syncInventoryToCloud() {
         if (window.NotificationSystem) {
             NotificationSystem.error('Error syncing inventory to cloud: ' + error.message);
         }
+    } finally {
+        // Re-enable button
+        const btn = document.getElementById('inventory-sync-to-cloud-btn');
+        if (btn) {
+            btn.disabled = false;
+            btn.textContent = btn._originalText || '⬆️ Push to Cloud';
+        }
     }
 }
 
 // Quick cloud sync for easy access
 async function quickCloudSync() {
+    const btn = document.getElementById('cloud-sync-quick-btn');
+    if (btn && btn.disabled) return; // Prevent double-click
+    
     if (!window.AuthManager || !AuthManager.isSignedIn()) {
         if (window.NotificationSystem) {
             NotificationSystem.error('Please sign in with Microsoft 365 to sync from cloud.');
@@ -584,6 +621,13 @@ async function quickCloudSync() {
             NotificationSystem.error('Cloud sync module is not initialized.');
         }
         return;
+    }
+
+    // Disable button during operation
+    if (btn) {
+        btn.disabled = true;
+        btn._originalText = btn.textContent;
+        btn.textContent = '⏳ Syncing...';
     }
 
     if (window.NotificationSystem) {
@@ -601,6 +645,12 @@ async function quickCloudSync() {
         console.error('Quick cloud sync error:', error);
         if (window.NotificationSystem) {
             NotificationSystem.error('Cloud sync failed: ' + error.message);
+        }
+    } finally {
+        // Re-enable button
+        if (btn) {
+            btn.disabled = false;
+            btn.textContent = btn._originalText || '☁️ Sync from HQ Workbook';
         }
     }
 }
@@ -872,6 +922,9 @@ function toggleBarcodeDetails() {
  * Email intake form
  */
 async function emailIntakeForm() {
+    const btn = document.getElementById('emailIntakeBtn');
+    if (btn && btn.disabled) return; // Prevent double-click
+    
     const formData = IntakeFormManager.currentIntakeData;
     if (!formData) {
         NotificationSystem.error('No intake data to email');
@@ -892,6 +945,13 @@ async function emailIntakeForm() {
         return;
     }
 
+    // Disable button during operation
+    if (btn) {
+        btn.disabled = true;
+        btn._originalText = btn.textContent;
+        btn.textContent = '⏳ Sending...';
+    }
+
     try {
         NotificationSystem.info('Sending email...');
 
@@ -901,6 +961,12 @@ async function emailIntakeForm() {
     } catch (error) {
         console.error('Error sending email:', error);
         NotificationSystem.error('Failed to send email: ' + error.message);
+    } finally {
+        // Re-enable button
+        if (btn) {
+            btn.disabled = false;
+            btn.textContent = btn._originalText || '📧 Send Email';
+        }
     }
 }
 
@@ -1372,9 +1438,20 @@ function cancelContainerEdit() {
  * Save container changes
  */
 async function saveContainerChanges() {
+    const btn = document.getElementById('saveContainerBtn');
+    if (btn && btn.disabled) return; // Prevent double-click
+    
     const container = window.currentEditingContainer;
     if (!container) return;
 
+    // Disable button during operation
+    if (btn) {
+        btn.disabled = true;
+        btn._originalText = btn.textContent;
+        btn.textContent = '⏳ Saving...';
+    }
+
+    try {
     // Collect updated values from input fields
     const inputs = document.querySelectorAll('.container-detail-field input, .container-detail-field select');
     const updates = {};
@@ -1434,6 +1511,19 @@ async function saveContainerChanges() {
     showContainerDetail(container);
 
     NotificationSystem.success(`Container ${container.containerId} updated successfully!`);
+    } catch (error) {
+        console.error('Error saving container changes:', error);
+        if (window.NotificationSystem) {
+            NotificationSystem.error('Failed to save changes: ' + error.message);
+        }
+    } finally {
+        // Re-enable button
+        const btn = document.getElementById('saveContainerBtn');
+        if (btn) {
+            btn.disabled = false;
+            btn.textContent = btn._originalText || '💾 Save Changes';
+        }
+    }
 }
 
 // ─── QR Pool UI Functions ──────────────────────────────────────────
