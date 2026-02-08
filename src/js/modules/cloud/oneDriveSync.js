@@ -216,16 +216,14 @@ window.OneDriveSync = {
             localStorage.setItem(this.CACHE_KEYS.LAST_SYNC, this.lastSync);
             localStorage.removeItem(this.CACHE_KEYS.LAST_ERROR);
 
-            // Update UI
-            this.updateStatusUI();
-
-            // Show success notification
+            // Show success notification with strain count
+            const strainCount = window.appState.strainsTable ? Object.keys(window.appState.strainsTable).length : 0;
             if (window.NotificationSystem) {
-                window.NotificationSystem.success('✅ Synced from cloud successfully');
+                window.NotificationSystem.success(`✅ Synced from cloud successfully - ${strainCount} strains loaded`);
             }
 
-            console.log('OneDriveSync: Manual sync completed successfully');
-            return { success: true, source: 'cloud', mapping };
+            console.log(`OneDriveSync: Manual sync completed successfully - ${strainCount} strains in strainsTable`);
+            return { success: true, source: 'cloud', mapping, strainCount };
 
         } catch (error) {
             console.error('OneDriveSync: Manual sync failed:', error);
@@ -233,9 +231,6 @@ window.OneDriveSync = {
             // Record error
             this.lastError = error.message;
             localStorage.setItem(this.CACHE_KEYS.LAST_ERROR, this.lastError);
-
-            // Update UI
-            this.updateStatusUI();
 
             // Show error notification (once per session)
             if (window.NotificationSystem && !this.hasShownErrorThisSession) {
@@ -249,8 +244,13 @@ window.OneDriveSync = {
             return { success: false, error: error.message };
 
         } finally {
+            // FIX: Set isRunning to false BEFORE calling updateStatusUI
+            // This ensures the status shows "Connected" instead of "Syncing..."
             this.isRunning = false;
             this.updateButtonState(false);
+            
+            // Update status UI AFTER isRunning is set to false
+            this.updateStatusUI();
         }
     },
 
@@ -873,18 +873,32 @@ window.OneDriveSync = {
             // followed by column headers in row 1. We need to skip the title row.
             const isRefSheet = strainsSheetName.toLowerCase().startsWith('ref_');
             let rows;
+            
+            // FIX: Log the sheet range to debug strain loading issues
+            const sheetRef = sheet['!ref'] || 'A1';
+            console.log(`OneDriveSync: Strains sheet reference range: ${sheetRef}`);
+            
             if (isRefSheet) {
                 // Get the sheet range and skip the first row (title row)
-                const range = XLSX.utils.decode_range(sheet['!ref'] || 'A1');
+                const range = XLSX.utils.decode_range(sheetRef);
+                console.log(`OneDriveSync: Decoded range - Start row: ${range.s.r}, End row: ${range.e.r}, Columns: ${range.s.c}-${range.e.c}`);
+                
                 range.s.r = 1; // Start from row 1 (0-indexed), skipping title row
                 const newRange = XLSX.utils.encode_range(range);
-                rows = XLSX.utils.sheet_to_json(sheet, { range: newRange });
+                console.log(`OneDriveSync: Adjusted range for Ref_ sheet: ${newRange}`);
+                
+                // FIX: Use defval to handle empty cells and ensure all rows are captured
+                rows = XLSX.utils.sheet_to_json(sheet, { range: newRange, defval: '' });
                 console.log(`OneDriveSync: Ref_ sheet detected, skipped title row. Parsing from row 2.`);
             } else {
-                rows = XLSX.utils.sheet_to_json(sheet);
+                // FIX: Use defval to handle empty cells
+                rows = XLSX.utils.sheet_to_json(sheet, { defval: '' });
             }
 
-            console.log(`OneDriveSync: Strains sheet has ${rows.length} rows`);
+            console.log(`OneDriveSync: ========================================`);
+            console.log(`OneDriveSync: STRAIN LOADING SUMMARY`);
+            console.log(`OneDriveSync: Total rows parsed from Strains sheet: ${rows.length}`);
+            console.log(`OneDriveSync: ========================================`);
             console.log('OneDriveSync: Strains sheet sample row:', rows[0]);
 
             // Initialize strain abbreviations table if not exists
@@ -905,8 +919,16 @@ window.OneDriveSync = {
             }
 
             let count = 0;
+            let skippedCount = 0;
             let ownerMappingsCount = 0;
-            rows.forEach(row => {
+            
+            // FIX: Log all column names from the first row for debugging
+            if (rows.length > 0) {
+                const allColumns = Object.keys(rows[0]);
+                console.log(`OneDriveSync: All column names in Strains sheet: ${JSON.stringify(allColumns)}`);
+            }
+            
+            rows.forEach((row, rowIndex) => {
                 // Expanded column matching for strain ID, name, abbreviation, and owner
                 const id = getField(row, ['strain_id', 'strainid', 'strain id', 'id', 'strain-id', 'variety_id', 'varietyid', 'cultivar_id', 'genetic_id', '#', 'no', 'number']);
                 const name = getField(row, ['strain_name', 'strain name', 'strainname', 'strain', 'name', 'variety', 'cultivar', 'genetic', 'variety_name', 'cultivar_name']);
@@ -914,7 +936,10 @@ window.OneDriveSync = {
                 // Expanded owner column matching - include variations with spaces, underscores, and different cases
                 const ownerCode = getField(row, ['owner_code', 'ownercode', 'owner code', 'owner', 'owner_id', 'ownerid', 'owner id', 'owners', 'owned_by', 'ownedby']);
 
-                if (id !== undefined && id !== null && id !== '') {
+                // FIX: Handle numeric IDs including 0
+                const hasValidId = id !== undefined && id !== null && String(id).trim() !== '';
+                
+                if (hasValidId) {
                     const strainId = String(id).trim();
                     const strainName = name ? String(name).trim() : strainId;
                     const strainAbbr = abbreviation ? String(abbreviation).trim() : null;
@@ -922,7 +947,10 @@ window.OneDriveSync = {
                     if (!strainsTable[strainId]) {
                         strainsTable[strainId] = strainName;
                         count++;
-                        console.log(`OneDriveSync: Added strain from ref sheet: ${strainId} = "${strainName}" (ABR: ${strainAbbr || 'none'})`);
+                        // Log every 10th strain to avoid flooding console, but log first 5 for debugging
+                        if (count <= 5 || count % 10 === 0) {
+                            console.log(`OneDriveSync: Added strain #${count}: ID=${strainId}, Name="${strainName}", ABR=${strainAbbr || 'none'}`);
+                        }
                     }
 
                     // Store abbreviation separately for InventoryLookupService
@@ -938,12 +966,23 @@ window.OneDriveSync = {
                         window.appState.strainOwners[strainId] = owners;
                         ownerMappingsCount++;
                     }
+                } else {
+                    // Log skipped rows to help debug missing strains
+                    skippedCount++;
+                    if (skippedCount <= 5) {
+                        console.log(`OneDriveSync: Skipped row ${rowIndex + 1} - no valid ID. Row data:`, JSON.stringify(row).substring(0, 200));
+                    }
                 }
             });
 
-            console.log(`OneDriveSync: Added ${count} strains from ${strainsSheetName} sheet`);
-            console.log(`OneDriveSync: Loaded ${Object.keys(window.appState.strainAbbreviations).length} strain abbreviations`);
-            console.log(`OneDriveSync: Loaded ${ownerMappingsCount} strain-owner mappings`);
+            console.log(`OneDriveSync: ========================================`);
+            console.log(`OneDriveSync: STRAIN LOADING RESULTS`);
+            console.log(`OneDriveSync: Total rows in sheet: ${rows.length}`);
+            console.log(`OneDriveSync: Strains added: ${count}`);
+            console.log(`OneDriveSync: Rows skipped (no ID): ${skippedCount}`);
+            console.log(`OneDriveSync: Strain abbreviations: ${Object.keys(window.appState.strainAbbreviations).length}`);
+            console.log(`OneDriveSync: Strain-owner mappings: ${ownerMappingsCount}`);
+            console.log(`OneDriveSync: ========================================`);
 
             // Log sample of strain-owner mappings for debugging
             const sampleMappings = Object.entries(window.appState.strainOwners).slice(0, 5);
@@ -1141,12 +1180,18 @@ window.OneDriveSync = {
         window.appState.strainsTable = strainsTable;
         window.appState.isDataLoaded = true;
 
-        console.log(`OneDriveSync: After parsing reference sheets:`);
-        console.log(`  - strainsTable: ${Object.keys(strainsTable).length} entries`);
-        console.log(`  - ownersTable: ${Object.keys(ownersTable).length} entries`);
-        console.log(`  - stagesTable: ${Object.keys(stagesTable).length} entries`);
-        console.log(`  - locationsTable: ${locationsTable.length} entries`);
-        console.log(`  - mediaTypesTable: ${Object.keys(mediaTypesTable).length} entries`);
+        console.log(`OneDriveSync: ==========================================`);
+        console.log(`OneDriveSync: REFERENCE DATA SYNC COMPLETE`);
+        console.log(`OneDriveSync: ==========================================`);
+        console.log(`OneDriveSync: Strains loaded: ${Object.keys(strainsTable).length}`);
+        console.log(`OneDriveSync: Owners loaded: ${Object.keys(ownersTable).length}`);
+        console.log(`OneDriveSync: Stages loaded: ${Object.keys(stagesTable).length}`);
+        console.log(`OneDriveSync: Locations loaded: ${locationsTable.length}`);
+        console.log(`OneDriveSync: Media Types loaded: ${Object.keys(mediaTypesTable).length}`);
+        if (window.appState.strainOwners) {
+            console.log(`OneDriveSync: Strain-Owner mappings: ${Object.keys(window.appState.strainOwners).length}`);
+        }
+        console.log(`OneDriveSync: ==========================================`);
 
         // Dispatch event to notify listeners that reference data has been updated
         const event = new CustomEvent('referenceData:updated', {
