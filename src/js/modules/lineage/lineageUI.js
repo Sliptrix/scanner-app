@@ -784,7 +784,8 @@ window.LineageUI = (function() {
         lineageBtn.onclick = showLineageFilterModal;
         
         const clearBtn = filtersDiv.querySelector('[onclick*="clearFilter"]');
-        if (clearBtn) {
+        // Only use insertBefore if clearBtn is a direct child of filtersDiv
+        if (clearBtn && clearBtn.parentElement === filtersDiv) {
             filtersDiv.insertBefore(lineageBtn, clearBtn);
         } else {
             filtersDiv.appendChild(lineageBtn);

@@ -9,6 +9,14 @@ window.AuthManager = {
     inactivityTimer: null,
     inactivityTimeout: 30 * 60 * 1000, // 30 minutes in milliseconds (configurable)
     
+    /**
+     * Get the current authenticated account
+     * @returns {Object|null} Current user account or null if not authenticated
+     */
+    getAccount() {
+        return this.currentUser;
+    },
+    
     // MSAL Configuration - loaded from environment config or defaults
     // SECURITY FIX: Credentials should be configured via environment, not hardcoded
     // See: config/auth-config.js or set window.MSAL_CONFIG before loading this script

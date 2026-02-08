@@ -179,6 +179,18 @@ window.ChartRenderer = (function() {
         if (!el) return;
 
         const { labels = [], values = [] } = data;
+        
+        // Handle empty data gracefully
+        if (!values || values.length === 0) {
+            el.innerHTML = `<div class="chart-container line-chart">
+                ${options.title ? `<div class="chart-title">${options.title}</div>` : ''}
+                <div class="chart-body" style="display: flex; align-items: center; justify-content: center; height: 150px; color: #94a3b8;">
+                    No data available
+                </div>
+            </div>`;
+            return;
+        }
+        
         const maxValue = Math.max(...values, 1);
         const minValue = Math.min(...values, 0);
         const range = maxValue - minValue || 1;
