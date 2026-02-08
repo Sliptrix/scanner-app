@@ -180,8 +180,9 @@ window.ChartRenderer = (function() {
 
         const { labels = [], values = [] } = data;
         
-        // Handle empty data gracefully
-        if (!values || values.length === 0) {
+        // Handle empty data gracefully - ensure values is a valid array with numeric data
+        const validValues = Array.isArray(values) ? values.filter(v => typeof v === 'number' && !isNaN(v)) : [];
+        if (validValues.length === 0) {
             el.innerHTML = `<div class="chart-container line-chart">
                 ${options.title ? `<div class="chart-title">${options.title}</div>` : ''}
                 <div class="chart-body" style="display: flex; align-items: center; justify-content: center; height: 150px; color: #94a3b8;">
@@ -191,8 +192,8 @@ window.ChartRenderer = (function() {
             return;
         }
         
-        const maxValue = Math.max(...values, 1);
-        const minValue = Math.min(...values, 0);
+        const maxValue = Math.max(...validValues, 1);
+        const minValue = Math.min(...validValues, 0);
         const range = maxValue - minValue || 1;
         const color = options.color || COLORS.primary[0];
 
@@ -207,8 +208,8 @@ window.ChartRenderer = (function() {
         let areaD = '';
         const points = [];
 
-        values.forEach((value, i) => {
-            const x = padding + (i / (values.length - 1 || 1)) * chartWidth;
+        validValues.forEach((value, i) => {
+            const x = padding + (i / (validValues.length - 1 || 1)) * chartWidth;
             const y = height - padding - ((value - minValue) / range) * chartHeight;
             points.push({ x, y, value, label: labels[i] });
             
@@ -221,7 +222,14 @@ window.ChartRenderer = (function() {
             }
         });
 
-        areaD += ` L ${width - padding} ${height - padding} Z`;
+        // Only close the area path if we have valid data (path must start with M)
+        if (pathD && areaD.startsWith('M')) {
+            areaD += ` L ${width - padding} ${height - padding} Z`;
+        } else {
+            // Fallback for edge case - empty area
+            areaD = `M ${padding} ${height - padding} L ${width - padding} ${height - padding} Z`;
+            pathD = pathD || `M ${padding} ${height - padding}`;
+        }
 
         let html = `<div class="chart-container line-chart">`;
         
