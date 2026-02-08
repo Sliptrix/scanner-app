@@ -7,6 +7,8 @@
     <link rel="stylesheet" href="src/styles/main-consolidated.css">
     <link rel="stylesheet" href="src/styles/dashboard.css">
     <link rel="stylesheet" href="src/styles/enhanced-data-layer.css">
+    <link rel="stylesheet" href="src/styles/lineage.css">
+    <link rel="stylesheet" href="src/styles/analytics.css">
 </head>
 <body>
     <!-- Login Page (shown when not authenticated) -->
@@ -20,6 +22,12 @@
                 🔐 Sign In with Microsoft 365
             </button>
             <p style="margin-top: 35px; font-size: 0.85rem; opacity: 0.6; color: #94a3b8;">Secure authentication powered by Azure AD</p>
+            <!-- Dev Mode Button (for local testing only) -->
+            <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid rgba(255,255,255,0.1);">
+                <button onclick="enterDevMode()" style="background: #334155; color: #94a3b8; border: 1px solid #475569; padding: 10px 24px; font-size: 0.9rem; font-weight: 500; border-radius: 8px; cursor: pointer; transition: all 0.2s ease;" onmouseover="this.style.background='#475569'" onmouseout="this.style.background='#334155'">
+                    🔧 Dev Mode (Local Testing)
+                </button>
+            </div>
         </div>
     </div>
     
@@ -83,6 +91,12 @@
             <header class="top-header">
                 <h1 class="page-title">Dashboard</h1>
                 <div class="header-actions">
+                    <!-- Cloud Connection Status Indicator -->
+                    <div id="cloud-connection-indicator" class="cloud-status-indicator" title="Cloud HQ Connection Status">
+                        <span id="cloud-status-icon" class="status-icon">⚪</span>
+                        <span id="cloud-status-text" class="status-text">Offline</span>
+                        <span id="cloud-last-sync" class="last-sync" style="display: none;"></span>
+                    </div>
                     <button class="btn-export" onclick="exportInventory()">
                         <span>📊</span> Excel Export
                     </button>
@@ -147,8 +161,63 @@
                     </div>
                 </div>
 
+                <!-- Date Range Selector & Quick Actions Row -->
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                    <div id="dateRangeSelector">
+                        <!-- Populated by DashboardManager -->
+                    </div>
+                    <div id="quickActionsContainer">
+                        <!-- Populated by DashboardManager -->
+                    </div>
+                </div>
+
+                <!-- Enhanced Stats Cards with Trends -->
+                <div id="enhancedStatsContainer" class="stat-cards-container">
+                    <!-- Populated by DashboardManager with trend indicators -->
+                </div>
+
+                <!-- Analytics Grid -->
+                <div class="analytics-grid">
+                    <!-- Stage Distribution Chart -->
+                    <div class="analytics-section">
+                        <div id="stageDistributionChart">
+                            <!-- Populated by ChartRenderer -->
+                        </div>
+                    </div>
+
+                    <!-- Transfer Timeline -->
+                    <div class="analytics-section">
+                        <div id="transferTimelineChart">
+                            <!-- Populated by ChartRenderer -->
+                        </div>
+                    </div>
+
+                    <!-- Media Batch Status -->
+                    <div class="analytics-section">
+                        <div id="batchStatusChart">
+                            <!-- Populated by ChartRenderer -->
+                        </div>
+                        <div id="expiringBatchesWarning" style="display: none;"></div>
+                    </div>
+
+                    <!-- Activity Heatmap -->
+                    <div class="analytics-section">
+                        <div id="activityHeatmapChart">
+                            <!-- Populated by ChartRenderer -->
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Lineage Statistics -->
+                <div class="analytics-section" style="margin-top: 20px;">
+                    <h3>📊 Lineage Statistics</h3>
+                    <div id="lineageStatsContainer">
+                        <!-- Populated by DashboardManager -->
+                    </div>
+                </div>
+
                 <!-- Recent Intake Table -->
-                <div class="recent-intake">
+                <div class="recent-intake" style="margin-top: 20px;">
                     <div class="section-header">
                         <h3>Recent Intake</h3>
                         <a href="#" class="view-all-link" onclick="switchMode('intake')">View All</a>
@@ -230,6 +299,42 @@
                         <!-- Sync Status Indicator -->
                         <div id="dataStats" style="display: none; margin-top: 12px; padding: 10px; background: #dcfce7; border-radius: 8px; font-size: 0.9rem; color: #166534;">
                             ✅ <span id="strainsCount">0</span> strains • <span id="ownersCount">0</span> owners • <span id="mediaCount">0</span> media types loaded
+                        </div>
+                    </div>
+
+                    <!-- Lineage & Audit Reports (Phase 3) -->
+                    <div style="background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%); border: 2px solid #22c55e; border-radius: 12px; padding: 24px; margin-bottom: 20px;">
+                        <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 16px;">
+                            <span style="font-size: 1.5rem;">🔗</span>
+                            <div>
+                                <h3 style="margin: 0; color: #166534; font-size: 1.1rem;">Lineage & Audit Tracking</h3>
+                                <p style="margin: 4px 0 0 0; color: #16a34a; font-size: 0.85rem;">Track container relationships, history, and data changes</p>
+                            </div>
+                        </div>
+
+                        <div style="display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 12px;">
+                            <button class="btn" onclick="LineageReports.showReportsModal()" style="flex: 1; background: #059669; color: white; padding: 12px 20px;">
+                                📊 Lineage Reports
+                            </button>
+                            <button class="btn" onclick="if(window.LineageService) { LineageService.rebuildFromInventory(); NotificationSystem.success('Lineage rebuilt from inventory'); }" style="flex: 1; background: #0891b2; color: white; padding: 12px 20px;">
+                                🔄 Rebuild Lineage
+                            </button>
+                        </div>
+
+                        <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+                            <button class="btn btn-secondary" onclick="LineageReports.downloadExcel()" style="flex: 1;">
+                                📑 Export Excel
+                            </button>
+                            <button class="btn btn-secondary" onclick="LineageReports.downloadCSV()" style="flex: 1;">
+                                📊 Export CSV
+                            </button>
+                            <button class="btn btn-secondary" onclick="LineageReports.downloadAuditLog()" style="flex: 1;">
+                                📜 Audit Log
+                            </button>
+                        </div>
+
+                        <div id="lineageStats" style="margin-top: 12px; padding: 10px; background: white; border-radius: 8px; font-size: 0.85rem; color: #166534;">
+                            <!-- Stats will be populated by JS -->
                         </div>
                     </div>
 
@@ -1086,12 +1191,18 @@
     <script src="src/js/modules/recipe/recipeStorage.js"></script>
     <script src="src/js/modules/recipe/recipeCalculator.js"></script>
     <script src="src/js/modules/recipe/recipeManager.js"></script>
+    <script src="src/js/modules/recipe/recipeVersioning.js"></script>
     <script src="src/js/modules/recipe/mediaBatchManager.js"></script>
     <script src="src/js/modules/recipe/mediaLabUI.js"></script>
     <!-- Builder Module -->
     <script src="src/js/modules/builder/stepManager.js"></script>
     <script src="src/js/modules/builder/barcodeGenerator.js"></script>
     <script src="src/js/modules/builder/builderMain.js"></script>
+    <!-- Lineage Module (Phase 3: Data Tracking & Lineage Enhancements) -->
+    <script src="src/js/modules/lineage/lineageService.js"></script>
+    <script src="src/js/modules/lineage/auditService.js"></script>
+    <script src="src/js/modules/lineage/lineageUI.js"></script>
+    <script src="src/js/modules/lineage/lineageReports.js"></script>
     <!-- Transfer Module -->
     <script src="src/js/modules/transfer/inputManager.js"></script>
     <script src="src/js/modules/transfer/transferProcessor.js"></script>
@@ -1113,14 +1224,25 @@
     <script src="src/js/modules/intake/pdfGenerator.js"></script>
     <script src="src/js/modules/intake/intakeMain.js"></script>
     <!-- Authentication Module -->
-    <script src="src/js/modules/auth/authManager.js"></script>
+    <script src="src/js/modules/auth/authManager.js?v=2"></script>
     <!-- Cloud Sync Module -->
     <script src="src/js/modules/cloud/oneDriveSync.js?v=2.3"></script>
     <!-- Email Service Module -->
     <script src="src/js/modules/email/emailService.js"></script>
-    <!-- Dashboard Module -->
+    <!-- Dashboard Analytics & Charts (Phase 5) -->
+    <script src="src/js/modules/dashboard/analyticsEngine.js"></script>
+    <script src="src/js/modules/dashboard/chartRenderer.js"></script>
     <script src="src/js/modules/dashboard/dashboardMain.js"></script>
+    
+    <!-- Barcode Builder UI (Phase 5) -->
+    <script src="src/js/modules/barcode/barcodeBuilderUI.js"></script>
+    
+    <!-- Configuration Files (optional - copy from templates and customize) -->
+    <!-- These provide environment-specific settings without hardcoding -->
+    <script src="config/auth-config.js" onerror="console.log('auth-config.js not found, using defaults')"></script>
+    <script src="config/cloud-hq-config.js" onerror="console.log('cloud-hq-config.js not found, using defaults')"></script>
+    
     <!-- Main Application -->
-    <script src="src/js/main.js?v=1.0"></script>
+    <script src="src/js/main.js?v=2.3"></script>
 </body>
 </html>

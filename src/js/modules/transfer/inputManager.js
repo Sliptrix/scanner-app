@@ -7,8 +7,8 @@ window.TransferInputManager = (function() {
     // Configuration
     const config = {
         minContainerId: 1,
-        maxContainerId: 99999,
-        containerIdPattern: /^\d{1,5}$/
+        maxContainerId: 999999,
+        containerIdPattern: /^\d{1,6}$/
     };
 
     function initialize() {
@@ -97,7 +97,7 @@ window.TransferInputManager = (function() {
             return false;
         }
         if (!config.containerIdPattern.test(id)) {
-            NotificationSystem.error('Container ID must be 1-5 digits');
+            NotificationSystem.error('Container ID must be 1-6 digits');
             return false;
         }
         return true;

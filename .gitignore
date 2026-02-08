@@ -117,3 +117,12 @@ logs/
 # Uncomment if these should be ignored
 # demo-data.json
 # *.xlsx (if Excel files are generated/temporary)
+
+# Configuration files with sensitive data
+# These should be copied from templates and customized locally
+config/auth-config.js
+config/cloud-hq-config.js
+
+# Keep templates in git
+!config/auth-config.template.js
+!config/cloud-hq-config.template.js

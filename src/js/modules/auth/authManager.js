@@ -9,12 +9,15 @@ window.AuthManager = {
     inactivityTimer: null,
     inactivityTimeout: 30 * 60 * 1000, // 30 minutes in milliseconds (configurable)
     
-    // MSAL Configuration - REPLACE THESE VALUES WITH YOUR AZURE AD APP REGISTRATION
+    // MSAL Configuration - loaded from environment config or defaults
+    // SECURITY FIX: Credentials should be configured via environment, not hardcoded
+    // See: config/auth-config.js or set window.MSAL_CONFIG before loading this script
     msalConfig: {
         auth: {
-            clientId: 'c5fd0c6d-55ab-46ac-aa66-af2befec9560', // Replace with your Azure AD app client ID
-            authority: 'https://login.microsoftonline.com/a1b92892-5ecd-4f98-ae48-e552b6767726', // Replace with your tenant ID
-            redirectUri: window.location.origin // Current origin (e.g., http://localhost:8000)
+            // Try to load from environment config, fall back to defaults for development
+            clientId: (window.MSAL_CONFIG && window.MSAL_CONFIG.clientId) || 'c5fd0c6d-55ab-46ac-aa66-af2befec9560',
+            authority: (window.MSAL_CONFIG && window.MSAL_CONFIG.authority) || 'https://login.microsoftonline.com/a1b92892-5ecd-4f98-ae48-e552b6767726',
+            redirectUri: (window.MSAL_CONFIG && window.MSAL_CONFIG.redirectUri) || window.location.origin
         },
         cache: {
             cacheLocation: 'sessionStorage',
@@ -130,16 +133,16 @@ window.AuthManager = {
      * Get access token for Microsoft Graph API
      */
     async getAccessToken() {
+        if (!this.currentUser) {
+            throw new Error('User not signed in');
+        }
+        
+        const tokenRequest = {
+            scopes: this.loginRequest.scopes,
+            account: this.currentUser
+        };
+        
         try {
-            if (!this.currentUser) {
-                throw new Error('User not signed in');
-            }
-            
-            const tokenRequest = {
-                scopes: this.loginRequest.scopes,
-                account: this.currentUser
-            };
-            
             // Try to acquire token silently
             const response = await this.msalInstance.acquireTokenSilent(tokenRequest);
             return response.accessToken;
@@ -372,6 +375,41 @@ function signOut() {
     AuthManager.signOut();
 }
 
+/**
+ * Enter dev mode - bypass authentication for local testing
+ * Only available when running on localhost
+ */
+function enterDevMode() {
+    // Only allow dev mode on localhost
+    if (!window.location.hostname.includes('localhost') && !window.location.hostname.includes('127.0.0.1')) {
+        alert('Dev mode is only available on localhost');
+        return;
+    }
+    
+    console.log('Entering dev mode - bypassing authentication');
+    
+    // Set a mock user
+    AuthManager.currentUser = {
+        username: 'dev@localhost.test',
+        name: 'Dev Mode User',
+        localAccountId: 'dev-mode-user'
+    };
+    
+    // Mark as dev mode
+    window.isDevMode = true;
+    
+    // Update UI to show app
+    AuthManager.updateUI(true);
+    
+    // Notify user
+    if (window.NotificationSystem) {
+        NotificationSystem.info('Running in Dev Mode - Authentication bypassed');
+    }
+    
+    console.log('Dev mode activated');
+}
+
 // Expose to window
 window.signIn = signIn;
 window.signOut = signOut;
+window.enterDevMode = enterDevMode;

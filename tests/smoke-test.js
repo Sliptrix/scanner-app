@@ -30,10 +30,18 @@ const requiredFiles = [
     'src/js/modules/recipe/recipeCalculator.js',
     'src/js/modules/recipe/recipeStorage.js',
     'src/js/modules/recipe/recipeManager.js',
+    // Phase 5: Dashboard Analytics & Barcode Builder
+    'src/js/modules/dashboard/analyticsEngine.js',
+    'src/js/modules/dashboard/chartRenderer.js',
+    'src/js/modules/dashboard/dashboardMain.js',
+    'src/js/modules/barcode/barcodeBuilderUI.js',
+    'src/styles/analytics.css',
+    // Test files
     'tests/phase3-validation.html',
     'tests/phase4-validation.html',
     'tests/phase5-validation.html',
-    'tests/recipe-integration.test.js'
+    'tests/recipe-integration.test.js',
+    'tests/phase5-analytics.test.js'
 ];
 
 let filesExist = 0;

@@ -8,8 +8,9 @@ console.log('========================================');
 console.log('Strain-Owner Mapping Test');
 console.log('========================================\n');
 
-// Load the HQ workbook
-const workbookPath = path.join(__dirname, '..', 'uploads', 'Enhanced_Plant_Inventory_System-7.xlsx');
+// Load the HQ workbook - use local sample file
+// Note: Original path pointed to uploads folder that may not exist
+const workbookPath = path.join(__dirname, '..', 'barcode test.xlsx');
 const workbook = XLSX.readFile(workbookPath);
 
 // Get Ref_Strains sheet

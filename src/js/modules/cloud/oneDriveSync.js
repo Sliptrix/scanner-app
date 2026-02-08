@@ -27,6 +27,11 @@ window.OneDriveSync = {
     // Safety flag: full workbook overwrite via uploadFile is disabled
     // unless this is explicitly set to true in a controlled context.
     allowFullWorkbookOverwrite: false,
+    
+    // CRITICAL SAFETY: Global read-only mode blocks ALL write operations
+    // Set to true by default to protect production cloud workbooks
+    // Must be explicitly set to false only in controlled export/test contexts
+    readOnlyMode: true,
     hasShownErrorThisSession: false,
     driveId: null,
     itemId: null,
@@ -622,9 +627,13 @@ window.OneDriveSync = {
         // Normalize header keys and map to app inventory objects
         const inventory = [];
 
+        // FIX: Enhanced getField that strips XLSX's _1, _2 suffix for duplicate columns
         const getField = (row, candidates) => {
             for (const key of Object.keys(row)) {
-                const normalizedKey = key.toLowerCase().trim();
+                // Normalize: lowercase, trim, and strip _N suffix from duplicate columns
+                let normalizedKey = key.toLowerCase().trim();
+                // Strip trailing _1, _2, etc. (XLSX adds these for duplicate column names)
+                normalizedKey = normalizedKey.replace(/_\d+$/, '');
                 if (candidates.includes(normalizedKey)) {
                     return row[key];
                 }
@@ -833,10 +842,13 @@ window.OneDriveSync = {
         // ALWAYS start fresh when parsing from cloud
         const strainsTable = {};
 
-        // Helper to get field value case-insensitively
+        // FIX: Enhanced getField that strips XLSX's _1, _2 suffix for duplicate columns
         const getField = (row, candidates) => {
             for (const key of Object.keys(row)) {
-                const normalizedKey = key.toLowerCase().trim();
+                // Normalize: lowercase, trim, and strip _N suffix from duplicate columns
+                let normalizedKey = key.toLowerCase().trim();
+                // Strip trailing _1, _2, etc. (XLSX adds these for duplicate column names)
+                normalizedKey = normalizedKey.replace(/_\d+$/, '');
                 if (candidates.includes(normalizedKey)) {
                     return row[key];
                 }
@@ -1010,8 +1022,18 @@ window.OneDriveSync = {
 
             let count = 0;
             rows.forEach(row => {
-                const id = getField(row, ['stage_id', 'stageid', 'stage id', 'id', 'stage-id', '#', 'code']);
-                const name = getField(row, ['stage_name', 'stage name', 'stagename', 'stage', 'name', 'description']);
+                // FIX: Add 'propogation stages id' (common misspelling in HQ workbooks)
+                const id = getField(row, [
+                    'stage_id', 'stageid', 'stage id', 'id', 'stage-id', '#', 'code',
+                    'propogation stages id', 'propagation stages id',
+                    'propogation_stages_id', 'propagation_stages_id'
+                ]);
+                // FIX: Add 'propogation stages' (common misspelling in HQ workbooks)
+                const name = getField(row, [
+                    'stage_name', 'stage name', 'stagename', 'stage', 'name', 'description',
+                    'propogation stages', 'propagation stages',
+                    'propogation_stages', 'propagation_stages'
+                ]);
 
                 if (id !== undefined && id !== null && id !== '') {
                     const stageId = String(id).trim();
@@ -1050,7 +1072,11 @@ window.OneDriveSync = {
             }
 
             rows.forEach(row => {
-                const name = getField(row, ['location_name', 'location name', 'locationname', 'location', 'name', 'room', 'area']);
+                // FIX: Add 'locations' pattern for HQ workbooks (some have just "Locations" as header)
+                const name = getField(row, [
+                    'location_name', 'location name', 'locationname', 'location', 
+                    'locations', 'name', 'room', 'area', 'rack', 'shelf'
+                ]);
                 if (name && !locationsTable.includes(String(name).trim())) {
                     locationsTable.push(String(name).trim());
                 }
@@ -1085,8 +1111,18 @@ window.OneDriveSync = {
 
             let count = 0;
             rows.forEach(row => {
-                const code = getField(row, ['media_code', 'mediacode', 'media code', 'code', 'type_id', 'typeid', 'id', '#']);
-                const name = getField(row, ['media_name', 'media name', 'medianame', 'media', 'name', 'type', 'description']);
+                // FIX: Add 'media id', 'media_id' patterns for HQ workbooks
+                const code = getField(row, [
+                    'media_code', 'mediacode', 'media code', 'code', 
+                    'media_id', 'mediaid', 'media id',
+                    'type_id', 'typeid', 'id', '#'
+                ]);
+                // FIX: Add 'media type', 'media_type' patterns
+                const name = getField(row, [
+                    'media_name', 'media name', 'medianame', 'media', 
+                    'media_type', 'mediatype', 'media type',
+                    'name', 'type', 'description'
+                ]);
 
                 if (code !== undefined && code !== null && code !== '') {
                     const mediaCode = String(code).trim();
@@ -1534,6 +1570,12 @@ window.OneDriveSync = {
     async appendNewInventoryRowsToCloud() {
         console.log('OneDriveSync: Appending new inventory rows to cloud Active_Inventory table...');
 
+        // CRITICAL SAFETY: Block all writes when in read-only mode
+        if (this.readOnlyMode) {
+            console.warn('OneDriveSync.appendNewInventoryRowsToCloud BLOCKED: readOnlyMode is enabled');
+            return { success: false, count: 0, blocked: true, reason: 'Read-only mode enabled' };
+        }
+
         if (!this.inventoryTableName) {
             throw new Error('OneDriveSync: inventoryTableName not configured');
         }
@@ -1855,6 +1897,12 @@ window.OneDriveSync = {
      * @returns {Promise<{success: boolean, error?: string}>}
      */
     async appendStrainReferenceRow(intakeData) {
+        // CRITICAL SAFETY: Block all writes when in read-only mode
+        if (this.readOnlyMode) {
+            console.warn('OneDriveSync.appendStrainReferenceRow BLOCKED: readOnlyMode is enabled');
+            return { success: false, blocked: true, reason: 'Read-only mode enabled' };
+        }
+
         try {
             if (!intakeData) {
                 throw new Error('No intake data provided');
@@ -1931,6 +1979,12 @@ window.OneDriveSync = {
      * @returns {Promise<{success: boolean, error?: string}>}
      */
     async appendRecipeToCloud(recipeData) {
+        // CRITICAL SAFETY: Block all writes when in read-only mode
+        if (this.readOnlyMode) {
+            console.warn('OneDriveSync.appendRecipeToCloud BLOCKED: readOnlyMode is enabled');
+            return { success: false, blocked: true, reason: 'Read-only mode enabled' };
+        }
+
         try {
             if (!recipeData) {
                 throw new Error('No recipe data provided');
@@ -2088,6 +2142,12 @@ window.OneDriveSync = {
      * @returns {Promise<{success: boolean}>}
      */
     async updateRecipeRow(excelRow, rowValues) {
+        // CRITICAL SAFETY: Block all writes when in read-only mode
+        if (this.readOnlyMode) {
+            console.warn('OneDriveSync.updateRecipeRow BLOCKED: readOnlyMode is enabled');
+            return { success: false, blocked: true };
+        }
+
         const token = await this.acquireToken();
         const baseUrl = `https://graph.microsoft.com/v1.0/drives/${this.driveId}/items/${this.itemId}/workbook`;
         const headers = {
@@ -2120,6 +2180,12 @@ window.OneDriveSync = {
      * @returns {Promise<{success: boolean, error?: string}>}
      */
     async appendBatchToCloud(batchData) {
+        // CRITICAL SAFETY: Block all writes when in read-only mode
+        if (this.readOnlyMode) {
+            console.warn('OneDriveSync.appendBatchToCloud BLOCKED: readOnlyMode is enabled');
+            return { success: false, blocked: true, reason: 'Read-only mode enabled' };
+        }
+
         try {
             if (!batchData) {
                 throw new Error('No batch data provided');
@@ -2257,6 +2323,12 @@ window.OneDriveSync = {
      * @returns {Promise<{success: boolean}>}
      */
     async updateBatchRow(excelRow, rowValues) {
+        // CRITICAL SAFETY: Block all writes when in read-only mode
+        if (this.readOnlyMode) {
+            console.warn('OneDriveSync.updateBatchRow BLOCKED: readOnlyMode is enabled');
+            return { success: false, blocked: true };
+        }
+
         const token = await this.acquireToken();
         const baseUrl = `https://graph.microsoft.com/v1.0/drives/${this.driveId}/items/${this.itemId}/workbook`;
         const headers = {
@@ -2286,36 +2358,123 @@ window.OneDriveSync = {
      * Update status UI element
      */
     updateStatusUI() {
-        if (!this.statusElementId) return;
+        // Update the main status element (if configured)
+        if (this.statusElementId) {
+            const statusElement = document.getElementById(this.statusElementId);
+            if (statusElement) {
+                let statusText = '';
+                let statusClass = '';
 
-        const statusElement = document.getElementById(this.statusElementId);
-        if (!statusElement) return;
+                if (this.isRunning) {
+                    statusText = '⏳ Syncing...';
+                    statusClass = 'syncing';
+                } else if (this.lastError) {
+                    statusText = `❌ Error: ${this.lastError}`;
+                    statusClass = 'error';
 
-        let statusText = '';
-        let statusClass = '';
+                    if (this.lastSync) {
+                        const syncDate = new Date(this.lastSync);
+                        statusText += ` (Last success: ${syncDate.toLocaleString()})`;
+                    }
+                } else if (this.lastSync) {
+                    const syncDate = new Date(this.lastSync);
+                    statusText = `✅ Last synced: ${syncDate.toLocaleString()}`;
+                    statusClass = 'success';
+                } else {
+                    statusText = 'Last synced: —';
+                    statusClass = '';
+                }
 
-        if (this.isRunning) {
-            statusText = '⏳ Syncing...';
-            statusClass = 'syncing';
-        } else if (this.lastError) {
-            statusText = `❌ Error: ${this.lastError}`;
-            statusClass = 'error';
-
-            if (this.lastSync) {
-                const syncDate = new Date(this.lastSync);
-                statusText += ` (Last success: ${syncDate.toLocaleString()})`;
+                statusElement.textContent = statusText;
+                statusElement.className = `cloud-sync-status ${statusClass}`.trim();
             }
-        } else if (this.lastSync) {
-            const syncDate = new Date(this.lastSync);
-            statusText = `✅ Last synced: ${syncDate.toLocaleString()}`;
-            statusClass = 'success';
-        } else {
-            statusText = 'Last synced: —';
-            statusClass = '';
         }
 
-        statusElement.textContent = statusText;
-        statusElement.className = `cloud-sync-status ${statusClass}`.trim();
+        // Update the header connection indicator
+        this.updateConnectionIndicator();
+    },
+
+    /**
+     * Update the header connection status indicator
+     * Shows connected/syncing/error/offline status
+     */
+    updateConnectionIndicator() {
+        const indicator = document.getElementById('cloud-connection-indicator');
+        if (!indicator) return;
+
+        const iconEl = document.getElementById('cloud-status-icon');
+        const textEl = document.getElementById('cloud-status-text');
+        const lastSyncEl = document.getElementById('cloud-last-sync');
+
+        // Remove all state classes
+        indicator.classList.remove('connected', 'syncing', 'error', 'offline');
+
+        let icon = '⚪';
+        let text = 'Offline';
+        let stateClass = 'offline';
+
+        if (this.isRunning) {
+            icon = '🔄';
+            text = 'Syncing';
+            stateClass = 'syncing';
+        } else if (this.lastError) {
+            icon = '🔴';
+            text = 'Error';
+            stateClass = 'error';
+        } else if (this.lastSync && this.fromCloud) {
+            icon = '🟢';
+            text = 'Connected';
+            stateClass = 'connected';
+        } else if (this.authManager && this.authManager.isSignedIn()) {
+            icon = '🟡';
+            text = 'Ready';
+            stateClass = 'connected';
+        }
+
+        if (iconEl) iconEl.textContent = icon;
+        if (textEl) textEl.textContent = text;
+        indicator.classList.add(stateClass);
+
+        // Update last sync timestamp
+        if (lastSyncEl) {
+            if (this.lastSync) {
+                const syncDate = new Date(this.lastSync);
+                const now = new Date();
+                const diffMs = now - syncDate;
+                const diffMins = Math.floor(diffMs / 60000);
+                
+                let relativeTime = '';
+                if (diffMins < 1) {
+                    relativeTime = 'just now';
+                } else if (diffMins < 60) {
+                    relativeTime = `${diffMins}m ago`;
+                } else if (diffMins < 1440) {
+                    relativeTime = `${Math.floor(diffMins / 60)}h ago`;
+                } else {
+                    relativeTime = syncDate.toLocaleDateString();
+                }
+                
+                lastSyncEl.textContent = relativeTime;
+                lastSyncEl.style.display = 'inline';
+                lastSyncEl.title = `Last synced: ${syncDate.toLocaleString()}`;
+            } else {
+                lastSyncEl.style.display = 'none';
+            }
+        }
+
+        // Make indicator clickable to trigger manual sync
+        if (!indicator._clickHandlerAttached) {
+            indicator.addEventListener('click', async () => {
+                if (!this.isRunning && this.authManager && this.authManager.isSignedIn()) {
+                    await this.manualSync();
+                } else if (!this.authManager || !this.authManager.isSignedIn()) {
+                    if (window.NotificationSystem) {
+                        window.NotificationSystem.warning('Please sign in to sync with cloud');
+                    }
+                }
+            });
+            indicator._clickHandlerAttached = true;
+        }
     },
 
     /**
@@ -2424,6 +2583,12 @@ window.OneDriveSync = {
      * @returns {Promise<{success: boolean, excelRow?: number}>}
      */
     async updateRowByContainerId(containerId, fieldValues) {
+        // CRITICAL SAFETY: Block all writes when in read-only mode
+        if (this.readOnlyMode) {
+            console.warn('OneDriveSync.updateRowByContainerId BLOCKED: readOnlyMode is enabled');
+            return { success: false, blocked: true, reason: 'Read-only mode enabled' };
+        }
+
         if (!this.shareUrl) return { success: false };
 
         try {

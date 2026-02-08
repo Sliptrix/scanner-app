@@ -1,6 +1,34 @@
 // Lab Barcode Builder & Transfer System - Main JavaScript Entry Point
 // Phase 3: Core Infrastructure
 
+// Global unhandled promise rejection handler
+// FIX: Catch unhandled async errors to prevent silent failures
+window.addEventListener('unhandledrejection', function(event) {
+    console.error('Unhandled promise rejection:', event.reason);
+    
+    // Show user-friendly notification if possible
+    if (window.NotificationSystem) {
+        const errorMessage = event.reason && event.reason.message 
+            ? event.reason.message 
+            : 'An unexpected error occurred';
+        window.NotificationSystem.error(`Error: ${errorMessage}`);
+    }
+    
+    // Prevent default browser error handling (don't show in console twice)
+    event.preventDefault();
+});
+
+// Global error handler for synchronous errors
+window.onerror = function(message, source, lineno, colno, error) {
+    console.error('Global error:', { message, source, lineno, colno, error });
+    
+    if (window.NotificationSystem) {
+        window.NotificationSystem.error('An unexpected error occurred. Please refresh the page if issues persist.');
+    }
+    
+    return false; // Don't suppress the error in console
+};
+
 // Application initialization
 document.addEventListener('DOMContentLoaded', function() {
     Logger.debug('Lab Scanner System - Phase 3 Core Infrastructure loaded');
@@ -58,6 +86,22 @@ function initializeApp() {
         InventoryManager.initialize();
     }
     
+    // Initialize Lineage and Audit services (Phase 3: Data Tracking & Lineage Enhancements)
+    if (window.LineageService) {
+        LineageService.initialize();
+        Logger.debug('LineageService initialized');
+    }
+    
+    if (window.AuditService) {
+        AuditService.initialize();
+        Logger.debug('AuditService initialized');
+    }
+    
+    if (window.LineageUI) {
+        LineageUI.initialize();
+        Logger.debug('LineageUI initialized');
+    }
+    
     // Initialize container initiator module
     if (window.ContainerInitiator) {
         ContainerInitiator.initialize();
@@ -82,14 +126,33 @@ function initializeApp() {
 
     // Initialize OneDrive/SharePoint cloud sync
     if (window.OneDriveSync && window.AuthManager) {
-        OneDriveSync.init(AuthManager, {
-            // Enhanced Plant Inventory System workbook (HQ source of truth)
-            shareUrl: 'https://netorgft8640892-my.sharepoint.com/:x:/r/personal/aterkonda_lonewolfgenetics_com/_layouts/15/Doc.aspx?sourcedoc=%7B4E2D4D05-505A-4790-84B7-2ECB59A4B65F%7D&file=Enhanced_Plant_Inventory_System.xlsx&action=default&mobileredirect=true&DefaultItemOpen=1&wdOrigin=WAC.EXCEL.HOME-BUTTON%2CAPPHOME-WEB.FILEBROWSER.RECENT&wdPreviousSession=1c886364-c1d1-4e1e-8692-d758a3632783&wdPreviousSessionSrc=AppHomeWeb&ct=1766427274916',
-            refreshIntervalMs: 300000, // 5 minutes
-            statusElementId: 'cloud-sync-status',
-            buttonElementId: 'cloud-sync-btn',
-            inventoryTableName: 'tblActiveInventory' // Excel table name for Active_Inventory sheet
-        });
+        // Build options from CLOUD_HQ_CONFIG (if available) or use defaults
+        const cloudConfig = window.CLOUD_HQ_CONFIG || {};
+        const defaultShareUrl = 'https://netorgft8640892-my.sharepoint.com/:x:/r/personal/aterkonda_lonewolfgenetics_com/_layouts/15/Doc.aspx?sourcedoc=%7B4E2D4D05-505A-4790-84B7-2ECB59A4B65F%7D&file=Enhanced_Plant_Inventory_System.xlsx&action=default&mobileredirect=true&DefaultItemOpen=1';
+        
+        const syncOptions = {
+            // Use config shareUrl if available and not placeholder, else use default
+            shareUrl: (cloudConfig.shareUrl && !cloudConfig.shareUrl.includes('YOUR_')) 
+                ? cloudConfig.shareUrl 
+                : defaultShareUrl,
+            refreshIntervalMs: cloudConfig.refreshIntervalMs || 300000, // 5 minutes
+            statusElementId: cloudConfig.ui?.statusElementId || 'cloud-sync-status',
+            buttonElementId: cloudConfig.ui?.buttonElementId || 'cloud-sync-btn',
+            // Table names from config
+            inventoryTableName: cloudConfig.tables?.activeInventory || 'tblActiveInventory',
+            strainMappingTableName: cloudConfig.tables?.strainMapping || 'tblStrainMapping',
+            recipeTableName: cloudConfig.tables?.recipes || 'tblRecipes',
+            batchTableName: cloudConfig.tables?.batches || 'tblMediaBatches'
+        };
+        
+        // Log configuration source
+        if (cloudConfig.shareUrl && !cloudConfig.shareUrl.includes('YOUR_')) {
+            Logger.info('Using cloud config from CLOUD_HQ_CONFIG');
+        } else {
+            Logger.debug('Using default cloud config (no custom config found)');
+        }
+        
+        OneDriveSync.init(AuthManager, syncOptions);
 
         // Start auto-refresh if authenticated
         if (AuthManager.isSignedIn()) {
@@ -121,6 +184,18 @@ function initializeApp() {
         // Force setup of recipe UI
         RecipeManager.setupRecipeUI();
         Logger.debug('RecipeManager initialized with UI setup');
+    }
+
+    // Initialize recipe versioning module (Phase 4)
+    if (window.RecipeVersioning) {
+        RecipeVersioning.initialize();
+        Logger.debug('RecipeVersioning initialized');
+    }
+
+    // Initialize media batch manager (Phase 4)
+    if (window.MediaBatchManager) {
+        MediaBatchManager.initialize();
+        Logger.debug('MediaBatchManager initialized');
     }
 
     // Initialize media lab UI (batch tracking)

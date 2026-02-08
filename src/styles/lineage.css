@@ -1,0 +1,481 @@
+/**
+ * LONE WOLF BIOTECH - LINEAGE UI STYLES
+ * Phase 3: Data Tracking & Lineage System
+ * 
+ * Styles for lineage visualization components
+ */
+
+/* =========================================================================
+   Lineage Badge Styles
+   ========================================================================= */
+
+.lineage-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 2px 8px;
+    border-radius: 12px;
+    font-size: 0.8rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.lineage-badge:hover {
+    transform: scale(1.05);
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.lineage-badge.generation-0 {
+    background: #e8f5e9;
+    color: #2e7d32;
+}
+
+.lineage-badge.generation-1 {
+    background: #e3f2fd;
+    color: #1565c0;
+}
+
+.lineage-badge.generation-2 {
+    background: #fff3e0;
+    color: #ef6c00;
+}
+
+.lineage-badge.generation-3plus {
+    background: #fce4ec;
+    color: #c62828;
+}
+
+.lineage-badge.has-children {
+    border: 2px solid currentColor;
+}
+
+.lineage-badge.is-consumed {
+    opacity: 0.6;
+    text-decoration: line-through;
+}
+
+/* =========================================================================
+   Lineage Tree Styles
+   ========================================================================= */
+
+.lineage-tree-container {
+    padding: 20px;
+    background: #f8fafc;
+    border-radius: 12px;
+    overflow-x: auto;
+}
+
+.lineage-tree {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+.lineage-node {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.lineage-node-card {
+    background: white;
+    border: 2px solid #e2e8f0;
+    border-radius: 8px;
+    padding: 12px 16px;
+    min-width: 150px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.lineage-node-card:hover {
+    border-color: #3b82f6;
+    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.2);
+}
+
+.lineage-node-card.current {
+    border-color: #10b981;
+    background: #ecfdf5;
+}
+
+.lineage-node-card.consumed {
+    opacity: 0.6;
+    border-style: dashed;
+}
+
+.lineage-node-id {
+    font-weight: 700;
+    font-size: 1.1rem;
+    color: #1f2937;
+}
+
+.lineage-node-meta {
+    font-size: 0.8rem;
+    color: #6b7280;
+    margin-top: 4px;
+}
+
+.lineage-node-children {
+    display: flex;
+    gap: 16px;
+    margin-top: 16px;
+    position: relative;
+}
+
+.lineage-node-children::before {
+    content: '';
+    position: absolute;
+    top: -16px;
+    left: 50%;
+    width: 2px;
+    height: 16px;
+    background: #cbd5e1;
+}
+
+.lineage-connector {
+    position: relative;
+}
+
+.lineage-connector::before {
+    content: '';
+    position: absolute;
+    top: -8px;
+    left: 50%;
+    width: 2px;
+    height: 8px;
+    background: #cbd5e1;
+}
+
+/* =========================================================================
+   Timeline Styles
+   ========================================================================= */
+
+.container-timeline {
+    position: relative;
+    padding-left: 32px;
+}
+
+.container-timeline::before {
+    content: '';
+    position: absolute;
+    left: 12px;
+    top: 0;
+    bottom: 0;
+    width: 2px;
+    background: #e2e8f0;
+}
+
+.timeline-entry {
+    position: relative;
+    padding: 12px 16px;
+    background: white;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    margin-bottom: 12px;
+}
+
+.timeline-entry::before {
+    content: '';
+    position: absolute;
+    left: -26px;
+    top: 16px;
+    width: 12px;
+    height: 12px;
+    background: #3b82f6;
+    border-radius: 50%;
+    border: 2px solid white;
+    box-shadow: 0 0 0 2px #e2e8f0;
+}
+
+/* Timeline entry type colors */
+.timeline-entry.type-created::before { background: #10b981; }
+.timeline-entry.type-split::before { background: #8b5cf6; }
+.timeline-entry.type-transferred::before { background: #f59e0b; }
+.timeline-entry.type-discarded::before { background: #ef4444; }
+.timeline-entry.type-location::before { background: #06b6d4; }
+.timeline-entry.type-updated::before { background: #6366f1; }
+
+.timeline-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+}
+
+.timeline-type {
+    font-weight: 600;
+    font-size: 0.9rem;
+}
+
+.timeline-time {
+    font-size: 0.8rem;
+    color: #6b7280;
+}
+
+.timeline-message {
+    font-size: 0.9rem;
+    color: #374151;
+}
+
+.timeline-user {
+    font-size: 0.8rem;
+    color: #9ca3af;
+    margin-top: 4px;
+}
+
+.timeline-changes {
+    margin-top: 8px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+}
+
+.timeline-change-tag {
+    background: #fef3c7;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 0.8rem;
+    color: #92400e;
+}
+
+/* =========================================================================
+   Lineage Modal Styles
+   ========================================================================= */
+
+.lineage-modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0,0,0,0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 2000;
+    backdrop-filter: blur(2px);
+}
+
+.lineage-modal-content {
+    background: white;
+    border-radius: 16px;
+    max-width: 90vw;
+    max-height: 90vh;
+    overflow: auto;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+    animation: modalSlideIn 0.2s ease-out;
+}
+
+@keyframes modalSlideIn {
+    from {
+        opacity: 0;
+        transform: translateY(-20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.lineage-modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 20px 24px;
+    border-bottom: 1px solid #e2e8f0;
+    position: sticky;
+    top: 0;
+    background: white;
+    z-index: 1;
+}
+
+.lineage-modal-body {
+    padding: 24px;
+}
+
+.lineage-modal-close {
+    background: none;
+    border: none;
+    font-size: 1.5rem;
+    cursor: pointer;
+    color: #6b7280;
+    padding: 4px;
+    line-height: 1;
+    transition: color 0.2s;
+}
+
+.lineage-modal-close:hover {
+    color: #1f2937;
+}
+
+/* =========================================================================
+   Lineage Stats Cards
+   ========================================================================= */
+
+.lineage-stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 16px;
+    margin-bottom: 24px;
+}
+
+.lineage-stat-card {
+    background: #f8fafc;
+    padding: 16px;
+    border-radius: 8px;
+    text-align: center;
+    transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.lineage-stat-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+}
+
+.lineage-stat-value {
+    font-size: 1.8rem;
+    font-weight: 700;
+    color: #1f2937;
+}
+
+.lineage-stat-label {
+    font-size: 0.8rem;
+    color: #6b7280;
+    margin-top: 4px;
+}
+
+/* =========================================================================
+   Lineage Tabs
+   ========================================================================= */
+
+.lineage-tabs {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 16px;
+    border-bottom: 2px solid #e2e8f0;
+    padding-bottom: 8px;
+}
+
+.lineage-tab {
+    padding: 8px 16px;
+    background: none;
+    border: none;
+    font-size: 0.9rem;
+    cursor: pointer;
+    color: #6b7280;
+    border-bottom: 2px solid transparent;
+    margin-bottom: -10px;
+    transition: color 0.2s, border-color 0.2s;
+}
+
+.lineage-tab:hover {
+    color: #374151;
+}
+
+.lineage-tab.active {
+    color: #3b82f6;
+    border-bottom-color: #3b82f6;
+}
+
+.lineage-tab-content {
+    animation: fadeIn 0.2s ease-out;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+/* =========================================================================
+   Lineage Path Display
+   ========================================================================= */
+
+.lineage-path {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+    padding: 16px;
+}
+
+.lineage-path-node {
+    padding: 12px 20px;
+    background: #f8fafc;
+    border: 2px solid #e2e8f0;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.lineage-path-node:hover {
+    border-color: #3b82f6;
+    background: #eff6ff;
+}
+
+.lineage-path-node.current {
+    background: #ecfdf5;
+    border-color: #10b981;
+}
+
+.lineage-path-arrow {
+    margin: 0 8px;
+    font-size: 1.2rem;
+    color: #9ca3af;
+}
+
+/* =========================================================================
+   Lineage Filter Modal
+   ========================================================================= */
+
+.lineage-filter-input {
+    width: 100%;
+    padding: 12px;
+    border: 2px solid #e2e8f0;
+    border-radius: 8px;
+    font-size: 1rem;
+    transition: border-color 0.2s;
+}
+
+.lineage-filter-input:focus {
+    outline: none;
+    border-color: #3b82f6;
+}
+
+.lineage-filter-select {
+    width: 100%;
+    padding: 12px;
+    border: 2px solid #e2e8f0;
+    border-radius: 8px;
+    font-size: 1rem;
+    background: white;
+}
+
+/* =========================================================================
+   Responsive Adjustments
+   ========================================================================= */
+
+@media (max-width: 768px) {
+    .lineage-modal-content {
+        max-width: 95vw;
+        max-height: 95vh;
+        margin: 10px;
+    }
+    
+    .lineage-stats-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+    
+    .lineage-node-children {
+        flex-direction: column;
+        align-items: center;
+    }
+    
+    .lineage-path {
+        flex-direction: column;
+    }
+    
+    .lineage-path-arrow {
+        transform: rotate(90deg);
+    }
+}

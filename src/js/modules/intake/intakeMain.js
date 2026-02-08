@@ -23,7 +23,7 @@ async function submitIntakeForm() {
     // Validate form
     const errors = IntakeFormManager.validateForm();
     if (errors.length > 0) {
-        showNotification('Validation errors: ' + errors.join(', '), 'error');
+        NotificationSystem.error('Validation errors: ' + errors.join(', '));
         return;
     }
     
@@ -45,7 +45,7 @@ async function submitIntakeForm() {
     IntakeFormManager.displaySummary(formData);
     
     // Show success notification for local intake handling
-    showNotification('Intake submitted successfully!', 'success');
+    NotificationSystem.success('Intake submitted successfully!');
     
     console.log('Intake submitted successfully');
     
@@ -57,7 +57,7 @@ async function submitIntakeForm() {
             await OneDriveSync.appendStrainReferenceRow(formData);
         } catch (error) {
             console.error('Error syncing intake reference data to cloud:', error);
-            showNotification('Intake saved, but failed to sync reference data to cloud.', 'warning');
+            NotificationSystem.warning('Intake saved, but failed to sync reference data to cloud.');
         }
     }
 
@@ -103,7 +103,7 @@ async function submitIntakeForm() {
         console.log('Created inventory entry from intake:', newInventoryEntry);
     } catch (error) {
         console.error('Error creating inventory entry from intake:', error);
-        showNotification('Intake saved, but failed to create inventory entry from intake.', 'warning');
+        NotificationSystem.warning('Intake saved, but failed to create inventory entry from intake.');
     }
 
     // 3) Previously: optionally push new inventory rows directly to cloud Active_Inventory via OneDrive.
@@ -116,16 +116,16 @@ async function submitIntakeForm() {
     if (window.AuthManager && AuthManager.isSignedIn()) {
         try {
             console.log('Auto-sending intake email...');
-            showNotification('Sending email to lab...', 'info');
+            NotificationSystem.info('Sending email to lab...');
             
             const recipients = ['pozersky@lonewolfgenetics.com', 'aterkonda@lonewolfgenetics.com'];
             const result = await EmailService.sendIntakeForm(formData, recipients);
             
-            showNotification(`✅ Email sent to lab successfully!`, 'success');
+            NotificationSystem.success(`✅ Email sent to lab successfully!`);
             console.log('Intake email sent automatically:', result);
         } catch (error) {
             console.error('Error auto-sending email:', error);
-            showNotification('⚠️ Intake saved but email failed. You can manually send it using the Email button.', 'warning');
+            NotificationSystem.warning('⚠️ Intake saved but email failed. You can manually send it using the Email button.');
         }
     } else {
         console.log('User not signed in - skipping auto-email');
@@ -138,7 +138,7 @@ async function submitIntakeForm() {
  */
 function clearIntakeForm() {
     IntakeFormManager.clearForm();
-    showNotification('Form cleared', 'info');
+    NotificationSystem.info('Form cleared');
 }
 
 /**
@@ -148,7 +148,7 @@ function clearIntakeForm() {
 function downloadIntakeJSON() {
     const data = IntakeFormManager.currentIntakeData;
     if (!data) {
-        showNotification('No intake data to download', 'error');
+        NotificationSystem.error('No intake data to download');
         return;
     }
     
@@ -167,7 +167,7 @@ function downloadIntakeJSON() {
     link.click();
     URL.revokeObjectURL(url);
     
-    showNotification('JSON downloaded successfully', 'success');
+    NotificationSystem.success('JSON downloaded successfully');
 }
 
 /**
@@ -177,13 +177,13 @@ function downloadIntakeJSON() {
 function downloadIntakeExcel() {
     const data = IntakeFormManager.currentIntakeData;
     if (!data) {
-        showNotification('No intake data to download', 'error');
+        NotificationSystem.error('No intake data to download');
         return;
     }
     
     // Check if XLSX library is available
     if (typeof XLSX === 'undefined') {
-        showNotification('Excel export library not loaded', 'error');
+        NotificationSystem.error('Excel export library not loaded');
         return;
     }
     
@@ -248,7 +248,7 @@ function downloadIntakeExcel() {
     // Download file
     XLSX.writeFile(wb, `intake_${data.strainID}_${new Date().toISOString().split('T')[0]}.xlsx`);
     
-    showNotification('Excel file downloaded successfully', 'success');
+    NotificationSystem.success('Excel file downloaded successfully');
 }
 
 /**
@@ -258,16 +258,16 @@ function downloadIntakeExcel() {
 function downloadIntakePDF() {
     const data = IntakeFormManager.currentIntakeData;
     if (!data) {
-        showNotification('No intake data to download', 'error');
+        NotificationSystem.error('No intake data to download');
         return;
     }
     
     try {
         IntakePDFGenerator.downloadPDF(data);
-        showNotification('PDF downloaded successfully', 'success');
+        NotificationSystem.success('PDF downloaded successfully');
     } catch (error) {
         console.error('Error generating PDF:', error);
-        showNotification('Error generating PDF: ' + error.message, 'error');
+        NotificationSystem.error('Error generating PDF: ' + error.message);
     }
 }
 
@@ -347,13 +347,13 @@ function setupBulkUploadListeners() {
  */
 async function handleBulkFileUpload(file) {
     try {
-        showNotification('Parsing file...', 'info');
+        NotificationSystem.info('Parsing file...');
         
         // Parse file
         const entries = await BulkUploadParser.parseFile(file);
         
         if (entries.length === 0) {
-            showNotification('No valid entries found in file', 'error');
+            NotificationSystem.error('No valid entries found in file');
             return;
         }
         
@@ -369,11 +369,11 @@ async function handleBulkFileUpload(file) {
         document.getElementById('bulkDataPreview').innerHTML = previewHtml;
         document.getElementById('bulkPreviewSection').style.display = 'block';
         
-        showNotification(`Parsed ${entries.length} entries from file`, 'success');
+        NotificationSystem.success(`Parsed ${entries.length} entries from file`);
         
     } catch (error) {
         console.error('Error handling bulk file:', error);
-        showNotification('Error parsing file: ' + error.message, 'error');
+        NotificationSystem.error('Error parsing file: ' + error.message);
     }
 }
 
@@ -385,7 +385,7 @@ function clearBulkFile() {
     document.getElementById('bulkFileInfo').style.display = 'none';
     document.getElementById('bulkPreviewSection').style.display = 'none';
     BulkUploadParser.parsedData = [];
-    showNotification('File cleared', 'info');
+    NotificationSystem.info('File cleared');
 }
 
 /**
@@ -395,7 +395,7 @@ function submitBulkIntake() {
     const entries = BulkUploadParser.parsedData;
     
     if (entries.length === 0) {
-        showNotification('No entries to submit', 'error');
+        NotificationSystem.error('No entries to submit');
         return;
     }
     
@@ -403,7 +403,7 @@ function submitBulkIntake() {
     const validEntries = entries.filter(e => e.errors.length === 0);
     
     if (validEntries.length === 0) {
-        showNotification('No valid entries to submit. Please fix errors first.', 'error');
+        NotificationSystem.error('No valid entries to submit. Please fix errors first.');
         return;
     }
     
@@ -427,7 +427,7 @@ function submitBulkIntake() {
         processed++;
     });
     
-    showNotification(`Successfully processed ${processed} entries!`, 'success');
+    NotificationSystem.success(`Successfully processed ${processed} entries!`);
     
     // Clear and return to upload
     clearBulkFile();

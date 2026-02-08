@@ -28,6 +28,13 @@ window.InventoryTableManager = (function() {
         setupSearchAndFilter();
         rebuildTable();
         populateLocationFilter();
+        
+        // Add lineage filter button if LineageUI is available (Phase 3)
+        if (window.LineageUI) {
+            setTimeout(() => {
+                LineageUI.addLineageFilterToInventory();
+            }, 100);
+        }
     }
 
     // Setup table headers with sorting
@@ -430,8 +437,14 @@ window.InventoryTableManager = (function() {
         return row;
     }
 
-    // Build lineage display for container relationships
+    // Build lineage display for container relationships - Enhanced with LineageUI (Phase 3)
     function buildLineageDisplay(item) {
+        // Use enhanced LineageUI if available (Phase 3)
+        if (window.LineageUI) {
+            return LineageUI.createTableLineageDisplay(item);
+        }
+        
+        // Fallback to legacy display
         if (item.transferSource) {
             const transferType = item.transferType === 'split' ? '🌱' : '📦';
             // SECURITY FIX: Sanitize transferSource

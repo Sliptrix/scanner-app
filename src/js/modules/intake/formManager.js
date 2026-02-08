@@ -326,6 +326,7 @@ window.IntakeFormManager = {
     
     /**
      * Display intake summary
+     * FIX: Sanitize all user input before rendering to prevent XSS
      */
     displaySummary(data) {
         const summaryContent = document.getElementById('intakeSummaryContent');
@@ -333,30 +334,35 @@ window.IntakeFormManager = {
         
         if (!summaryContent || !summarySection) return;
         
+        // Use UIUtils.sanitize for all user-provided data to prevent XSS
+        const s = window.UIUtils && window.UIUtils.sanitize 
+            ? window.UIUtils.sanitize.bind(window.UIUtils) 
+            : (str) => String(str || '').replace(/[<>&"']/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;',"'":'&#39;'}[c]));
+        
         const html = `
             <div style="background: #f8f9fa; padding: 20px; border-radius: 8px; border-left: 4px solid #28a745;">
                 <div style="margin-bottom: 15px;">
-                    <strong>Customer Type:</strong> ${data.customerType}
+                    <strong>Customer Type:</strong> ${s(data.customerType)}
                 </div>
                 <div style="margin-bottom: 15px;">
-                    <strong>Customer Name:</strong> ${data.customerName}
+                    <strong>Customer Name:</strong> ${s(data.customerName)}
                 </div>
-                ${data.address ? `<div style="margin-bottom: 15px;"><strong>Address:</strong> ${data.address}</div>` : ''}
-                ${data.poNumber ? `<div style="margin-bottom: 15px;"><strong>PO#:</strong> ${data.poNumber}</div>` : ''}
+                ${data.address ? `<div style="margin-bottom: 15px;"><strong>Address:</strong> ${s(data.address)}</div>` : ''}
+                ${data.poNumber ? `<div style="margin-bottom: 15px;"><strong>PO#:</strong> ${s(data.poNumber)}</div>` : ''}
                 <div style="margin-bottom: 15px;">
-                    <strong>Services:</strong> ${data.services.join(', ')}
-                </div>
-                <div style="margin-bottom: 15px;">
-                    <strong>Genetics:</strong> ${data.genetics}
+                    <strong>Services:</strong> ${data.services.map(svc => s(svc)).join(', ')}
                 </div>
                 <div style="margin-bottom: 15px;">
-                    <strong>Strain Name:</strong> ${data.strainName}
+                    <strong>Genetics:</strong> ${s(data.genetics)}
                 </div>
                 <div style="margin-bottom: 15px;">
-                    <strong>Owner ID:</strong> ${data.ownerID}
+                    <strong>Strain Name:</strong> ${s(data.strainName)}
                 </div>
                 <div style="margin-bottom: 15px;">
-                    <strong>Strain ID:</strong> ${data.strainID}
+                    <strong>Owner ID:</strong> ${s(data.ownerID)}
+                </div>
+                <div style="margin-bottom: 15px;">
+                    <strong>Strain ID:</strong> ${s(data.strainID)}
                 </div>
             </div>
         `;

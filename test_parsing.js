@@ -1,6 +1,7 @@
 const XLSX = require('xlsx');
 
-const workbook = XLSX.readFile('/sessions/nice-exciting-ride/mnt/uploads/Enhanced_Plant_Inventory_System-6.xlsx');
+// Use local sample file - original session path no longer exists
+const workbook = XLSX.readFile('./barcode test.xlsx');
 
 console.log('=== TESTING PARSING LOGIC ===');
 

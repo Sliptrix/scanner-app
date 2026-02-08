@@ -1169,6 +1169,32 @@ window.ContainerInitiator = (function() {
         // Add to inventory using StateManager to ensure proper tracking
         window.appState.inventory.push(newContainer); // Append to end to match Excel row order
 
+        // Log container creation via AuditService (Phase 3)
+        if (window.AuditService) {
+            AuditService.logContainerCreated(currentContainerId, {
+                strain: strainName,
+                owner: ownerName,
+                stage: stageName,
+                media: mediaName,
+                location: location,
+                tissueCount: tissue,
+                date: formattedDate,
+                metadata: {
+                    qrExcelRow: qrExcelRow,
+                    source: 'initiator'
+                }
+            });
+        }
+
+        // Add to LineageService (Phase 3)
+        if (window.LineageService) {
+            LineageService.addNode(currentContainerId, {
+                strain: strainName,
+                owner: ownerName,
+                createdAt: new Date().toISOString()
+            });
+        }
+
         // Assign the scanned QR code to this container
         const qrExcelRow = StateManager.getState('initiatorState.qrExcelRow');
         if (qrExcelRow && window.QRCodeService) {

@@ -36,6 +36,18 @@ const dom = new JSDOM(`<!DOCTYPE html>
 global.window = dom.window;
 global.document = dom.window.document;
 
+// Mock localStorage for Node.js environment
+const localStorageData = {};
+global.localStorage = {
+    getItem: (key) => localStorageData[key] || null,
+    setItem: (key, value) => { localStorageData[key] = String(value); },
+    removeItem: (key) => { delete localStorageData[key]; },
+    clear: () => { Object.keys(localStorageData).forEach(key => delete localStorageData[key]); },
+    key: (i) => Object.keys(localStorageData)[i],
+    get length() { return Object.keys(localStorageData).length; }
+};
+dom.window.localStorage = global.localStorage;
+
 // Load the modules
 const stateContent = fs.readFileSync(path.join(__dirname, '../src/js/core/state.js'), 'utf8');
 const notificationsContent = fs.readFileSync(path.join(__dirname, '../src/js/core/notifications.js'), 'utf8');
@@ -50,6 +62,7 @@ eval(notificationsContent);
 eval(uiUtilsContent);
 
 // Create global aliases to make modules work in Node.js
+global.Logger = window.Logger;
 global.StateManager = window.StateManager;
 global.NotificationSystem = window.NotificationSystem;
 global.UIUtils = window.UIUtils;

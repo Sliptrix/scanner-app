@@ -316,8 +316,9 @@ window.TransferProcessor = (function() {
         console.log(`Inventory updated: ${transferResult.sourceContainerId} → ${transferResult.destinationContainers.join(', ')}${transferResult.samplesDiscarded ? `, ${transferResult.samplesDiscarded} discarded` : ''}`);
     }
 
-    // Update container lineage tracking
+    // Update container lineage tracking - Now uses LineageService for enhanced tracking
     function updateContainerLineage(transferResult) {
+        // Legacy lineage tracking (for backwards compatibility)
         const lineage = StateManager.getState('containerLineage') || {};
 
         transferResult.destinationContainers.forEach(destId => {
@@ -335,6 +336,59 @@ window.TransferProcessor = (function() {
         });
 
         StateManager.setState('containerLineage', lineage);
+
+        // Enhanced lineage tracking via LineageService (Phase 3)
+        if (window.LineageService) {
+            try {
+                // Get container data for metadata
+                const sourceSample = transferResult.transferredSamples[0] || {};
+                
+                LineageService.recordTransfer(
+                    transferResult.sourceContainerId,
+                    transferResult.destinationContainers,
+                    {
+                        strain: sourceSample.strain,
+                        owner: sourceSample.owner,
+                        consumed: true, // Source is consumed after transfer
+                        transferType: transferResult.type,
+                        tissueCount: transferResult.samplesTransferred
+                    }
+                );
+                
+                console.log('LineageService: Transfer recorded');
+            } catch (lineageError) {
+                console.error('LineageService: Failed to record transfer:', lineageError);
+            }
+        }
+
+        // Audit logging via AuditService (Phase 3)
+        if (window.AuditService) {
+            try {
+                AuditService.logTransfer(
+                    transferResult.sourceContainerId,
+                    transferResult.destinationContainers,
+                    {
+                        tissuesTransferred: transferResult.samplesTransferred,
+                        tissuesDiscarded: transferResult.samplesDiscarded,
+                        discardReason: transferResult.discardReason,
+                        transferType: transferResult.type
+                    }
+                );
+                
+                // Log discards separately if any
+                if (transferResult.samplesDiscarded > 0) {
+                    AuditService.logDiscard(
+                        transferResult.sourceContainerId,
+                        transferResult.samplesDiscarded,
+                        transferResult.discardReason || 'during transfer'
+                    );
+                }
+                
+                console.log('AuditService: Transfer logged');
+            } catch (auditError) {
+                console.error('AuditService: Failed to log transfer:', auditError);
+            }
+        }
     }
 
     // Add transfer to history
