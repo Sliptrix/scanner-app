@@ -1113,7 +1113,27 @@ window.ContainerInitiator = (function() {
         let barcodeString = null;
 
         // Map media for barcode encoding: use a safe code when no media is present
-        const mediaCodeForBarcode = hasNoMedia ? 'NM' : mediaUpper; // "NM" = No Media
+        // Media codes must be 1-3 letters for Code128 barcodes
+        let mediaCodeForBarcode = 'NM'; // Default "NM" = No Media
+        if (!hasNoMedia && mediaUpper) {
+            // Map common media names to short codes
+            const mediaCodeMap = {
+                'INITIATION': 'In',
+                'MULTIPLICATION': 'Mu',
+                'ROOTING': 'Ro',
+                'N/A': 'NM'
+            };
+            // Check if it's a known media type or already a short code
+            if (mediaCodeMap[mediaUpper]) {
+                mediaCodeForBarcode = mediaCodeMap[mediaUpper];
+            } else if (mediaUpper.length <= 3) {
+                // Already a short code
+                mediaCodeForBarcode = mediaUpper;
+            } else {
+                // Truncate to first 2 chars as fallback
+                mediaCodeForBarcode = mediaUpper.substring(0, 2);
+            }
+        }
 
         if (window.Code128BarcodeGenerator) {
             try {
@@ -1169,6 +1189,9 @@ window.ContainerInitiator = (function() {
         // Add to inventory using StateManager to ensure proper tracking
         window.appState.inventory.push(newContainer); // Append to end to match Excel row order
 
+        // Get QR Excel row reference before audit logging
+        const qrExcelRow = StateManager.getState('initiatorState.qrExcelRow');
+
         // Log container creation via AuditService (Phase 3)
         if (window.AuditService) {
             AuditService.logContainerCreated(currentContainerId, {
@@ -1195,8 +1218,7 @@ window.ContainerInitiator = (function() {
             });
         }
 
-        // Assign the scanned QR code to this container
-        const qrExcelRow = StateManager.getState('initiatorState.qrExcelRow');
+        // Assign the scanned QR code to this container (qrExcelRow already retrieved above)
         if (qrExcelRow && window.QRCodeService) {
             const assigned = QRCodeService.assignRowToContainer(qrExcelRow, currentContainerId);
             if (assigned) {
