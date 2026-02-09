@@ -891,15 +891,33 @@
             </div>
             
             <div class="initiator-section" id="initiatorSection">
-                <h2 style="margin-bottom: 20px; color: #2c3e50;">Initiate New Container</h2>
+                <h2 style="margin-bottom: 20px; color: #2c3e50;">🏷️ Assign Container</h2>
 
-                <!-- QR Code Pool Management -->
-                <div id="qrPoolSection" style="margin-bottom: 20px; padding: 12px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px;">
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-                        <strong style="font-size: 0.9rem;">QR Code Pool</strong>
-                        <span id="qrPoolStatus" style="font-size: 0.8rem; color: #6b7280;">Loading...</span>
+                <!-- Quick Assign Hero — Primary Workflow -->
+                <div id="quickAssignPanel" style="margin-bottom: 24px; padding: 20px; background: linear-gradient(135deg, #ecfdf5 0%, #f0fdf4 100%); border: 2px solid #10b981; border-radius: 12px; box-shadow: 0 2px 8px rgba(16,185,129,0.15);">
+                    <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 12px;">
+                        <span style="font-size: 1.5rem;">📋</span>
+                        <div>
+                            <strong style="font-size: 1.1rem; color: #065f46;">Type the label number from your container</strong>
+                            <p style="margin: 2px 0 0; font-size: 0.85rem; color: #047857;">Enter the pre-printed ID (e.g. "305") then fill in metadata step-by-step</p>
+                        </div>
                     </div>
-                    <div style="display: flex; gap: 8px; align-items: center;">
+                    <div style="display: flex; gap: 10px; align-items: center;">
+                        <input type="number" id="quickAssignId" min="1" placeholder="e.g. 305" style="flex: 1; max-width: 200px; padding: 12px 16px; font-size: 1.2rem; font-weight: 700; border: 2px solid #10b981; border-radius: 8px; text-align: center; font-family: monospace;" aria-label="Container label number" />
+                        <button id="quickAssignBtn" onclick="quickAssignContainer()" style="padding: 12px 24px; font-size: 1rem; font-weight: 600; background: #059669; color: white; border: none; border-radius: 8px; cursor: pointer; transition: all 0.2s;" onmouseover="this.style.background='#047857'" onmouseout="this.style.background='#059669'">
+                            ▶ Start Assignment
+                        </button>
+                    </div>
+                    <div id="quickAssignFeedback" style="margin-top: 8px; font-size: 0.85rem; color: #047857; display: none;"></div>
+                </div>
+
+                <!-- QR Code Pool Management (collapsed by default) -->
+                <details id="qrPoolSection" style="margin-bottom: 20px; padding: 12px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px;">
+                    <summary style="cursor: pointer; font-size: 0.9rem; font-weight: 600; color: #374151; display: flex; justify-content: space-between; align-items: center;">
+                        <span>⚙️ QR Code Pool Management</span>
+                        <span id="qrPoolStatus" style="font-size: 0.8rem; color: #6b7280; font-weight: 400;">Loading...</span>
+                    </summary>
+                    <div style="margin-top: 10px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
                         <input type="number" id="qrBatchCount" min="1" max="50" value="10" style="width: 60px; padding: 6px; border: 1px solid #d1d5db; border-radius: 4px; font-size: 0.85rem;">
                         <button class="btn" id="qrBatchGenerateBtn" onclick="generateQrBatch()" style="background: #7c3aed; color: white; font-size: 0.85rem; padding: 6px 12px;">Generate QR Batch</button>
                         <button class="btn" id="qrPoolViewBtn" onclick="viewQrPool()" style="background: #6b7280; color: white; font-size: 0.85rem; padding: 6px 12px;">View Pool</button>
@@ -912,10 +930,12 @@
                         </div>
                         <span id="qrBatchProgressText" style="font-size: 0.75rem; color: #6b7280;"></span>
                     </div>
-                </div>
+                </details>
 
-                <div class="initiator-prompt" id="initiatorPrompt">Scan QR Code Label:</div>
-                <div class="initiator-hint" id="initiatorHint">Scan the pre-printed QR code or enter the 6-character code</div>
+                <!-- Step Wizard (hidden until container ID is entered) -->
+                <div id="initiatorStepWizard" style="display: none; border-top: 2px solid #e2e8f0; padding-top: 16px;">
+                <div class="initiator-prompt" id="initiatorPrompt">Enter Container Label ID:</div>
+                <div class="initiator-hint" id="initiatorHint">Type the number from the pre-printed label (e.g. 305)</div>
                 <div class="input-group">
                     <input type="text" id="initiatorInput" class="barcode-input" placeholder="Enter value..." autocomplete="off" aria-label="Container initiator input">
                 </div>
@@ -968,6 +988,7 @@
                     </div>
                     <div id="confirmQrCode" style="text-align: center; margin-top: 15px;"></div>
                 </div>
+                </div><!-- /initiatorStepWizard -->
             </div>
 
             <!-- Recipe Manager Section -->

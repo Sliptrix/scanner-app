@@ -2028,17 +2028,35 @@ function assignPoolCodeFromView(shortCode) {
     // Switch to the Initiator tab
     switchMode('initiator');
 
-    // Pre-fill the initiator input with the shortCode and trigger processing
+    // Show the step wizard, pre-fill, and trigger processing
     setTimeout(() => {
+        const wizard = document.getElementById('initiatorStepWizard');
+        if (wizard) wizard.style.display = 'block';
+
+        // Dim the quick assign panel
+        const panel = document.getElementById('quickAssignPanel');
+        if (panel) panel.style.opacity = '0.6';
+
+        // Pre-fill the quick assign input for visual feedback
+        const quickInput = document.getElementById('quickAssignId');
+        if (quickInput) quickInput.value = shortCode;
+
+        // Pre-fill the initiator input and trigger the QR step
         const input = document.getElementById('initiatorInput');
         if (input) {
             input.value = shortCode;
             input.focus();
-            // Show feedback so user knows what happened
-            if (window.NotificationSystem) {
-                NotificationSystem.info(`Container #${shortCode} selected — fill in the details below and press Next`);
-            }
         }
+
+        if (window.NotificationSystem) {
+            NotificationSystem.info(`Container #${shortCode} selected — processing...`);
+        }
+
+        // Trigger QR step processing
+        setTimeout(() => {
+            const btn = document.getElementById('initiateBtn');
+            if (btn) btn.click();
+        }, 100);
     }, 200);
 }
 
@@ -2198,6 +2216,54 @@ window.viewQrPool = viewQrPool;
 window.updateQrPoolStatus = updateQrPoolStatus;
 window.printUnassignedLabels = printUnassignedLabels;
 window.assignPoolCodeFromView = assignPoolCodeFromView;
+window.quickAssignContainer = quickAssignContainer;
+
+/**
+ * Quick Assign Container — primary workflow entry point.
+ * User types a numeric label ID, we show the step wizard and auto-process the QR step.
+ */
+function quickAssignContainer() {
+    const input = document.getElementById('quickAssignId');
+    const feedback = document.getElementById('quickAssignFeedback');
+    const val = (input ? input.value : '').trim();
+
+    if (!val || isNaN(val) || parseInt(val) < 1) {
+        if (feedback) {
+            feedback.style.display = 'block';
+            feedback.style.color = '#dc2626';
+            feedback.textContent = '⚠️ Please enter a valid numeric container ID (e.g. 305)';
+        }
+        return;
+    }
+
+    // Show the step wizard
+    const wizard = document.getElementById('initiatorStepWizard');
+    if (wizard) wizard.style.display = 'block';
+
+    // Hide the quick assign panel highlight (keep visible but dim)
+    const panel = document.getElementById('quickAssignPanel');
+    if (panel) panel.style.opacity = '0.6';
+
+    // Pre-fill the initiator input and trigger the QR step
+    const initiatorInput = document.getElementById('initiatorInput');
+    if (initiatorInput) {
+        initiatorInput.value = val;
+        initiatorInput.focus();
+    }
+
+    // Trigger the QR processing step
+    if (feedback) {
+        feedback.style.display = 'block';
+        feedback.style.color = '#047857';
+        feedback.textContent = `Looking up container #${val}...`;
+    }
+
+    // Use ContainerInitiator to process the QR input
+    setTimeout(() => {
+        const btn = document.getElementById('initiateBtn');
+        if (btn) btn.click();
+    }, 100);
+}
 
 // Label printing — uses backend print endpoint
 function printUnassignedLabels() {

@@ -130,6 +130,17 @@ window.ContainerInitiator = (function() {
                 }
             }
             
+            // Wire up Enter key on the quick assign input
+            const quickAssignInput = document.getElementById('quickAssignId');
+            if (quickAssignInput) {
+                quickAssignInput.addEventListener('keydown', function(e) {
+                    if (e.key === 'Enter') {
+                        e.preventDefault();
+                        if (window.quickAssignContainer) window.quickAssignContainer();
+                    }
+                });
+            }
+
             initialized = true;
             console.log('🚀 ContainerInitiator module initialized successfully');
             
@@ -677,6 +688,14 @@ window.ContainerInitiator = (function() {
             moveToStep('owner');
             updateInitiatorUI();
             showFeedback(`QR label #${shortCode} selected ✓ — Container ID: ${shortCode}`, 'success');
+
+            // Update quick assign feedback
+            const qaf = document.getElementById('quickAssignFeedback');
+            if (qaf) {
+                qaf.style.display = 'block';
+                qaf.style.color = '#059669';
+                qaf.textContent = `✅ Container #${shortCode} found — now fill in the details below`;
+            }
         } catch (err) {
             console.error('Pool lookup failed:', err);
             showFeedback('Failed to look up QR code. Is the backend running?', 'error');
@@ -1402,6 +1421,21 @@ window.ContainerInitiator = (function() {
         const nextBtn = document.getElementById('initiateBtn');
         
         if (!input || !prompt || !hint) return;
+
+        // Show the step wizard whenever we're past the QR step or completed
+        const wizard = document.getElementById('initiatorStepWizard');
+        const quickPanel = document.getElementById('quickAssignPanel');
+        if (wizard) {
+            wizard.style.display = (currentStep !== 'qr' || isCompleted) ? 'block' : 'none';
+        }
+        if (quickPanel) {
+            quickPanel.style.opacity = (currentStep !== 'qr' && !isCompleted) ? '0.6' : '1';
+        }
+
+        // When completed or reset to QR, restore quick assign panel
+        if (isCompleted && quickPanel) {
+            quickPanel.style.opacity = '1';
+        }
         
         // Clear input field unless we've already completed the flow
         if (!isCompleted) {
@@ -1813,6 +1847,12 @@ window.ContainerInitiator = (function() {
         if (confirmationElement) {
             confirmationElement.style.display = 'none';
         }
+
+        // Reset quick assign panel
+        const quickInput = document.getElementById('quickAssignId');
+        if (quickInput) quickInput.value = '';
+        const quickFeedback = document.getElementById('quickAssignFeedback');
+        if (quickFeedback) quickFeedback.style.display = 'none';
         
         // Update UI
         updateInitiatorUI();

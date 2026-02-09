@@ -55,6 +55,7 @@ if __name__ == "__main__":
     mimetypes.add_type('text/css', '.css')
     mimetypes.add_type('text/html', '.html')
     
+    socketserver.TCPServer.allow_reuse_address = True
     with socketserver.TCPServer(("", PORT), CustomHTTPRequestHandler) as httpd:
         print(f"🚀 Lab Scanner Server starting at http://localhost:{PORT}")
         print("📁 Serving files from:", os.getcwd())
