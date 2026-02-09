@@ -167,7 +167,9 @@ function generateShortCode(maxRetries = 10) {
  */
 app.post('/api/qrcodes', async (req, res) => {
     try {
-        const { containerId, barcodeData, appUrl = 'http://localhost:8000', destinationUrl: customDestUrl } = req.body;
+        const { containerId, barcodeData, appUrl, destinationUrl: customDestUrl } = req.body;
+        // Use PUBLIC_URL env var for QR codes (so they work when scanned from phones)
+        const baseUrl = appUrl || process.env.PUBLIC_URL || `http://localhost:${PORT}`;
 
         if (!containerId || !barcodeData) {
             return res.status(400).json({
@@ -196,8 +198,8 @@ app.post('/api/qrcodes', async (req, res) => {
         saveQRMappings();
 
         // Use custom destination URL (e.g. Excel deep link) if provided,
-        // otherwise fall back to app URL with short code
-        const destinationUrl = customDestUrl || `${appUrl}?c=${shortCode}`;
+        // otherwise fall back to scan page URL
+        const destinationUrl = customDestUrl || `${baseUrl}/s/${shortCode}`;
 
         // Generate QR code as data URL
         const qrDataUrl = await QRCode.toDataURL(destinationUrl, {
@@ -278,7 +280,174 @@ app.post('/api/qr-generate', async (req, res) => {
 });
 
 /**
- * Lookup a short code to get container information
+ * Scan page — renders container metadata as a nice HTML page
+ * This is the URL encoded in pre-printed QR codes on physical containers.
+ * GET /s/:shortCode
+ */
+app.get('/s/:shortCode', (req, res) => {
+    const { shortCode } = req.params;
+
+    if (!/^[A-Za-z0-9]{6}$/.test(shortCode)) {
+        return res.status(400).send(renderScanPage(null, 'Invalid QR code'));
+    }
+
+    if (!qrMappings.has(shortCode)) {
+        return res.status(404).send(renderScanPage(null, 'Container not found. This QR code may not be registered yet.'));
+    }
+
+    const data = qrMappings.get(shortCode);
+    res.send(renderScanPage(data));
+});
+
+/**
+ * Render a mobile-friendly HTML page for scanned containers
+ */
+function renderScanPage(data, error) {
+    if (error) {
+        return `<!DOCTYPE html>
+<html lang="en"><head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Container Not Found — LoneWolf Biotech</title>
+<style>
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#f8fafc;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px}
+  .card{background:#fff;border-radius:16px;padding:32px;max-width:420px;width:100%;box-shadow:0 4px 24px rgba(0,0,0,0.08);text-align:center}
+  .icon{font-size:3rem;margin-bottom:16px}
+  h1{font-size:1.3rem;color:#1e293b;margin-bottom:8px}
+  p{color:#64748b;font-size:0.95rem;line-height:1.6}
+  .brand{margin-top:24px;padding-top:16px;border-top:1px solid #e2e8f0;font-size:0.8rem;color:#94a3b8}
+</style>
+</head><body>
+<div class="card">
+  <div class="icon">⚠️</div>
+  <h1>Container Not Found</h1>
+  <p>${error}</p>
+  <div class="brand">🐺 LoneWolf Biotech Lab Tracker</div>
+</div>
+</body></html>`;
+    }
+
+    // Parse barcode data to extract fields
+    const fields = parseBarcodeData(data.barcodeData);
+
+    return `<!DOCTYPE html>
+<html lang="en"><head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Container ${data.containerId} — LoneWolf Biotech</title>
+<style>
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:linear-gradient(135deg,#f0fdf4 0%,#ecfdf5 50%,#f0f9ff 100%);min-height:100vh;padding:20px}
+  .container{max-width:480px;margin:0 auto}
+  .header{text-align:center;margin-bottom:20px;padding:24px 0}
+  .header .icon{font-size:2.5rem;margin-bottom:8px}
+  .header h1{font-size:1.4rem;color:#166534;font-weight:700}
+  .header .id{font-size:2rem;color:#059669;font-weight:800;letter-spacing:1px;margin-top:4px}
+  .card{background:#fff;border-radius:16px;padding:24px;margin-bottom:16px;box-shadow:0 2px 12px rgba(0,0,0,0.06);border:1px solid #e2e8f0}
+  .card h2{font-size:0.85rem;text-transform:uppercase;letter-spacing:1px;color:#94a3b8;margin-bottom:16px;font-weight:600}
+  .field{display:flex;justify-content:space-between;align-items:center;padding:12px 0;border-bottom:1px solid #f1f5f9}
+  .field:last-child{border-bottom:none}
+  .field-label{font-size:0.9rem;color:#64748b;font-weight:500}
+  .field-value{font-size:0.95rem;color:#1e293b;font-weight:600;text-align:right;max-width:60%}
+  .stage-badge{display:inline-block;padding:4px 12px;border-radius:20px;font-size:0.85rem;font-weight:600}
+  .stage-initiation{background:#dbeafe;color:#1e40af}
+  .stage-multiplication{background:#dcfce7;color:#166534}
+  .stage-rooting{background:#fef3c7;color:#92400e}
+  .stage-hardening{background:#fce7f3;color:#9d174d}
+  .stage-stock{background:#e0e7ff;color:#3730a3}
+  .raw{background:#f8fafc;border-radius:12px;padding:16px;margin-top:8px}
+  .raw-label{font-size:0.75rem;color:#94a3b8;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px}
+  .raw-value{font-family:'SF Mono',Monaco,Consolas,monospace;font-size:0.8rem;color:#475569;word-break:break-all;line-height:1.5}
+  .brand{text-align:center;margin-top:24px;padding:16px 0;font-size:0.8rem;color:#94a3b8}
+  .brand strong{color:#166534}
+  .timestamp{text-align:center;font-size:0.75rem;color:#cbd5e1;margin-top:8px}
+</style>
+</head><body>
+<div class="container">
+  <div class="header">
+    <div class="icon">🧬</div>
+    <h1>Container Specimen</h1>
+    <div class="id">#${escapeHtml(data.containerId)}</div>
+  </div>
+
+  <div class="card">
+    <h2>Specimen Details</h2>
+    ${fields.map(f => `<div class="field">
+      <span class="field-label">${f.label}</span>
+      <span class="field-value${f.badgeClass ? ' stage-badge ' + f.badgeClass : ''}">${escapeHtml(f.value)}</span>
+    </div>`).join('\n    ')}
+  </div>
+
+  <div class="card">
+    <div class="raw">
+      <div class="raw-label">Barcode Data</div>
+      <div class="raw-value">${escapeHtml(data.barcodeData)}</div>
+    </div>
+  </div>
+
+  <div class="brand">🐺 <strong>LoneWolf Biotech</strong> Lab Tracker</div>
+  <div class="timestamp">Registered ${data.createdAt ? new Date(data.createdAt).toLocaleDateString('en-US', {year:'numeric',month:'long',day:'numeric'}) : 'N/A'}</div>
+</div>
+</body></html>`;
+}
+
+/**
+ * Parse barcode data string into labeled fields
+ * Supports formats like "STAGE-STRAIN-OWNER-DATE-ID" or delimited data
+ */
+function parseBarcodeData(barcodeData) {
+    if (!barcodeData) return [{ label: 'Data', value: 'N/A' }];
+
+    // Try splitting by common delimiters
+    const parts = barcodeData.split(/[-|/]/);
+
+    // Common cannabis TC barcode format: STAGE-STRAIN-OWNER-DATE-CONTAINERID
+    const stageMap = {
+        'I': 'Initiation', 'IN': 'Initiation', 'INIT': 'Initiation',
+        'M': 'Multiplication', 'MU': 'Multiplication', 'MULT': 'Multiplication',
+        'R': 'Rooting', 'RO': 'Rooting', 'ROOT': 'Rooting',
+        'H': 'Hardening', 'HA': 'Hardening', 'HARD': 'Hardening',
+        'S': 'Stock', 'ST': 'Stock', 'STOCK': 'Stock'
+    };
+
+    const stageClassMap = {
+        'Initiation': 'stage-initiation',
+        'Multiplication': 'stage-multiplication',
+        'Rooting': 'stage-rooting',
+        'Hardening': 'stage-hardening',
+        'Stock': 'stage-stock'
+    };
+
+    if (parts.length >= 3) {
+        const fields = [];
+        const stageCode = parts[0].toUpperCase().trim();
+        const stageName = stageMap[stageCode] || parts[0];
+        
+        fields.push({ label: 'Stage', value: stageName, badgeClass: stageClassMap[stageName] || '' });
+        if (parts[1]) fields.push({ label: 'Strain', value: parts[1].trim() });
+        if (parts[2]) fields.push({ label: 'Owner', value: parts[2].trim() });
+        if (parts[3]) fields.push({ label: 'Date', value: parts[3].trim() });
+        if (parts[4]) fields.push({ label: 'Container', value: parts[4].trim() });
+        // Any extra fields
+        for (let i = 5; i < parts.length; i++) {
+            if (parts[i].trim()) fields.push({ label: `Field ${i + 1}`, value: parts[i].trim() });
+        }
+        return fields;
+    }
+
+    // Fallback: just show the raw data
+    return [{ label: 'Barcode', value: barcodeData }];
+}
+
+/**
+ * HTML-escape a string to prevent XSS
+ */
+function escapeHtml(str) {
+    if (!str) return '';
+    return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#039;');
+}
+
+/**
+ * Lookup a short code to get container information (JSON API)
  * GET /api/qrcodes/:shortCode
  */
 app.get('/api/qrcodes/:shortCode', (req, res) => {
