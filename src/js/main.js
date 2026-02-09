@@ -2236,6 +2236,18 @@ function quickAssignContainer() {
         return;
     }
 
+    // CRITICAL: Reset initiator to QR step before processing
+    // Without this, if the wizard is already on 'owner' step from a previous
+    // attempt, the container ID gets processed as an owner name instead of QR input
+    if (window.StateManager) {
+        StateManager.setState('initiatorState.currentStep', 'qr');
+        StateManager.setState('initiatorState.owner', null);
+        StateManager.setState('initiatorState.strain', null);
+        StateManager.setState('initiatorState.media', null);
+        StateManager.setState('initiatorState.stage', null);
+        StateManager.setState('initiatorState.completed', false);
+    }
+
     // Show the step wizard
     const wizard = document.getElementById('initiatorStepWizard');
     if (wizard) wizard.style.display = 'block';

@@ -565,7 +565,7 @@ window.ContainerInitiator = (function() {
     /**
      * Handle the initiator input
      */
-    function handleInitiatorInput() {
+    async function handleInitiatorInput() {
         console.log('🔵 handleInitiatorInput called');
         
         const currentStep = StateManager.getState('initiatorState.currentStep');
@@ -588,7 +588,7 @@ window.ContainerInitiator = (function() {
         switch (currentStep) {
             case 'qr':
                 console.log('Processing QR scan input...');
-                processQrInput();
+                await processQrInput();
                 break;
             case 'owner':
                 console.log('Processing owner input...');
