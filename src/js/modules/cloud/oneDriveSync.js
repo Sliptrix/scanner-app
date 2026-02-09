@@ -230,6 +230,23 @@ window.OneDriveSync = {
                 }
             }
 
+            // Also pull Active_Inventory as part of the unified sync
+            let inventoryCount = 0;
+            try {
+                const invResult = await this.syncActiveInventoryToApp();
+                if (invResult && invResult.success) {
+                    inventoryCount = invResult.count || 0;
+                    console.log(`OneDriveSync: Active inventory loaded: ${inventoryCount} containers`);
+                    
+                    // Update next available container ID
+                    if (window.ContainerInitiator && typeof ContainerInitiator.updateNextAvailableId === 'function') {
+                        ContainerInitiator.updateNextAvailableId();
+                    }
+                }
+            } catch (invError) {
+                console.warn('OneDriveSync: Could not load active inventory:', invError.message);
+            }
+
             // Record success
             this.lastSync = new Date().toISOString();
             this.lastError = null;
@@ -237,14 +254,21 @@ window.OneDriveSync = {
             localStorage.setItem(this.CACHE_KEYS.LAST_SYNC, this.lastSync);
             localStorage.removeItem(this.CACHE_KEYS.LAST_ERROR);
 
-            // Show success notification with strain count
+            // Show success notification with counts
             const strainCount = window.appState.strainsTable ? Object.keys(window.appState.strainsTable).length : 0;
             if (window.NotificationSystem) {
-                window.NotificationSystem.success(`✅ Synced from cloud successfully - ${strainCount} strains loaded`);
+                window.NotificationSystem.success(`✅ Synced from cloud — ${strainCount} strains, ${inventoryCount} containers loaded`);
             }
 
-            console.log(`OneDriveSync: Manual sync completed successfully - ${strainCount} strains in strainsTable`);
-            return { success: true, source: 'cloud', mapping, strainCount };
+            // Update inventory sync status
+            const statusEl = document.getElementById('inventory-sync-status');
+            if (statusEl) {
+                const ts = new Date().toLocaleString();
+                statusEl.textContent = `📦 Inventory: ${inventoryCount} containers synced at ${ts}`;
+            }
+
+            console.log(`OneDriveSync: Manual sync completed — ${strainCount} strains, ${inventoryCount} containers`);
+            return { success: true, source: 'cloud', mapping, strainCount, inventoryCount };
 
         } catch (error) {
             console.error('OneDriveSync: Manual sync failed:', error);
