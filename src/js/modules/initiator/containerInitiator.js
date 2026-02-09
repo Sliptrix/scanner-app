@@ -641,11 +641,26 @@ window.ContainerInitiator = (function() {
 
         showFeedback('Looking up QR code...', 'info');
         try {
-            const poolEntry = await QRCodeService.lookupPoolCode(shortCode);
+            let poolEntry = await QRCodeService.lookupPoolCode(shortCode);
+
+            // Auto-create the pool code if it doesn't exist yet
+            // (the physical label exists, we just haven't tracked it digitally)
             if (!poolEntry) {
-                showFeedback(`QR code #${shortCode} not found. Generate a batch first.`, 'error');
-                return;
+                showFeedback(`QR code #${shortCode} not in pool — creating it...`, 'info');
+                try {
+                    await QRCodeService.createPoolCode(shortCode);
+                    poolEntry = await QRCodeService.lookupPoolCode(shortCode);
+                } catch (createErr) {
+                    console.error('Failed to auto-create pool code:', createErr);
+                    showFeedback(`Failed to create pool code #${shortCode}: ${createErr.message}`, 'error');
+                    return;
+                }
+                if (!poolEntry) {
+                    showFeedback(`Failed to create pool code #${shortCode}`, 'error');
+                    return;
+                }
             }
+
             if (poolEntry.status === 'assigned') {
                 showFeedback(`QR code #${shortCode} is already assigned to container ${poolEntry.containerId}`, 'error');
                 return;

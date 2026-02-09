@@ -1977,10 +1977,15 @@ async function viewQrPool() {
             html += '<h4 style="margin: 15px 0 10px;">Available (Unassigned)</h4>';
             html += '<div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px;">';
             unassigned.forEach(qr => {
+                const hasImage = qr.qrImageDataUrl && qr.qrImageDataUrl !== 'null';
                 html += `
                     <div style="text-align: center; padding: 10px; border: 1px solid #e2e8f0; border-radius: 8px; background: white;">
-                        <img src="${qr.qrImageDataUrl}" alt="QR ${qr.shortCode}" style="width: 120px; height: 120px;" />
+                        ${hasImage
+                            ? `<img src="${qr.qrImageDataUrl}" alt="QR ${qr.shortCode}" style="width: 120px; height: 120px;" />`
+                            : `<div style="width: 120px; height: 120px; display: flex; align-items: center; justify-content: center; background: #f3f4f6; border-radius: 8px; margin: 0 auto; font-size: 2rem; color: #9ca3af;">📋</div>`
+                        }
                         <p style="margin: 6px 0 0; font-family: monospace; font-size: 0.9rem; font-weight: bold; color: #7c3aed;">${qr.shortCode}</p>
+                        <button onclick="assignPoolCodeFromView('${qr.shortCode}')" style="margin-top:6px;padding:4px 14px;font-size:0.8rem;background:#059669;color:white;border:none;border-radius:4px;cursor:pointer;">Assign</button>
                     </div>`;
             });
             html += '</div>';
@@ -2009,6 +2014,32 @@ async function viewQrPool() {
     } catch (err) {
         content.innerHTML = `<p style="color: #dc2626;">Failed to load pool: ${err.message}</p>`;
     }
+}
+
+/**
+ * Assign a pool code from the pool view — switches to Initiator tab
+ * with the QR ID pre-filled so the user goes through the assignment form.
+ */
+function assignPoolCodeFromView(shortCode) {
+    // Close the pool modal
+    const modal = document.getElementById('containerDetailModal');
+    if (modal) modal.style.display = 'none';
+
+    // Switch to the Initiator tab
+    switchMode('initiator');
+
+    // Pre-fill the initiator input with the shortCode and trigger processing
+    setTimeout(() => {
+        const input = document.getElementById('initiatorInput');
+        if (input) {
+            input.value = shortCode;
+            input.focus();
+            // Show feedback so user knows what happened
+            if (window.NotificationSystem) {
+                NotificationSystem.info(`Container #${shortCode} selected — fill in the details below and press Next`);
+            }
+        }
+    }, 200);
 }
 
 async function unassignPoolCode(shortCode) {
@@ -2166,6 +2197,7 @@ window.generateQrBatch = generateQrBatch;
 window.viewQrPool = viewQrPool;
 window.updateQrPoolStatus = updateQrPoolStatus;
 window.printUnassignedLabels = printUnassignedLabels;
+window.assignPoolCodeFromView = assignPoolCodeFromView;
 
 // Label printing — uses backend print endpoint
 function printUnassignedLabels() {

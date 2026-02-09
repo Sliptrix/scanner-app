@@ -22,43 +22,14 @@ const path = require('path');
 const app = express();
 const PORT = process.env.PORT || 3001;
 
-// Persistent QR code mappings (short code -> barcode data)
-const QR_DATA_DIR = path.join(__dirname, 'data');
-const QR_DATA_FILE = path.join(QR_DATA_DIR, 'qr-mappings.json');
+// In-memory QR code mappings (short code -> barcode data)
+// Starts clean every boot — HQ workbook is the source of truth for next ID
 const qrMappings = new Map();
 
-// Load QR mappings from disk on startup
-function loadQRMappings() {
-    try {
-        if (!fs.existsSync(QR_DATA_DIR)) {
-            fs.mkdirSync(QR_DATA_DIR, { recursive: true });
-        }
-        if (fs.existsSync(QR_DATA_FILE)) {
-            const data = JSON.parse(fs.readFileSync(QR_DATA_FILE, 'utf8'));
-            for (const [key, value] of Object.entries(data)) {
-                qrMappings.set(key, value);
-            }
-            console.log(`📂 Loaded ${qrMappings.size} QR mappings from disk`);
-        }
-    } catch (err) {
-        console.error('Failed to load QR mappings:', err.message);
-    }
-}
+// No-op: mappings are ephemeral (session-only)
+function saveQRMappings() {}
 
-// Save QR mappings to disk
-function saveQRMappings() {
-    try {
-        if (!fs.existsSync(QR_DATA_DIR)) {
-            fs.mkdirSync(QR_DATA_DIR, { recursive: true });
-        }
-        const obj = Object.fromEntries(qrMappings);
-        fs.writeFileSync(QR_DATA_FILE, JSON.stringify(obj, null, 2));
-    } catch (err) {
-        console.error('Failed to save QR mappings:', err.message);
-    }
-}
-
-loadQRMappings();
+console.log('🧹 Starting with clean QR mappings (HQ workbook is source of truth)');
 
 // SECURITY: Configure CORS with specific origins in production
 const corsOptions = {
@@ -298,6 +269,37 @@ app.post('/api/qr-generate', async (req, res) => {
 // ============================================================
 
 /**
+ * Create a single pool code on-the-fly (for type-in assignment workflow).
+ * If the code already exists, returns it as-is. Otherwise creates it without
+ * calling the QR image API (the label is already physically printed).
+ * POST /api/qrcodes/pool/create-single
+ * Body: { shortCode: "305" }
+ */
+app.post('/api/qrcodes/pool/create-single', (req, res) => {
+    const { shortCode } = req.body;
+    if (!shortCode) {
+        return res.status(400).json({ error: 'shortCode is required' });
+    }
+
+    // If it already exists, return it
+    if (qrMappings.has(shortCode)) {
+        const existing = qrMappings.get(shortCode);
+        return res.json({ success: true, created: false, shortCode, ...existing });
+    }
+
+    // Create a new unassigned pool entry (no QR image needed — label already printed)
+    const data = {
+        status: 'unassigned',
+        createdAt: new Date().toISOString(),
+        qrImageDataUrl: null // Physical label exists; no digital image needed
+    };
+    qrMappings.set(shortCode, data);
+    saveQRMappings();
+
+    res.json({ success: true, created: true, shortCode, ...data });
+});
+
+/**
  * Generate a pool of unassigned QR codes with pre-generated images
  * POST /api/qrcodes/pool/generate
  * Body: { count: 50, prefix: "LW" }
@@ -321,8 +323,22 @@ app.post('/api/qrcodes/pool/generate', async (req, res) => {
         const results = [];
         const errors = [];
 
-        // Determine next numeric ID by finding the highest existing numeric shortCode
+        // Determine next numeric ID from HQ workbook (source of truth) + local session
         let nextId = 1;
+        
+        // Check HQ workbook for highest Container_ID (use caller's token if available)
+        const token = extractBearerToken(req);
+        if (token) {
+            try {
+                const hqMax = await queryHQMaxContainerId(token);
+                if (hqMax >= nextId) nextId = hqMax + 1;
+                console.log(`📊 HQ workbook max Container_ID: ${hqMax}, next pool ID: ${nextId}`);
+            } catch (err) {
+                console.warn('⚠️ Could not query HQ workbook for max ID, using local state:', err.message);
+            }
+        }
+        
+        // Also check any in-memory codes from this session
         for (const [code] of qrMappings) {
             const num = parseInt(code, 10);
             if (!isNaN(num) && num >= nextId) {
@@ -1338,6 +1354,96 @@ function extractBearerToken(req) {
     if (auth && auth.startsWith('Bearer ')) return auth.slice(7);
     return null;
 }
+
+/**
+ * Query HQ workbook for the highest numeric Container_ID.
+ * Requires a valid Azure AD Bearer token with Graph API permissions.
+ * Returns 0 if workbook is empty/inaccessible.
+ */
+async function queryHQMaxContainerId(token) {
+    const spUrl = process.env.SHAREPOINT_WORKBOOK_URL || '';
+    if (!spUrl || !token) return 0;
+
+    const sourcedocMatch = spUrl.match(/sourcedoc=%7B([^%}]+)%7D/i) || spUrl.match(/sourcedoc=\{([^}]+)\}/i);
+    const personalMatch = spUrl.match(/personal\/([^/]+)/);
+    if (!sourcedocMatch || !personalMatch) return 0;
+
+    const itemId = sourcedocMatch[1];
+    const driveUser = personalMatch[1].replace(/_/g, '.').replace(/\.lonewolfgenetics\.com$/, '@lonewolfgenetics.com');
+    const graphBase = 'https://graph.microsoft.com/v1.0';
+    const sheetName = 'Active_Inventory';
+    const rangeUrl = `${graphBase}/users/${encodeURIComponent(driveUser)}/drive/items/${itemId}/workbook/worksheets('${sheetName}')/usedRange(valuesOnly=true)`;
+
+    const graphRes = await fetch(rangeUrl, {
+        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' }
+    });
+
+    if (!graphRes.ok) {
+        console.warn(`⚠️ Graph API returned ${graphRes.status} querying Active_Inventory`);
+        return 0;
+    }
+
+    const rangeData = await graphRes.json();
+    const rows = rangeData.values || [];
+    if (rows.length < 2) return 0;
+
+    const headers = rows[0].map(h => String(h || '').trim().toLowerCase().replace(/[_\s]/g, ''));
+    const cidCol = headers.findIndex(h => h === 'containerid');
+    if (cidCol === -1) return 0;
+
+    let max = 0;
+    for (let i = 1; i < rows.length; i++) {
+        const val = parseInt(String(rows[i][cidCol] || ''), 10);
+        if (!isNaN(val) && val > max) max = val;
+    }
+    return max;
+}
+
+/**
+ * Get highest numeric Container_ID from in-memory mappings (session-local fallback)
+ */
+function getMaxContainerIdLocal() {
+    let max = 0;
+    for (const [code, data] of qrMappings) {
+        // Check assigned container IDs
+        if (data.containerId) {
+            const num = parseInt(data.containerId, 10);
+            if (!isNaN(num) && num > max) max = num;
+        }
+        // Check numeric short codes
+        const codeNum = parseInt(code, 10);
+        if (!isNaN(codeNum) && codeNum > max) max = codeNum;
+    }
+    return max;
+}
+
+/**
+ * GET /api/qrcodes/next-id
+ * Returns the next available container ID based on HQ workbook data.
+ * Requires Bearer token for Graph API access.
+ */
+app.get('/api/qrcodes/next-id', async (req, res) => {
+    try {
+        const token = extractBearerToken(req);
+        let hqMax = 0;
+        
+        if (token) {
+            try {
+                hqMax = await queryHQMaxContainerId(token);
+            } catch (err) {
+                console.warn('⚠️ HQ workbook query failed:', err.message);
+            }
+        }
+        
+        const localMax = getMaxContainerIdLocal();
+        const nextId = Math.max(hqMax, localMax) + 1;
+        
+        res.json({ success: true, nextId, hqMax, localMax });
+    } catch (error) {
+        console.error('Next ID error:', error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
 
 /**
  * GET /api/container/:containerId/details

@@ -1065,7 +1065,8 @@ window.OneDriveSync = {
 
             let count = 0;
             rows.forEach(row => {
-                const id = getField(row, ['owner_id', 'ownerid', 'owner id', 'owner_code', 'ownercode', 'owner code', 'id', 'owner-id', '#']);
+                // Prefer Owner_Code (alphabetic, e.g. "AP") — barcode generator requires 1-3 letter codes
+                const id = getField(row, ['owner_code', 'ownercode', 'owner code', 'owner_id', 'ownerid', 'owner id', 'id', 'owner-id', '#']);
                 const name = getField(row, ['owner_name', 'owner name', 'ownername', 'owner', 'name']);
 
                 if (id !== undefined && id !== null && id !== '') {

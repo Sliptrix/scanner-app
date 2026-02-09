@@ -537,6 +537,25 @@ window.QRCodeService = {
     },
 
     /**
+     * Create a single pool code on-the-fly (for type-in assignment).
+     * If the code already exists in the backend, returns it as-is.
+     * @param {string} shortCode - The numeric ID to create (e.g. "305")
+     * @returns {Promise<Object>} The pool entry
+     */
+    async createPoolCode(shortCode) {
+        const response = await fetch(`${this.backendUrl}/api/qrcodes/pool/create-single`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ shortCode })
+        });
+        if (!response.ok) {
+            const err = await response.json().catch(() => ({}));
+            throw new Error(err.error || `HTTP ${response.status}`);
+        }
+        return response.json();
+    },
+
+    /**
      * Parse a scanned QR input and extract the shortCode.
      * Accepts:
      *   - Full scan URL: https://scanner.lonewolfgenetics.com/s/LW4k2m

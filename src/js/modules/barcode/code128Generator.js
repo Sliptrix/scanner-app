@@ -196,9 +196,9 @@ window.Code128BarcodeGenerator = {
      * @param {Object} fields - Fields to validate
      */
     validateFieldFormats: function(fields) {
-        // Owner: 1-3 letters
-        if (!/^[A-Z]{1,3}$/i.test(fields.owner)) {
-            throw new Error('Invalid owner format: must be 1-3 letters');
+        // Owner: 1-10 alphanumeric characters (Owner_Code from HQ workbook)
+        if (!/^[A-Za-z0-9]{1,10}$/i.test(fields.owner)) {
+            throw new Error('Invalid owner format: must be 1-10 alphanumeric characters');
         }
         
         // Strain: exactly 5 digits (padded if necessary)
