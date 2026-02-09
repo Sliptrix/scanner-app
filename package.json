@@ -5,11 +5,12 @@
   "main": "public/index.html",
   "scripts": {
     "start": "python3 -m http.server 8000 --directory public",
-    "test": "echo \"Running tests...\" && npm run test:unit && npm run test:phase5 && npm run test:integration && npm run test:e2e && npm run test:hq && npm run test:smoke",
+    "test": "echo \"Running tests...\" && npm run test:unit && npm run test:phase5 && npm run test:integration && npm run test:e2e && npm run test:hq && npm run test:title-row && npm run test:smoke",
     "test:unit": "node tests/transfer-split-mode.test.js",
     "test:phase5": "node tests/phase5-analytics.test.js",
     "test:integration": "node tests/integration/integration-test-suite.js",
     "test:e2e": "node tests/e2e-critical-paths.test.js",
+    "test:title-row": "node tests/unit/title-row-parsing.test.js",
     "test:hq": "node tests/hq-workbook-parsing.test.js",
     "test:smoke": "node tests/smoke-test.js",
     "validate": "echo \"Validating build...\" && npm run start"
