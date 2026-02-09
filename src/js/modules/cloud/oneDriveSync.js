@@ -1525,6 +1525,10 @@ window.OneDriveSync = {
             return !isNaN(num) && num > max ? num : max;
         }, 0);
         window.StateManager.setState('highestContainerId', maxId);
+        console.log(`📊 OneDriveSync: highestContainerId = ${maxId}`);
+        
+        // Dispatch event so QR pool UI can update next ID
+        window.dispatchEvent(new CustomEvent('inventorySynced', { detail: { highestContainerId: maxId } }));
 
         // Parse reference sheets for strain data (Ref_Strains, Ref_Owners, etc.)
         // Note: Config sheet parsing removed as HQ workbook uses Ref_ sheets instead

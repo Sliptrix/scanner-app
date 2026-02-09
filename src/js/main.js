@@ -1886,35 +1886,40 @@ function updateQrPoolStatus() {
  */
 function updateNextIdFromSyncedData() {
     try {
-        // Check appState for inventory data
-        const inventory = window.appState?.inventoryData || window.appState?.activeInventory || [];
+        // StateManager.highestContainerId is set by OneDriveSync after merging inventory
+        // This is the most reliable source — already calculated during sync
         let maxId = 0;
         
-        // Scan all inventory items for highest numeric Container_ID
-        if (Array.isArray(inventory)) {
-            inventory.forEach(item => {
-                const cid = parseInt(item.Container_ID || item.containerId || item.Asset_ID || '', 10);
+        if (window.StateManager) {
+            maxId = parseInt(StateManager.getState('highestContainerId'), 10) || 0;
+        }
+        
+        // Fallback: scan appState.inventory directly
+        if (maxId === 0 && window.appState?.inventory?.length > 0) {
+            window.appState.inventory.forEach(item => {
+                const cid = parseInt(String(item.containerId || ''), 10);
                 if (!isNaN(cid) && cid > maxId) maxId = cid;
             });
         }
-        
-        // Also check if EnhancedDataLayer has the data
-        if (maxId === 0 && window.EnhancedDataLayer) {
-            const items = EnhancedDataLayer.getAllInventory ? EnhancedDataLayer.getAllInventory() : [];
-            items.forEach(item => {
-                const cid = parseInt(item.Container_ID || item.containerId || item.Asset_ID || '', 10);
-                if (!isNaN(cid) && cid > maxId) maxId = cid;
-            });
+
+        // Fallback: check appState.highestContainerId
+        if (maxId === 0 && window.appState?.highestContainerId) {
+            maxId = parseInt(window.appState.highestContainerId, 10) || 0;
         }
         
         if (maxId > 0) {
             const nextId = maxId + 1;
-            window._qrNextId = nextId;
-            const valueEl = document.getElementById('qrNextIdValue');
-            const infoEl = document.getElementById('qrNextIdInfo');
-            if (valueEl) valueEl.textContent = nextId;
-            if (infoEl) infoEl.style.display = 'block';
-            console.log(`📊 Updated QR next ID from synced data: max Container_ID = ${maxId}, next = ${nextId}`);
+            // Only update if higher than current (don't go backwards)
+            if (!window._qrNextId || nextId > window._qrNextId) {
+                window._qrNextId = nextId;
+                const valueEl = document.getElementById('qrNextIdValue');
+                const infoEl = document.getElementById('qrNextIdInfo');
+                if (valueEl) valueEl.textContent = nextId;
+                if (infoEl) infoEl.style.display = 'block';
+                console.log(`📊 Updated QR next ID from synced data: max Container_ID = ${maxId}, next = ${nextId}`);
+            }
+        } else {
+            console.warn('📊 No Container_IDs found after sync. highestContainerId not set yet.');
         }
     } catch (err) {
         console.warn('Could not update next ID from synced data:', err.message);
@@ -2159,6 +2164,20 @@ async function unassignPoolCode(shortCode) {
 // Update pool status on page load
 document.addEventListener('DOMContentLoaded', () => {
     setTimeout(updateQrPoolStatus, 500);
+});
+
+// Listen for inventory sync to update QR next ID immediately
+window.addEventListener('inventorySynced', (e) => {
+    const maxId = e.detail?.highestContainerId || 0;
+    if (maxId > 0) {
+        const nextId = maxId + 1;
+        window._qrNextId = nextId;
+        const valueEl = document.getElementById('qrNextIdValue');
+        const infoEl = document.getElementById('qrNextIdInfo');
+        if (valueEl) valueEl.textContent = nextId;
+        if (infoEl) infoEl.style.display = 'block';
+        console.log(`📊 QR next ID updated from sync event: ${nextId}`);
+    }
 });
 
 /**
