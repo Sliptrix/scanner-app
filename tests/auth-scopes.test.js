@@ -123,29 +123,40 @@ runTest('authManager.js preserves offline_access scope if present', () => {
 
 // Test 6: Scopes are used in login flow
 runTest('acquireTokenSilent uses loginRequest with new scopes', () => {
-    // Check that acquireTokenSilent is called with loginRequest or includes the scopes
-    const acquireTokenSilentPattern = /acquireTokenSilent\s*\(\s*{[\s\S]*?scopes[\s\S]*?}\s*\)/i;
+    // The code creates tokenRequest with scopes: this.loginRequest.scopes
+    // Then calls acquireTokenSilent(tokenRequest)
+    const hasTokenRequestWithScopes = /tokenRequest\s*=\s*{[\s\S]*?scopes\s*:\s*(?:this\.)?loginRequest\.scopes/i;
+    const hasAcquireTokenSilent = /acquireTokenSilent\s*\(\s*tokenRequest\s*\)/i;
 
-    if (!acquireTokenSilentPattern.test(authManagerContent)) {
-        // Alternative: check if loginRequest is used
-        const loginRequestUsagePattern = /acquireTokenSilent\s*\(\s*(?:this\.)?loginRequest/i;
-
-        if (!loginRequestUsagePattern.test(authManagerContent)) {
+    if (!hasTokenRequestWithScopes.test(authManagerContent)) {
+        // Fallback: check if loginRequest is used directly
+        const directUsagePattern = /acquireTokenSilent\s*\(\s*(?:this\.)?loginRequest/i;
+        if (!directUsagePattern.test(authManagerContent)) {
             throw new Error('acquireTokenSilent does not appear to use loginRequest scopes');
+        }
+    }
+    
+    if (!hasAcquireTokenSilent.test(authManagerContent)) {
+        // Check if scopes are passed inline
+        const inlinePattern = /acquireTokenSilent\s*\(\s*{[\s\S]*?scopes/i;
+        if (!inlinePattern.test(authManagerContent)) {
+            throw new Error('acquireTokenSilent call not found');
         }
     }
 });
 
-// Test 7: Scopes are used in interactive token acquisition
-runTest('acquireTokenPopup uses loginRequest with new scopes', () => {
-    const acquireTokenPopupPattern = /acquireTokenPopup\s*\(\s*(?:this\.)?loginRequest/i;
+// Test 7: Scopes are used in interactive token acquisition (redirect flow)
+runTest('acquireTokenRedirect uses loginRequest with new scopes', () => {
+    // The code uses acquireTokenRedirect for interactive auth, not acquireTokenPopup
+    const hasLoginRedirect = /loginRedirect\s*\(\s*(?:this\.)?loginRequest\s*\)/i;
+    const hasTokenRedirect = /acquireTokenRedirect\s*\(\s*tokenRequest\s*\)/i;
 
-    if (!acquireTokenPopupPattern.test(authManagerContent)) {
-        // Check alternative pattern
-        const alternativePattern = /acquireTokenPopup\s*\(\s*{[\s\S]*?scopes/i;
+    if (!hasLoginRedirect.test(authManagerContent) && !hasTokenRedirect.test(authManagerContent)) {
+        // Check alternative pattern - popup fallback
+        const alternativePattern = /acquireToken(?:Popup|Redirect)\s*\(\s*(?:this\.)?loginRequest/i;
 
         if (!alternativePattern.test(authManagerContent)) {
-            throw new Error('acquireTokenPopup does not appear to use loginRequest scopes');
+            throw new Error('Interactive token acquisition does not appear to use loginRequest scopes');
         }
     }
 });

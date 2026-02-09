@@ -36,6 +36,27 @@ const dom = new JSDOM(`<!DOCTYPE html>
 global.window = dom.window;
 global.document = dom.window.document;
 
+// Mock localStorage for Node.js environment
+const localStorageData = {};
+global.localStorage = {
+    getItem: (key) => localStorageData[key] || null,
+    setItem: (key, value) => { localStorageData[key] = value; },
+    removeItem: (key) => { delete localStorageData[key]; },
+    clear: () => { Object.keys(localStorageData).forEach(k => delete localStorageData[k]); }
+};
+dom.window.localStorage = global.localStorage;
+
+// Mock Logger
+global.Logger = {
+    debug: () => {},
+    info: () => {},
+    warn: () => {},
+    error: () => {},
+    group: () => {},
+    groupEnd: () => {}
+};
+dom.window.Logger = global.Logger;
+
 // Load the modules
 const stateContent = fs.readFileSync(path.join(__dirname, '../src/js/core/state.js'), 'utf8');
 const notificationsContent = fs.readFileSync(path.join(__dirname, '../src/js/core/notifications.js'), 'utf8');
@@ -77,6 +98,12 @@ try {
 
 // Test data setup with mixed status samples
 function setupTestDataWithActiveStatus() {
+    // Ensure we're in transfer mode for the tests
+    if (!window.appState) {
+        window.appState = { mode: 'transfer' };
+    }
+    window.appState.mode = 'transfer';
+    
     // Initialize state with samples that have "active" status (simulating the problem)
     window.StateManager.setState('inventory', [
         { containerId: 1, strain: 'TestStrain1', owner: 'TestOwner', stage: 'Stage1', media: 'Media1', tissue: 'Tissue1', date: '2024-01-01', status: 'active', tissueCount: 2 },

@@ -40,8 +40,19 @@ window.OneDriveSync = {
     CACHE_KEYS: {
         META: 'cloud:onedrive:meta',
         LAST_SYNC: 'cloud:onedrive:lastSync',
-        LAST_ERROR: 'cloud:onedrive:lastError'
+        LAST_ERROR: 'cloud:onedrive:lastError',
+        WORKBOOK_ETAG: 'cloud:onedrive:workbookEtag'
     },
+    
+    // PERF: Request deduplication - track in-flight requests
+    _pendingRequests: new Map(),
+    
+    // PERF: Workbook ETag for conditional requests
+    _workbookEtag: null,
+    
+    // PERF: Minimum sync interval to prevent API hammering (30 seconds)
+    _minSyncIntervalMs: 30000,
+    _lastSyncAttempt: 0,
 
     /**
      * Initialize the OneDriveSync module

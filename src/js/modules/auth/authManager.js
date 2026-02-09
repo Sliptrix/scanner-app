@@ -17,18 +17,21 @@ window.AuthManager = {
         return this.currentUser;
     },
     
-    // MSAL Configuration - loaded from environment config or defaults
-    // SECURITY FIX: Credentials should be configured via environment, not hardcoded
-    // See: config/auth-config.js or set window.MSAL_CONFIG before loading this script
+    // MSAL Configuration - MUST be loaded from environment config
+    // SECURITY: No hardcoded credentials - config must be provided via config/auth-config.js
+    // See: config/auth-config.template.js for setup instructions
     msalConfig: {
         auth: {
-            // Try to load from environment config, fall back to defaults for development
-            clientId: (window.MSAL_CONFIG && window.MSAL_CONFIG.clientId) || 'c5fd0c6d-55ab-46ac-aa66-af2befec9560',
-            authority: (window.MSAL_CONFIG && window.MSAL_CONFIG.authority) || 'https://login.microsoftonline.com/a1b92892-5ecd-4f98-ae48-e552b6767726',
+            // SECURITY: These MUST be configured via window.MSAL_CONFIG before loading this script
+            // Fallback to empty strings to fail safely if not configured
+            clientId: (window.MSAL_CONFIG && window.MSAL_CONFIG.clientId) || '',
+            authority: (window.MSAL_CONFIG && window.MSAL_CONFIG.authority) || '',
             redirectUri: (window.MSAL_CONFIG && window.MSAL_CONFIG.redirectUri) || window.location.origin
         },
         cache: {
+            // SECURITY: Use sessionStorage (cleared on tab close) instead of localStorage
             cacheLocation: 'sessionStorage',
+            // SECURITY: Disable cookie storage for auth state
             storeAuthStateInCookie: false
         }
     },
@@ -48,6 +51,22 @@ window.AuthManager = {
         if (typeof msal === 'undefined') {
             console.error('MSAL library not loaded. Please include msal-browser.min.js');
             this.showError('Authentication library not loaded');
+            return;
+        }
+        
+        // SECURITY: Validate that auth configuration is provided
+        if (!this.msalConfig.auth.clientId || !this.msalConfig.auth.authority) {
+            console.error('MSAL configuration not provided. Create config/auth-config.js from the template.');
+            console.error('See config/auth-config.template.js for instructions.');
+            this.showError('Authentication not configured. Contact administrator.');
+            return;
+        }
+        
+        // SECURITY: Warn if running with placeholder config
+        if (this.msalConfig.auth.clientId.includes('YOUR_') || 
+            this.msalConfig.auth.authority.includes('YOUR_')) {
+            console.error('MSAL configuration contains placeholder values. Update config/auth-config.js');
+            this.showError('Authentication configuration incomplete.');
             return;
         }
         

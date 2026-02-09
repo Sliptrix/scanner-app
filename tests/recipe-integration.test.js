@@ -11,6 +11,24 @@
  * - Integration with inventory system
  */
 
+const { JSDOM } = require('jsdom');
+
+// Setup DOM environment for Node.js
+const dom = new JSDOM(`<!DOCTYPE html><html><head></head><body></body></html>`);
+global.window = dom.window;
+global.document = dom.window.document;
+global.HTMLElement = dom.window.HTMLElement;
+
+// Mock localStorage
+const localStorageData = {};
+global.localStorage = {
+    getItem: (key) => localStorageData[key] || null,
+    setItem: (key, value) => { localStorageData[key] = String(value); },
+    removeItem: (key) => { delete localStorageData[key]; },
+    clear: () => { Object.keys(localStorageData).forEach(k => delete localStorageData[k]); }
+};
+dom.window.localStorage = global.localStorage;
+
 // Mock DOM elements and dependencies
 function setupTestEnvironment() {
     // Create required DOM elements
@@ -454,15 +472,7 @@ if (typeof module !== 'undefined' && module.exports) {
     };
 }
 
-// Auto-run tests if this file is executed directly
-if (typeof window !== 'undefined') {
-    // Browser environment
-    document.addEventListener('DOMContentLoaded', function() {
-        if (window.location.pathname.includes('test')) {
-            runRecipeIntegrationTests();
-        }
-    });
-} else if (typeof require !== 'undefined' && require.main === module) {
-    // Node.js environment
+// Auto-run tests in Node.js environment
+if (typeof require !== 'undefined' && require.main === module) {
     runRecipeIntegrationTests();
 }

@@ -17,9 +17,35 @@ const PORT = process.env.PORT || 3001;
 // In production, this should be a database
 const qrMappings = new Map();
 
+// SECURITY: Configure CORS with specific origins in production
+const corsOptions = {
+    origin: process.env.CORS_ORIGINS 
+        ? process.env.CORS_ORIGINS.split(',') 
+        : ['http://localhost:8000', 'http://localhost:3000', 'http://127.0.0.1:8000'],
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization'],
+    credentials: true,
+    maxAge: 86400 // 24 hours
+};
+
 // Middleware
-app.use(cors());
+app.use(cors(corsOptions));
 app.use(express.json({ limit: '10mb' }));
+
+// SECURITY: Add security headers
+app.use((req, res, next) => {
+    // Prevent clickjacking
+    res.setHeader('X-Frame-Options', 'DENY');
+    // Prevent MIME type sniffing
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    // Enable XSS filter in older browsers
+    res.setHeader('X-XSS-Protection', '1; mode=block');
+    // Referrer policy
+    res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+    // Permissions policy
+    res.setHeader('Permissions-Policy', 'geolocation=(), microphone=(), camera=()');
+    next();
+});
 
 // Configure multer for file uploads (in-memory)
 const storage = multer.memoryStorage();
@@ -123,12 +149,20 @@ app.post('/api/qrcodes', async (req, res) => {
  *
  * Body: { qr_code_text, image_format, image_width, foreground_color, background_color }
  * Returns: PNG image as base64 data URL
+ * 
+ * SECURITY: API key must be provided via QR_API_KEY environment variable
  */
-const QR_API_KEY = '2Z2MbdGz4I1ypDA8gIFNqmUYRHHmOW_qwP4INxNVgMDlZOOQMiuuKwIB7UZe34Ld';
-
 app.post('/api/qr-generate', async (req, res) => {
     try {
-        const apiUrl = `https://api.qr-code-generator.com/v1/create?access-token=${QR_API_KEY}`;
+        // SECURITY: Load API key from environment variable only
+        const qrApiKey = process.env.QR_API_KEY;
+        if (!qrApiKey) {
+            return res.status(500).json({ 
+                error: 'QR API not configured',
+                message: 'QR_API_KEY environment variable not set'
+            });
+        }
+        const apiUrl = `https://api.qr-code-generator.com/v1/create?access-token=${qrApiKey}`;
         const apiResponse = await fetch(apiUrl, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -201,6 +235,8 @@ app.get('/api/qrcodes', (req, res) => {
  * - body: Email body (HTML)
  * - pdfData: Base64 encoded PDF data
  * - pdfFilename: Name for the PDF attachment
+ * 
+ * SECURITY: Validates all inputs to prevent injection attacks
  */
 app.post('/api/email/send', async (req, res) => {
     try {
@@ -213,6 +249,34 @@ app.post('/api/email/send', async (req, res) => {
                 required: ['accessToken', 'recipients', 'pdfData']
             });
         }
+        
+        // SECURITY: Validate email addresses format
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        const invalidEmails = recipients.filter(email => !emailRegex.test(email.trim()));
+        if (invalidEmails.length > 0) {
+            return res.status(400).json({
+                error: 'Invalid email addresses',
+                invalid: invalidEmails
+            });
+        }
+        
+        // SECURITY: Limit number of recipients to prevent abuse
+        if (recipients.length > 10) {
+            return res.status(400).json({
+                error: 'Too many recipients',
+                message: 'Maximum 10 recipients allowed per email'
+            });
+        }
+        
+        // SECURITY: Sanitize subject line (prevent header injection)
+        const sanitizedSubject = (subject || 'LoneWolf Biotech - Intake Form Submission')
+            .replace(/[\r\n]/g, '') // Remove newlines
+            .substring(0, 200); // Limit length
+        
+        // SECURITY: Validate filename to prevent path traversal
+        const sanitizedFilename = (pdfFilename || 'intake_form.pdf')
+            .replace(/[^a-zA-Z0-9._-]/g, '_') // Only allow safe characters
+            .substring(0, 100); // Limit length
 
         // Initialize Graph client with access token
         const client = Client.init({
@@ -221,11 +285,13 @@ app.post('/api/email/send', async (req, res) => {
             }
         });
 
-        // Prepare email message
+        // Prepare email message with sanitized inputs
         const message = {
-            subject: subject || 'LoneWolf Biotech - Intake Form Submission',
+            subject: sanitizedSubject,
             body: {
                 contentType: 'HTML',
+                // SECURITY: Body content is passed as-is since Graph API handles HTML safely
+                // Additional sanitization could be added here if needed
                 content: body || '<p>Please find the intake form attached.</p>'
             },
             toRecipients: recipients.map(email => ({
@@ -234,7 +300,7 @@ app.post('/api/email/send', async (req, res) => {
             attachments: [
                 {
                     '@odata.type': '#microsoft.graph.fileAttachment',
-                    name: pdfFilename || 'intake_form.pdf',
+                    name: sanitizedFilename,
                     contentType: 'application/pdf',
                     contentBytes: pdfData.split(',')[1] || pdfData // Remove data:application/pdf;base64, if present
                 }

@@ -1,329 +1,314 @@
 # Lab Barcode Builder & Transfer System
 
-A comprehensive laboratory management system for barcode generation, container transfers, recipe management, and tissue culture operations with ML-enhanced recommendations.
+A comprehensive laboratory management system for barcode generation, container transfers, recipe management, and tissue culture operations with Microsoft 365 authentication and ML-enhanced recommendations.
 
 ## 🚀 Current Status: Production Ready
 
-**✅ All Core Features Implemented:**
-- Barcode generation with Code128 format
-- Container transfer system with tissue splitting
-- Recipe management with dynamic templates
-- Inventory management with export/import
-- ML recommendations and analytics
-- Comprehensive testing suite
+**Version:** 2.4  
+**Branch:** feature/production-enhancements-2026-02
 
-## 🎯 Key Features
+---
 
-- **Barcode Generation**: Create Code128 barcodes with customizable metadata
-- **Container Management**: Track containers with detailed lineage information
-- **Transfer System**: Handle container-to-container transfers with validation
-- **Recipe Management**: Create and manage tissue culture media recipes with dynamic templates
-- **Import/Export**: Multi-format data export (Excel, CSV, JSON) with import capabilities
-- **ML Integration**: Smart recommendations for recipes and transfer success prediction
-- **Dashboard Analytics**: Visual insights into lab operations
+## ✨ Key Features
+
+| Feature | Description |
+|---------|-------------|
+| **🔐 Microsoft 365 SSO** | Secure Azure AD authentication with auto-logout |
+| **🏷️ Barcode Generation** | Code128 and QR code generation with batch printing |
+| **📦 Container Management** | Track containers with detailed lineage information |
+| **🔄 Transfer System** | Container-to-container transfers with tissue splitting |
+| **📊 Recipe Management** | Create and manage tissue culture media recipes |
+| **📈 Dashboard Analytics** | Visual insights with charts and activity heatmaps |
+| **☁️ Cloud Sync** | SharePoint/OneDrive workbook integration |
+| **📧 Email Automation** | Automatic intake form emailing with PDF attachments |
+| **🖨️ Zebra Printing** | Direct ZPL printing to network Zebra printers |
+
+---
+
+## 📋 Prerequisites
+
+| Requirement | Minimum Version |
+|-------------|-----------------|
+| Node.js | 18.x |
+| Python | 3.8+ |
+| Browser | Chrome 90+, Firefox 88+, Safari 14+ |
+
+**Required Accounts:**
+- Microsoft 365 / Azure AD tenant
+- Azure AD admin access (for app registration)
+
+---
 
 ## 🚀 Quick Start
 
-### Using Python Server (Recommended)
+### Development Setup
+
 ```bash
-python3 server.py
+# Clone repository
+git clone <repo-url>
+cd scanner-app
+
+# Install dependencies
+npm install
+cd backend && npm install && cd ..
+
+# Copy configuration templates
+cp config/auth-config.template.js config/auth-config.js
+cp config/cloud-hq-config.template.js config/cloud-hq-config.js
+
+# Edit config files with your Azure AD credentials
+# See docs/AZURE_AD_SETUP.md for details
+
+# Start both servers
+./start-servers.sh
 ```
+
 Open http://localhost:8000 in your browser.
 
-### Using Node.js (Alternative)
+### Alternative Start Methods
+
 ```bash
-npm install
+# Frontend only (Python)
+python3 server.py
+
+# Frontend only (Node)
 npm start
+
+# Backend only
+cd backend && npm start
 ```
 
-### Direct File Access
-Open `index.html` directly in a modern web browser (may have CORS limitations).
+---
 
 ## 📁 Project Structure
 
 ```
-Scanner/
-├── index.html                 # Main application entry point
-├── server.py                  # Python development server
-├── package.json               # Node.js dependencies
-├── .gitignore                 # Git ignore patterns
-├── README.md                  # This file
-├── src/                       # Source code modules
+scanner-app/
+├── index.html                    # Main application
+├── server.py                     # Python dev server
+├── start-servers.sh              # Combined server startup
+├── package.json                  # Frontend dependencies
+│
+├── config/                       # Configuration files
+│   ├── auth-config.template.js   # Azure AD config template
+│   └── cloud-hq-config.template.js # Cloud sync config template
+│
+├── backend/                      # Node.js backend
+│   ├── server.js                 # Express API server
+│   └── package.json              # Backend dependencies
+│
+├── src/
 │   ├── js/
-│   │   ├── main.js           # Application entry point
-│   │   ├── modules/          # Feature modules
-│   │   │   ├── barcode/      # Barcode generation
-│   │   │   ├── transfer/     # Container transfers
-│   │   │   ├── inventory/    # Inventory management
-│   │   │   ├── recipe/       # Recipe management
-│   │   │   └── ml/          # ML engine and integration
-│   │   └── utils/           # Utility functions
-│   └── css/                 # Stylesheets
-├── tests/                   # Test files
-│   ├── unit/               # Unit tests
-│   ├── integration/        # Integration tests
-│   ├── import-export.test.js
-│   └── recipe-wizard.test.js
-├── docs/                    # Documentation
-│   ├── DEMO_GUIDE.md
-│   ├── DEPLOYMENT_PLAN.md
-│   └── [other documentation]
-├── tools/                   # Development tools
-│   └── legacy-tests/       # Legacy test files
-├── node_modules/           # Node.js dependencies (ignored)
-└── venv/                   # Python virtual environment (ignored)
+│   │   ├── main.js              # Application entry point
+│   │   ├── modules/
+│   │   │   ├── auth/            # Authentication (MSAL)
+│   │   │   ├── barcode/         # Barcode generation
+│   │   │   ├── cloud/           # OneDrive/SharePoint sync
+│   │   │   ├── dashboard/       # Analytics & charts
+│   │   │   ├── email/           # Email service
+│   │   │   ├── intake/          # Intake form handling
+│   │   │   ├── inventory/       # Inventory management
+│   │   │   ├── lineage/         # Container lineage tracking
+│   │   │   ├── recipe/          # Recipe management
+│   │   │   └── transfer/        # Container transfers
+│   │   └── utils/               # Utility functions
+│   └── styles/                  # CSS stylesheets
+│
+├── tests/                       # Test suites
+│   ├── smoke-test.js            # Basic functionality tests
+│   ├── unit/                    # Unit tests
+│   └── integration/             # Integration tests
+│
+└── docs/                        # Documentation
+    ├── AZURE_AD_SETUP.md        # Azure configuration
+    ├── CLOUD_HQ_INTEGRATION.md  # SharePoint sync guide
+    └── ...
 ```
 
-## 🎯 Features Implemented (Phase 1)
+---
 
-### ✅ UI Foundation
-- Clean, modern interface with gradient background
-- Responsive design that works on different screen sizes
-- Professional Lab Barcode Builder & Transfer System branding
-- Mode selector for switching between Builder and Transfer modes
+## ⚙️ Configuration
 
-### ✅ File Upload System
-- Drag and drop Excel file upload
-- File validation for .xlsx and .xls formats
-- Visual feedback for upload status
-- Integration with xlsx.js library
+### Azure AD Authentication
 
-### ✅ Basic Navigation
-- Mode switching between Barcode Builder and Container Transfer
-- Progress tracking UI for barcode building steps
-- Transfer workflow interface with source/destination containers
+1. Register app in Azure Portal (see [docs/AZURE_AD_SETUP.md](docs/AZURE_AD_SETUP.md))
+2. Create `config/auth-config.js`:
 
-### ✅ Application Architecture
-- Modular CSS organization
-- JavaScript state management foundation
-- Event handling system
-- Notification system for user feedback
+```javascript
+window.MSAL_CONFIG = {
+    clientId: 'your-client-id',
+    authority: 'https://login.microsoftonline.com/your-tenant-id',
+    redirectUri: window.location.origin
+};
+```
 
-## 🧪 Testing & Validation
+### Cloud Sync (Optional)
 
-### Run Phase 1 Validation
-1. Start the development server:
-   ```bash
-   npm start
-   # OR
-   python3 -m http.server 8000 --directory public
-   ```
+Create `config/cloud-hq-config.js` for SharePoint workbook integration:
 
-2. Open validation test:
-   ```
-   http://localhost:8000/../tests/phase1-validation.html
-   ```
+```javascript
+window.CLOUD_HQ_CONFIG = {
+    shareUrl: 'your-sharepoint-workbook-url',
+    sync: { readOnlyMode: true }
+};
+```
 
-3. The validation test will automatically run and verify:
-   - CSS and JavaScript files load correctly
-   - All UI sections are present
-   - Basic functionality works as expected
+### Environment Variables
 
-### Manual Testing Checklist
-- [ ] Page loads without errors
-- [ ] UI displays with proper styling
-- [ ] Mode buttons switch between Builder and Transfer
-- [ ] File upload area is interactive
-- [ ] Notifications appear when buttons are clicked
-- [ ] Stats grid shows initial values
-- [ ] All sections are visible and properly styled
-
-## 🔄 Next Phases
-
-### Phase 2: Extract and Modularize CSS (Next)
-- [ ] Split CSS into logical modules (base, components, responsive)
-- [ ] Create component-specific stylesheets
-- [ ] Implement CSS organization structure
-- [ ] **Validation:** Visual regression test to ensure UI looks identical
-
-### Phase 3: Extract Core JavaScript Infrastructure
-- [ ] Extract application state and core utilities
-- [ ] Create data management module
-- [ ] Create notification system
-- [ ] **Validation:** Basic functionality tests
-
-### Phase 4: Extract Barcode Builder Feature
-- [ ] Extract barcode builder HTML components
-- [ ] Extract barcode builder JavaScript logic
-- [ ] **Validation:** Barcode builder workflow tests
-
-### Phase 5: Extract Container Transfer Feature
-- [ ] Extract container transfer HTML components
-- [ ] Extract container transfer JavaScript logic
-- [ ] **Validation:** Container transfer workflow tests
-
-### Phase 6: Extract Inventory Management
-- [ ] Extract inventory table components
-- [ ] Extract Excel export/import functionality
-- [ ] **Validation:** Data persistence and export tests
-
-### Phase 7: Final Integration and Optimization
-- [ ] Create proper build system
-- [ ] Add comprehensive documentation
-- [ ] Final testing and validation
-
-## 🛠️ Development Commands
+Create `backend/.env`:
 
 ```bash
-# Start development server
-npm start
-
-# Run tests (placeholder)
-npm test
-
-# Validate current phase
-# Open browser to: http://localhost:8000/../tests/phase1-validation.html
+PORT=3001
+NODE_ENV=production
+ZEBRA_PRINTER_IP=192.168.1.100    # Optional
+ZEBRA_PRINTER_PORT=9100           # Optional
 ```
 
-## 📝 Architecture Notes
+---
 
-### CSS Organization
-- Single main.css file with organized sections
-- Uses CSS Grid and Flexbox for layout
-- Responsive design with mobile breakpoints
-- Modern CSS animations and transitions
+## 🔒 Security Features
 
-### JavaScript Structure
-- Event-driven architecture
-- Global state management with `appState` object
-- Modular function organization
-- Error handling and user feedback
-
-### External Dependencies
-- **xlsx.js**: Excel file processing (CDN loaded)
-- **No framework dependencies**: Vanilla JavaScript implementation
-
-## 🔧 Current Limitations (To be addressed in future phases)
-
-1. **Monolithic Files**: All CSS and JS in single files
-2. **Placeholder Functions**: Most functionality shows notifications instead of real behavior
-3. **No Data Persistence**: No backend or local storage implementation
-4. **Limited Testing**: Only basic validation tests implemented
-5. **No Build System**: Direct file serving without optimization
-
-## 📊 Phase 1 Success Metrics
-
-- ✅ Page loads without JavaScript errors
-- ✅ All UI sections render correctly
-- ✅ CSS styling matches original design
-- ✅ Basic user interactions work (mode switching, notifications)
-- ✅ File upload interface functions
-- ✅ External library (xlsx.js) loads successfully
-- ✅ Validation tests pass
+- **Mandatory Authentication**: All features require Microsoft 365 sign-in
+- **OAuth 2.0**: Industry-standard authentication via Azure AD
+- **Session Management**: 30-minute inactivity auto-logout
+- **Read-Only Cloud Sync**: Blocks accidental writes to production workbooks
+- **No Credential Storage**: All authentication via Microsoft
 
 ---
 
-## Phase 5: Extract Container Transfer Feature ✅ COMPLETED
+## 🧪 Testing
 
-**Status**: DONE - Full container transfer and tissue splitting functionality extracted
+```bash
+# Run all tests
+npm test
 
-**Description**: Complete modularization of container transfer functionality including tissue splitting capabilities for laboratory sample management.
+# Run specific test suites
+npm run test:smoke          # Basic functionality
+npm run test:unit           # Unit tests
+npm run test:phase5         # Analytics tests
+```
 
-**Components Created**:
-- **Transfer Input Manager** (`src/js/modules/transfer/inputManager.js`):
-  - Source and destination container input processing
-  - Container validation and lookup
-  - Inventory integration for container data
-  - Real-time UI updates and feedback
+### Manual Testing
 
-- **Transfer Processor** (`src/js/modules/transfer/transferProcessor.js`):
-  - Core transfer operations (single and split modes)
-  - Tissue splitting algorithms with even distribution
-  - Container ID generation for new containers
-  - Transfer history and lineage tracking
-  - Inventory state management after transfers
-
-- **Main Transfer Module** (`src/js/modules/transfer/transferMain.js`):
-  - Transfer workflow coordination
-  - Mode switching (single vs. split transfer)
-  - Split count management and preview
-  - State management integration
-  - Transfer validation and confirmation
-
-**Key Features**:
-- **Single Container Transfer**: Move all samples from source to existing destination
-- **Tissue Splitting**: Divide samples evenly across multiple new containers (2-10 containers)
-- **Container Validation**: Real-time lookup and validation against inventory
-- **Transfer History**: Tracking of all transfer operations with timestamps
-- **Container Lineage**: Parent-child relationship tracking for split operations
-- **Split Preview**: Visual preview of sample distribution before processing
-
-**Integration Points**:
-- Updated `main.js` with transfer module initialization
-- Modified `index.html` to load all transfer modules
-- Enhanced `StateManager` with transfer state management
-- Updated smoke tests to include Phase 5 modules
-
-**Testing**:
-- ✅ All Phase 5 modules created and integrated
-- ✅ Transfer input validation working
-- ✅ Single and split transfer modes functional
-- ✅ Container lookup and validation operational
-- ✅ Inventory updates after transfers confirmed
+1. Start servers: `./start-servers.sh`
+2. Open http://localhost:8000
+3. Sign in with Microsoft 365
+4. Test barcode generation, transfers, and exports
 
 ---
 
-## Phase 6: Extract Inventory Management ✅ COMPLETED
+## 🚀 Production Deployment
 
-**Status**: DONE - Comprehensive inventory management system with advanced features
+See **[DEPLOYMENT.md](DEPLOYMENT.md)** for complete deployment instructions.
 
-**Description**: Complete modularization of inventory management functionality including dynamic table management, advanced filtering, search capabilities, data export, and automated backup systems.
+### Quick Deployment Checklist
 
-**Components Created**:
-- **Inventory Table Manager** (`src/js/modules/inventory/tableManager.js`):
-  - Dynamic inventory table display with sorting and filtering
-  - Real-time search with debounced input handling
-  - Quick filter buttons (Today, This Week, Split Origins)
-  - Row-level detailed information modals
-  - Interactive container lineage visualization
-  - Statistics tracking and display
+1. Configure Azure AD app for production domain
+2. Set up HTTPS (required for auth)
+3. Create production config files
+4. Deploy backend with PM2
+5. Deploy frontend to web server
+6. Complete [PRE_FLIGHT_CHECKLIST.md](PRE_FLIGHT_CHECKLIST.md)
 
-- **Data Export Manager** (`src/js/modules/inventory/exportManager.js`):
-  - Advanced Excel export with multiple worksheets
-  - CSV export option for simple data
-  - Configurable export options (inventory, transfers, lineage, summary)
-  - Data scope selection (all data vs. filtered results)
-  - Automatic file naming with timestamps
-  - Comprehensive summary reports with statistics
+```bash
+# Backend (PM2)
+cd backend
+pm2 start server.js --name scanner-backend
 
-- **Main Inventory Manager** (`src/js/modules/inventory/inventoryMain.js`):
-  - Central coordination of all inventory functionality
-  - Auto-save to localStorage every 30 seconds
-  - Automatic backup creation every 100 entries
-  - Data validation and health monitoring
-  - Storage optimization and duplicate removal
-  - Enhanced clear inventory dialog with backup options
-
-**Advanced Features**:
-- **Smart Table Management**: Sortable columns, real-time filtering, pagination-ready design
-- **Search & Filter**: Instant search across all fields, quick filter presets, statistics display
-- **Export System**: Multi-format export (Excel/CSV), multiple worksheet support, filtered data export
-- **Data Persistence**: Auto-save, backup management, data validation, storage optimization
-- **UI Enhancements**: Enhanced controls, health indicators, detailed tooltips, confirmation dialogs
-- **Error Handling**: Comprehensive validation, graceful fallbacks, user-friendly error messages
-
-**Integration Points**:
-- Updated `main.js` with inventory module initialization
-- Enhanced `index.html` to load all inventory modules
-- Extended `UIUtils` with inventory table rebuild support
-- Updated smoke tests to include Phase 6 modules
-- Seamless integration with transfer and builder modules
-
-**Data Management**:
-- **Auto-Save**: Persistent storage every 30 seconds
-- **Backup System**: Automatic backups every 100 entries, keeps last 5 backups
-- **Data Validation**: Real-time validation with health indicators
-- **Storage Optimization**: Duplicate detection and removal
-- **Import/Export**: Comprehensive data export with multiple formats
-
-**Testing**:
-- ✅ All Phase 6 modules created and integrated
-- ✅ Table management fully functional with sorting/filtering
-- ✅ Export system working with Excel and CSV formats
-- ✅ Auto-save and backup systems operational
-- ✅ Data validation and optimization confirmed
-- ✅ UI enhancements properly integrated
+# Verify
+curl https://your-domain.com/health
+```
 
 ---
 
-**Next Step**: Ready for final testing and optimization, or additional feature development as needed.
+## 📊 API Endpoints
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/health` | GET | Health check |
+| `/api/email/send` | POST | Send email with PDF attachment |
+| `/api/qrcodes` | POST | Generate QR code |
+| `/api/qrcodes/:code` | GET | Lookup QR code |
+| `/api/print/zpl` | POST | Print to Zebra printer |
+
+---
+
+## 📚 Documentation
+
+| Document | Description |
+|----------|-------------|
+| [DEPLOYMENT.md](DEPLOYMENT.md) | Production deployment guide |
+| [PRE_FLIGHT_CHECKLIST.md](PRE_FLIGHT_CHECKLIST.md) | Go-live checklist |
+| [CHANGELOG.md](CHANGELOG.md) | Version history |
+| [TESTING_GUIDE.md](TESTING_GUIDE.md) | Testing instructions |
+| [docs/AZURE_AD_SETUP.md](docs/AZURE_AD_SETUP.md) | Azure AD configuration |
+| [docs/CLOUD_HQ_INTEGRATION.md](docs/CLOUD_HQ_INTEGRATION.md) | SharePoint sync setup |
+| [docs/EMAIL_AUTH_FEATURE.md](docs/EMAIL_AUTH_FEATURE.md) | Email feature details |
+
+---
+
+## 🔄 Recent Updates
+
+### v2.4 (February 2026)
+- Dashboard analytics with interactive charts
+- Enhanced barcode builder with batch generation
+- Activity heatmaps and trend analysis
+- Recipe versioning system
+- Cloud connection status indicator
+
+### v2.3 (February 2026)
+- Configurable Cloud HQ connection
+- Recipe-container usage tracking
+- Enhanced security with read-only mode
+
+### v2.2 (February 2026)
+- Comprehensive lineage tracking
+- Audit trail system
+- Transfer history and reports
+
+See [CHANGELOG.md](CHANGELOG.md) for complete history.
+
+---
+
+## 🆘 Troubleshooting
+
+### Authentication Issues
+- Verify Azure AD Client ID and Tenant ID
+- Check redirect URI matches exactly
+- Ensure admin consent granted
+
+### Backend Not Starting
+```bash
+# Check Node version (need 18+)
+node --version
+
+# Check for port conflicts
+lsof -i :3001
+
+# Check dependencies
+cd backend && npm ci
+```
+
+### Cloud Sync Issues
+- Verify SharePoint URL is accessible
+- Check user has read access to workbook
+- Ensure Files.Read.All permission granted
+
+---
+
+## 📞 Support
+
+1. Check browser console for errors
+2. Verify backend health: `curl http://localhost:3001/health`
+3. Review [Troubleshooting](#-troubleshooting) section
+4. Check [docs/](docs/) for feature-specific guides
+
+---
+
+## 📄 License
+
+MIT License
+
+---
+
+*Last Updated: February 2026*

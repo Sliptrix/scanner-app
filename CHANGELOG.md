@@ -1,5 +1,68 @@
 # Changelog - Scanner App Updates
 
+## Version 2.5 - Production Deployment & Documentation (2026-02-08)
+
+### 📚 Documentation Overhaul
+
+#### Comprehensive Deployment Guide
+- **DEPLOYMENT.md**: Complete production deployment documentation
+  - Prerequisites and system requirements
+  - Step-by-step Azure AD configuration
+  - Environment configuration guide
+  - HTTPS/SSL setup instructions (Nginx, Let's Encrypt, Azure)
+  - Backend deployment with PM2
+  - Frontend static hosting options
+  - Cloud HQ SharePoint integration
+  - Troubleshooting guide with common issues
+  - Maintenance procedures and monitoring
+
+#### Pre-Flight Checklist
+- **PRE_FLIGHT_CHECKLIST.md**: Go-live verification checklist
+  - Azure AD setup verification
+  - Configuration file validation
+  - SSL/HTTPS requirements
+  - Infrastructure deployment steps
+  - Testing phase checklist
+  - Security verification
+  - Documentation review
+  - Emergency contacts and rollback procedures
+  - Sign-off section for stakeholders
+
+#### Updated README
+- Production-ready README with clear structure
+  - Quick start guide for development
+  - Configuration sections for auth and cloud sync
+  - API endpoint documentation
+  - Troubleshooting section
+  - Links to all deployment documentation
+
+### 🔧 Bug Fixes (2026-02-08)
+
+- **Dashboard UI**: Fixed display issues with stat cards
+- **Sync Status**: Resolved stuck "Syncing" indicator
+- **Container Initiation**: Fixed media code mapping for barcodes
+- **QR Code Dev Mode**: Corrected development mode QR generation
+- **Chart Rendering**: Fixed empty state SVG path validation
+- **Auth**: Fixed `getAccount` method in authManager
+- **Lineage UI**: Resolved DOM manipulation bug
+- **Logger Utility**: Converted console.log to Logger.debug for cleaner output
+
+### 📁 Files Added
+- `DEPLOYMENT.md` - Production deployment guide
+- `PRE_FLIGHT_CHECKLIST.md` - Go-live verification checklist
+
+### 📝 Files Modified
+- `README.md` - Complete rewrite for production readiness
+- `CHANGELOG.md` - Added v2.5 release notes
+
+### ✅ Verified
+- All E2E tests passing
+- Backend health checks working
+- Authentication flow tested
+- Cloud sync functionality verified
+
+---
+
 ## Version 2.4 - Dashboard Analytics & Barcode Builder Enhancements (2026-02-07)
 
 ### 📊 Phase 5: Dashboard Analytics & Visualization

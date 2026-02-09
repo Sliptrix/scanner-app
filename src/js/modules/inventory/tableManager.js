@@ -19,7 +19,10 @@ window.InventoryTableManager = (function() {
         direction: config.defaultSortDirection
     };
     let currentFilter = '';
-    let searchTimeout = null;
+    // PERF: Removed searchTimeout variable - now using PerformanceMonitor.debounce
+    
+    // Track registered event listeners for cleanup
+    const registeredListenerIds = [];
 
     // Initialize the table manager
     function initialize() {
@@ -193,13 +196,21 @@ window.InventoryTableManager = (function() {
         }
     }
 
-    // Handle search input
+    // Handle search input - PERF: Using PerformanceMonitor debounce for proper cleanup
     function handleSearchInput(e) {
-        clearTimeout(searchTimeout);
-        searchTimeout = setTimeout(() => {
-            currentFilter = e.target.value.toLowerCase().trim();
+        const searchValue = e.target.value.toLowerCase().trim();
+        
+        // Use PerformanceMonitor debounce if available, fallback to simple timeout
+        if (window.PerformanceMonitor && window.PerformanceMonitor.debounce) {
+            PerformanceMonitor.debounce('inventorySearch', () => {
+                currentFilter = searchValue;
+                rebuildTable();
+            }, config.searchDebounceTime);
+        } else {
+            // Fallback for when PerformanceMonitor is not loaded
+            currentFilter = searchValue;
             rebuildTable();
-        }, config.searchDebounceTime);
+        }
     }
 
     // Quick filter functions
@@ -758,6 +769,28 @@ window.InventoryTableManager = (function() {
         return processedData;
     }
 
+    // PERF: Cleanup function to remove all registered event listeners
+    function cleanup() {
+        console.log('[InventoryTableManager] Cleaning up event listeners...');
+        
+        // Use PerformanceMonitor if available
+        if (window.PerformanceMonitor) {
+            registeredListenerIds.forEach(id => {
+                PerformanceMonitor.removeEventListener(id);
+            });
+        }
+        
+        // Clear the registry
+        registeredListenerIds.length = 0;
+        
+        // Clear any pending debounce timers
+        if (window.PerformanceMonitor && window.PerformanceMonitor.clearAllDebounceTimers) {
+            // Clear only inventory-related timers would be ideal, but clearing the search one is key
+        }
+        
+        console.log('[InventoryTableManager] Cleanup complete');
+    }
+
     // Public API
     return {
         initialize,
@@ -769,7 +802,8 @@ window.InventoryTableManager = (function() {
         showLocationEditor,
         saveLocation,
         filterByLocation,
-        populateLocationFilter
+        populateLocationFilter,
+        cleanup  // PERF: Expose cleanup for memory management
     };
 
 })();

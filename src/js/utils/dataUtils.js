@@ -21,26 +21,49 @@ window.DataUtils = {
         return year + month + day;
     },
     
-    // Container ID utilities
+    // Container ID utilities - PERF: Optimized to avoid full inventory scan
+    // Track when we last recalculated to avoid redundant scans
+    _lastInventoryLength: 0,
+    _cachedHighestId: 0,
+    
     getNextContainerId: function() {
-        // Update highest container ID from all existing containers
-        window.appState.inventory.forEach(entry => {
-            const containerId = parseInt(entry.containerId);
-            if (!isNaN(containerId) && containerId > window.appState.highestContainerId) {
-                window.appState.highestContainerId = containerId;
+        const inventory = window.appState.inventory;
+        const currentLength = inventory.length;
+        
+        // PERF: Only scan if inventory has grown since last calculation
+        if (currentLength !== this._lastInventoryLength || this._cachedHighestId === 0) {
+            // Full scan only when necessary
+            let highest = window.appState.highestContainerId || 0;
+            
+            for (let i = 0; i < currentLength; i++) {
+                const containerId = parseInt(inventory[i].containerId);
+                if (!isNaN(containerId) && containerId > highest) {
+                    highest = containerId;
+                }
             }
-        });
+            
+            this._cachedHighestId = highest;
+            this._lastInventoryLength = currentLength;
+            window.appState.highestContainerId = highest;
+        }
         
         // Also check current container being processed
         if (window.appState.currentContainer) {
             const currentId = parseInt(window.appState.currentContainer);
-            if (!isNaN(currentId) && currentId > window.appState.highestContainerId) {
+            if (!isNaN(currentId) && currentId > this._cachedHighestId) {
+                this._cachedHighestId = currentId;
                 window.appState.highestContainerId = currentId;
             }
         }
         
         // Return the next sequential ID
-        return window.appState.highestContainerId + 1;
+        return this._cachedHighestId + 1;
+    },
+    
+    // PERF: Invalidate cache when inventory changes significantly
+    invalidateContainerIdCache: function() {
+        this._lastInventoryLength = 0;
+        this._cachedHighestId = 0;
     },
     
     // Container lineage utilities

@@ -99,7 +99,7 @@ console.log('\n📄 Checking HTML structure...');
 if (fs.existsSync('index.html')) {
     const htmlContent = fs.readFileSync('index.html', 'utf8');
     const checks = [
-        { name: 'Has CSS link', test: () => htmlContent.includes('src/styles/main.css') },
+        { name: 'Has CSS link', test: () => htmlContent.includes('src/styles/main.css') || htmlContent.includes('src/styles/main-consolidated.css') },
         { name: 'Has JS modules', test: () => htmlContent.includes('src/js/core/state.js') },
         { name: 'Has builder modules', test: () => htmlContent.includes('src/js/modules/builder/stepManager.js') },
         { name: 'Has transfer modules', test: () => htmlContent.includes('src/js/modules/transfer/inputManager.js') },
