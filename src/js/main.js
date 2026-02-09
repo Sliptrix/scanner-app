@@ -1995,9 +1995,6 @@ async function generateQrBatch() {
         btn.style.background = '#059669';
     }
 
-    // Clear manual start-from input after successful generation
-    if (startFromInput) startFromInput.value = '';
-
     updateQrPoolStatus();
 
     setTimeout(() => {
