@@ -75,12 +75,12 @@ const DashboardManager = (function() {
 
         // Update DOM with proper formatting and trends
         updateMetricCard('activeCultures', activeCultures, '', null);
-        updateMetricCard('contaminationRate', contaminationRate, '%', null, 1);
+        updateMetricCard('survivalRate', survivalRate, '%', null, 1);
         updateMetricCard('multiplicationRate', avgSplitRatio, '', null, 1);
         updateMetricCard('containersNeedingTransfer', containersNeedingTransfer, '', null);
         
-        // Update contamination rate color coding
-        updateContaminationRateColor(contaminationRate);
+        // Update survival rate color coding
+        updateSurvivalRateColor(survivalRate);
     }
 
     // Enhanced analytics display (tissue culture lab-specific)
@@ -104,6 +104,7 @@ const DashboardManager = (function() {
         renderWeeklyThroughput(analytics);
         renderMediaConsumption(analytics);
         renderOwnerWorkload(analytics);
+        renderSurvivalBreakdown(analytics);
 
         // Keep lineage stats (useful)
         renderLineageStats(analytics);
@@ -911,20 +912,56 @@ const DashboardManager = (function() {
     }
 
     // Helper: Update contamination rate color coding
-    function updateContaminationRateColor(rate) {
-        const card = document.getElementById('contaminationCard');
+    function updateSurvivalRateColor(rate) {
+        const card = document.getElementById('survivalCard');
         if (!card) return;
 
-        // Remove existing contamination classes
-        card.classList.remove('contamination-good', 'contamination-warning', 'contamination-danger');
+        // Remove existing color classes
+        card.classList.remove('metric-good', 'metric-warning', 'metric-danger');
         
-        if (rate < 5) {
-            card.classList.add('contamination-good');
-        } else if (rate <= 10) {
-            card.classList.add('contamination-warning');
+        if (rate >= 90) {
+            card.classList.add('metric-good');
+        } else if (rate >= 70) {
+            card.classList.add('metric-warning');
         } else {
-            card.classList.add('contamination-danger');
+            card.classList.add('metric-danger');
         }
+    }
+
+    // Render Rooting & Survival Breakdown chart
+    function renderSurvivalBreakdown(analytics) {
+        const container = document.getElementById('survivalBreakdownChart');
+        if (!container) return;
+
+        const inventory = window.appState?.inventory || [];
+        
+        // Count containers by survival status
+        const active = inventory.filter(i => !i.status || i.status === 'Active').length;
+        const complete = inventory.filter(i => i.status === 'Complete').length;
+        const rooting = inventory.filter(i => i.stage === 'Rooting' && (!i.status || i.status === 'Active')).length;
+        const discarded = inventory.filter(i => i.status === 'Discarded' || i.status === 'Contaminated').length;
+        const consumed = inventory.filter(i => i.status === 'Consumed').length;
+
+        const labels = [];
+        const values = [];
+        const colors = [];
+
+        if (active > 0) { labels.push('Active'); values.push(active); colors.push('#10b981'); }
+        if (complete > 0) { labels.push('Complete'); values.push(complete); colors.push('#3b82f6'); }
+        if (rooting > 0) { labels.push('In Rooting'); values.push(rooting); colors.push('#8b5cf6'); }
+        if (consumed > 0) { labels.push('Consumed'); values.push(consumed); colors.push('#f59e0b'); }
+        if (discarded > 0) { labels.push('Lost/Discarded'); values.push(discarded); colors.push('#ef4444'); }
+
+        const total = inventory.length;
+        const survived = active + complete;
+        const survivalPct = total > 0 ? Math.round((survived / total) * 100) : 0;
+
+        ChartRenderer.renderPieChart(container, { labels, values, colors }, {
+            title: '🌿 Rooting & Survival Breakdown',
+            donut: true,
+            centerText: survivalPct + '%',
+            centerLabel: 'Survival'
+        });
     }
 
     // Setup auto-refresh

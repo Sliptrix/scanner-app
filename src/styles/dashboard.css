@@ -818,6 +818,14 @@ body {
     top: 0;
 }
 
+/* Metric card color states */
+.metric-card.metric-good .metric-value { color: #059669; }
+.metric-card.metric-good { border-left: 4px solid #10b981; }
+.metric-card.metric-warning .metric-value { color: #d97706; }
+.metric-card.metric-warning { border-left: 4px solid #f59e0b; }
+.metric-card.metric-danger .metric-value { color: #dc2626; }
+.metric-card.metric-danger { border-left: 4px solid #ef4444; }
+
 /* Hide old sections when in dashboard mode */
 .dashboard-section.active ~ .builder-section,
 .dashboard-section.active ~ .transfer-section,
