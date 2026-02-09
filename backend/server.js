@@ -293,6 +293,263 @@ app.post('/api/qr-generate', async (req, res) => {
     }
 });
 
+// ============================================================
+// QR Code Pool Management Endpoints
+// ============================================================
+
+/**
+ * Generate a pool of unassigned QR codes with pre-generated images
+ * POST /api/qrcodes/pool/generate
+ * Body: { count: 50, prefix: "LW" }
+ */
+app.post('/api/qrcodes/pool/generate', async (req, res) => {
+    try {
+        let { count, prefix } = req.body;
+        count = parseInt(count) || 10;
+        prefix = (prefix || '').replace(/[^A-Za-z0-9]/g, '').substring(0, 4);
+
+        if (count < 1 || count > 100) {
+            return res.status(400).json({ error: 'Count must be between 1 and 100' });
+        }
+
+        const qrApiKey = process.env.QR_API_KEY;
+        if (!qrApiKey) {
+            return res.status(500).json({ error: 'QR_API_KEY not configured' });
+        }
+
+        const baseUrl = process.env.PUBLIC_URL || 'https://scanner.lonewolfgenetics.com';
+        const results = [];
+        const errors = [];
+
+        for (let i = 0; i < count; i++) {
+            try {
+                const shortCode = prefix ? generatePrefixedShortCode(prefix) : generateShortCode();
+                const scanUrl = `${baseUrl}/s/${shortCode}`;
+
+                // Call QR code generator API
+                const apiUrl = `https://api.qr-code-generator.com/v1/create?access-token=${qrApiKey}`;
+                const apiResponse = await fetch(apiUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        frame_name: 'no-frame',
+                        qr_code_text: scanUrl,
+                        image_format: 'PNG',
+                        image_width: 300,
+                        foreground_color: '#000000',
+                        background_color: '#FFFFFF'
+                    })
+                });
+
+                if (!apiResponse.ok) {
+                    throw new Error(`QR API returned ${apiResponse.status}`);
+                }
+
+                const buffer = await apiResponse.arrayBuffer();
+                const base64 = Buffer.from(buffer).toString('base64');
+                const qrImageDataUrl = `data:image/png;base64,${base64}`;
+
+                qrMappings.set(shortCode, {
+                    status: 'unassigned',
+                    createdAt: new Date().toISOString(),
+                    qrImageDataUrl
+                });
+
+                results.push({ shortCode, qrImageDataUrl });
+            } catch (err) {
+                console.error(`Pool generate error for code ${i + 1}:`, err.message);
+                errors.push({ index: i, error: err.message });
+            }
+        }
+
+        saveQRMappings();
+
+        res.json({
+            success: true,
+            generated: results.length,
+            errors: errors.length,
+            codes: results,
+            errorDetails: errors.length > 0 ? errors : undefined
+        });
+    } catch (error) {
+        console.error('Pool generate error:', error);
+        res.status(500).json({ error: 'Failed to generate pool codes', message: error.message });
+    }
+});
+
+/**
+ * Get all pool codes with optional status filter
+ * GET /api/qrcodes/pool?status=unassigned
+ */
+app.get('/api/qrcodes/pool', (req, res) => {
+    const { status } = req.query;
+    const codes = [];
+
+    for (const [shortCode, data] of qrMappings.entries()) {
+        // Only include pool entries (those with a status field)
+        if (!data.status) continue;
+        if (status && data.status !== status) continue;
+        codes.push({ shortCode, ...data });
+    }
+
+    // Sort by createdAt descending
+    codes.sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
+
+    res.json({ success: true, count: codes.length, codes });
+});
+
+/**
+ * Assign a pool code to a container
+ * POST /api/qrcodes/pool/:shortCode/assign
+ * Body: { containerId, barcodeData }
+ */
+app.post('/api/qrcodes/pool/:shortCode/assign', (req, res) => {
+    const { shortCode } = req.params;
+    const { containerId, barcodeData } = req.body;
+
+    if (!containerId || !barcodeData) {
+        return res.status(400).json({ error: 'containerId and barcodeData are required' });
+    }
+
+    if (!qrMappings.has(shortCode)) {
+        return res.status(404).json({ error: 'Short code not found' });
+    }
+
+    const data = qrMappings.get(shortCode);
+    if (data.status === 'assigned') {
+        return res.status(409).json({ error: 'Code already assigned', containerId: data.containerId });
+    }
+
+    data.status = 'assigned';
+    data.containerId = containerId;
+    data.barcodeData = barcodeData;
+    data.assignedAt = new Date().toISOString();
+
+    qrMappings.set(shortCode, data);
+    saveQRMappings();
+
+    res.json({ success: true, shortCode, ...data });
+});
+
+/**
+ * Unassign a pool code (reset to unassigned)
+ * POST /api/qrcodes/pool/:shortCode/unassign
+ */
+app.post('/api/qrcodes/pool/:shortCode/unassign', (req, res) => {
+    const { shortCode } = req.params;
+
+    if (!qrMappings.has(shortCode)) {
+        return res.status(404).json({ error: 'Short code not found' });
+    }
+
+    const data = qrMappings.get(shortCode);
+    data.status = 'unassigned';
+    delete data.containerId;
+    delete data.barcodeData;
+    delete data.assignedAt;
+
+    qrMappings.set(shortCode, data);
+    saveQRMappings();
+
+    res.json({ success: true, shortCode, ...data });
+});
+
+/**
+ * Printable label sheet for QR codes
+ * GET /api/qrcodes/pool/print?codes=X7kP2m,Y8lQ3n or ?status=unassigned&limit=50
+ */
+app.get('/api/qrcodes/pool/print', (req, res) => {
+    let codesToPrint = [];
+
+    if (req.query.codes) {
+        const requestedCodes = req.query.codes.split(',').map(c => c.trim()).filter(Boolean);
+        for (const code of requestedCodes) {
+            if (qrMappings.has(code)) {
+                const data = qrMappings.get(code);
+                if (data.qrImageDataUrl) {
+                    codesToPrint.push({ shortCode: code, ...data });
+                }
+            }
+        }
+    } else {
+        const status = req.query.status || 'unassigned';
+        const limit = Math.min(parseInt(req.query.limit) || 50, 200);
+        for (const [shortCode, data] of qrMappings.entries()) {
+            if (data.status === status && data.qrImageDataUrl) {
+                codesToPrint.push({ shortCode, ...data });
+                if (codesToPrint.length >= limit) break;
+            }
+        }
+    }
+
+    if (codesToPrint.length === 0) {
+        return res.status(404).send('<html><body><h1>No codes found to print</h1></body></html>');
+    }
+
+    const labelHtml = codesToPrint.map(c => `
+        <div class="label">
+            <img src="${c.qrImageDataUrl}" alt="QR ${c.shortCode}" />
+            <div class="code">${escapeHtml(c.shortCode)}</div>
+            ${c.containerId ? `<div class="cid">${escapeHtml(c.containerId)}</div>` : ''}
+        </div>
+    `).join('');
+
+    res.send(`<!DOCTYPE html>
+<html><head>
+<meta charset="UTF-8">
+<title>QR Label Sheet — LoneWolf Biotech</title>
+<style>
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;padding:10px}
+  .no-print{text-align:center;padding:16px;margin-bottom:16px}
+  .no-print button{background:#2563eb;color:#fff;border:none;padding:12px 32px;font-size:1rem;border-radius:8px;cursor:pointer;margin:0 8px}
+  .no-print button:hover{background:#1d4ed8}
+  .no-print .secondary{background:#6b7280}
+  .grid{display:grid;grid-template-columns:repeat(5,1fr);gap:8px}
+  .label{text-align:center;border:1px dashed #ccc;padding:8px;break-inside:avoid;page-break-inside:avoid}
+  .label img{width:100%;max-width:150px;height:auto}
+  .label .code{font-family:monospace;font-size:14px;font-weight:700;margin-top:4px}
+  .label .cid{font-size:11px;color:#666;margin-top:2px}
+  @media print{
+    .no-print{display:none}
+    .grid{grid-template-columns:repeat(5,1fr);gap:4px}
+    .label{border:1px solid #eee;padding:4px}
+    .label img{max-width:120px}
+    body{padding:0}
+  }
+</style>
+</head><body>
+<div class="no-print">
+  <button onclick="window.print()">🖨️ Print Labels</button>
+  <button class="secondary" onclick="window.close()">Close</button>
+  <p style="margin-top:8px;color:#666;font-size:0.9rem">${codesToPrint.length} labels ready to print</p>
+</div>
+<div class="grid">${labelHtml}</div>
+</body></html>`);
+});
+
+/**
+ * Generate a short code with a human-readable prefix
+ * @param {string} prefix - 1-4 character prefix
+ * @returns {string} Prefixed short code (e.g., "LW4k2m")
+ */
+function generatePrefixedShortCode(prefix, maxRetries = 10) {
+    const crypto = require('crypto');
+    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+    const suffixLen = 6 - prefix.length;
+    for (let attempt = 0; attempt < maxRetries; attempt++) {
+        const bytes = crypto.randomBytes(suffixLen);
+        let code = prefix;
+        for (let i = 0; i < suffixLen; i++) {
+            code += chars[bytes[i] % chars.length];
+        }
+        if (!qrMappings.has(code)) {
+            return code;
+        }
+    }
+    throw new Error('Failed to generate unique prefixed short code');
+}
+
 /**
  * Scan page — renders container metadata as a nice HTML page
  * This is the URL encoded in pre-printed QR codes on physical containers.
@@ -301,7 +558,7 @@ app.post('/api/qr-generate', async (req, res) => {
 app.get('/s/:shortCode', (req, res) => {
     const { shortCode } = req.params;
 
-    if (!/^[A-Za-z0-9]{6}$/.test(shortCode)) {
+    if (!/^[A-Za-z0-9]{2,8}$/.test(shortCode)) {
         return res.status(400).send(renderScanPage(null, 'Invalid QR code'));
     }
 
@@ -310,6 +567,12 @@ app.get('/s/:shortCode', (req, res) => {
     }
 
     const data = qrMappings.get(shortCode);
+
+    // Handle unassigned pool codes
+    if (data.status === 'unassigned') {
+        return res.send(renderUnassignedPage(shortCode));
+    }
+
     res.send(renderScanPage(data));
 });
 
@@ -692,6 +955,35 @@ function renderScanPage(data, error) {
 }
 
 /**
+ * Render page for unassigned QR pool codes
+ */
+function renderUnassignedPage(shortCode) {
+    return `<!DOCTYPE html>
+<html lang="en"><head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Unassigned Label — LoneWolf Biotech</title>
+<style>
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#f8fafc;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px}
+  .card{background:#fff;border-radius:16px;padding:32px;max-width:420px;width:100%;box-shadow:0 4px 24px rgba(0,0,0,0.08);text-align:center}
+  .icon{font-size:3rem;margin-bottom:16px}
+  h1{font-size:1.3rem;color:#1e293b;margin-bottom:8px}
+  .code{font-family:monospace;font-size:1.5rem;color:#7c3aed;font-weight:700;margin:12px 0}
+  p{color:#64748b;font-size:0.95rem;line-height:1.6}
+  .brand{margin-top:24px;padding-top:16px;border-top:1px solid #e2e8f0;font-size:0.8rem;color:#94a3b8}
+</style>
+</head><body>
+<div class="card">
+  <div class="icon">🏷️</div>
+  <h1>Unassigned Label</h1>
+  <div class="code">${escapeHtml(shortCode)}</div>
+  <p>This label hasn't been assigned to a container yet. Use the Scanner App to assign it.</p>
+  <div class="brand">🐺 LoneWolf Biotech Lab Tracker</div>
+</div>
+</body></html>`;
+}
+
+/**
  * Parse barcode data string into labeled fields
  * Supports formats like "STAGE-STRAIN-OWNER-DATE-ID" or delimited data
  */
@@ -754,8 +1046,8 @@ function escapeHtml(str) {
 app.get('/api/qrcodes/:shortCode', (req, res) => {
     const { shortCode } = req.params;
 
-    // SECURITY: Validate shortCode format (alphanumeric, 6 chars)
-    if (!/^[A-Za-z0-9]{6}$/.test(shortCode)) {
+    // SECURITY: Validate shortCode format (alphanumeric, 2-8 chars to support prefixed codes)
+    if (!/^[A-Za-z0-9]{2,8}$/.test(shortCode)) {
         return res.status(400).json({ error: 'Invalid short code format' });
     }
 
@@ -769,9 +1061,13 @@ app.get('/api/qrcodes/:shortCode', (req, res) => {
     const data = qrMappings.get(shortCode);
     res.json({
         success: true,
+        shortCode,
+        status: data.status || 'assigned',
         containerId: data.containerId,
         barcodeData: data.barcodeData,
-        createdAt: data.createdAt
+        createdAt: data.createdAt,
+        assignedAt: data.assignedAt,
+        qrImageDataUrl: data.qrImageDataUrl
     });
 });
 

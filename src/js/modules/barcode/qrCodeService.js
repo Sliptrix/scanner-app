@@ -448,5 +448,113 @@ window.QRCodeService = {
         if (!isNaN(num) && num >= 3) return num;
 
         return null;
+    },
+
+    // ─── Backend Pool API ──────────────────────────────────────────────
+
+    /**
+     * Generate pool codes via backend API
+     * @param {number} count
+     * @param {string} [prefix]
+     * @param {function} [onProgress] - callback(generated, total)
+     * @returns {Promise<{generated, errors, codes}>}
+     */
+    async generatePoolBatch(count, prefix, onProgress) {
+        const response = await fetch(`${this.backendUrl}/api/qrcodes/pool/generate`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ count, prefix })
+        });
+        if (!response.ok) {
+            const err = await response.json().catch(() => ({}));
+            throw new Error(err.error || `HTTP ${response.status}`);
+        }
+        return response.json();
+    },
+
+    /**
+     * Get pool codes from backend
+     * @param {string} [status] - 'unassigned' or 'assigned'
+     * @returns {Promise<{codes: Array}>}
+     */
+    async getPoolCodes(status) {
+        const params = status ? `?status=${status}` : '';
+        const response = await fetch(`${this.backendUrl}/api/qrcodes/pool${params}`);
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        return response.json();
+    },
+
+    /**
+     * Assign a pool code to a container via backend
+     * @param {string} shortCode
+     * @param {string} containerId
+     * @param {string} barcodeData
+     * @returns {Promise<Object>}
+     */
+    async assignPoolCode(shortCode, containerId, barcodeData) {
+        const response = await fetch(`${this.backendUrl}/api/qrcodes/pool/${shortCode}/assign`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ containerId, barcodeData })
+        });
+        if (!response.ok) {
+            const err = await response.json().catch(() => ({}));
+            throw new Error(err.error || `HTTP ${response.status}`);
+        }
+        return response.json();
+    },
+
+    /**
+     * Unassign a pool code via backend
+     * @param {string} shortCode
+     * @returns {Promise<Object>}
+     */
+    async unassignPoolCode(shortCode) {
+        const response = await fetch(`${this.backendUrl}/api/qrcodes/pool/${shortCode}/unassign`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' }
+        });
+        if (!response.ok) {
+            const err = await response.json().catch(() => ({}));
+            throw new Error(err.error || `HTTP ${response.status}`);
+        }
+        return response.json();
+    },
+
+    /**
+     * Look up a short code from the backend pool
+     * @param {string} shortCode
+     * @returns {Promise<Object|null>}
+     */
+    async lookupPoolCode(shortCode) {
+        try {
+            const response = await fetch(`${this.backendUrl}/api/qrcodes/${shortCode}`);
+            if (!response.ok) return null;
+            return response.json();
+        } catch (e) {
+            return null;
+        }
+    },
+
+    /**
+     * Parse a scanned QR input and extract the shortCode.
+     * Accepts:
+     *   - Full scan URL: https://scanner.lonewolfgenetics.com/s/LW4k2m
+     *   - Short code directly: LW4k2m
+     * @param {string} input
+     * @returns {string|null} The shortCode or null
+     */
+    parsePoolQrInput(input) {
+        if (!input) return null;
+        input = input.trim();
+
+        // Try full URL: .../s/{shortCode}
+        const urlMatch = input.match(/\/s\/([A-Za-z0-9]{2,8})(?:\?|$|#)/);
+        if (urlMatch) return urlMatch[1];
+
+        // Try bare short code (2-8 alphanumeric)
+        if (/^[A-Za-z0-9]{2,8}$/.test(input)) return input;
+
+        return null;
     }
 };

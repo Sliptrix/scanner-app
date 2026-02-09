@@ -68,6 +68,7 @@ window.ContainerInitiator = (function() {
             const initialState = {
                 currentStep: 'qr',
                 qrExcelRow: null,
+                qrShortCode: null,
                 prePopulatedContainerId: null,
                 owner: null,
                 strain: null,
@@ -615,10 +616,10 @@ window.ContainerInitiator = (function() {
     
     /**
      * Process QR code scan input (first step).
-     * User scans a pre-printed QR label. The app parses the QR ID
-     * and verifies it exists in the pool and is unassigned.
+     * User scans a pre-printed QR label. The app parses the shortCode
+     * and verifies it exists in the backend pool and is unassigned.
      */
-    function processQrInput() {
+    async function processQrInput() {
         const input = document.getElementById('initiatorInput').value.trim();
 
         if (!input) {
@@ -631,9 +632,37 @@ window.ContainerInitiator = (function() {
             return;
         }
 
+        // Try new pool system first (shortCode-based)
+        const shortCode = QRCodeService.parsePoolQrInput(input);
+        if (shortCode) {
+            showFeedback('Looking up code...', 'info');
+            try {
+                const poolEntry = await QRCodeService.lookupPoolCode(shortCode);
+                if (!poolEntry) {
+                    showFeedback(`Code "${shortCode}" not found in pool. Generate a batch first.`, 'error');
+                    return;
+                }
+                if (poolEntry.status === 'assigned') {
+                    showFeedback(`Code "${shortCode}" is already assigned to container ${poolEntry.containerId}`, 'error');
+                    return;
+                }
+
+                // Store the shortCode for assignment later
+                StateManager.setState('initiatorState.qrShortCode', shortCode);
+                StateManager.setState('initiatorState.qrExcelRow', null);
+                moveToStep('owner');
+                updateInitiatorUI();
+                showFeedback(`QR code: ${shortCode} selected ✓`, 'success');
+                return;
+            } catch (err) {
+                console.warn('Backend pool lookup failed, trying legacy:', err);
+            }
+        }
+
+        // Fallback to legacy Excel row-based pool
         const excelRow = QRCodeService.parseQrInput(input);
         if (!excelRow) {
-            showFeedback('Invalid QR code. Expected format: Excel URL with Active_Inventory!A{row}, A{row}, or a row number', 'error');
+            showFeedback('Invalid QR code. Scan a pool label URL or enter a shortcode (e.g., LW4k2m)', 'error');
             return;
         }
 
@@ -648,8 +677,8 @@ window.ContainerInitiator = (function() {
             return;
         }
 
-        // Store the Excel row and pre-populated Container_ID for later use
         StateManager.setState('initiatorState.qrExcelRow', excelRow);
+        StateManager.setState('initiatorState.qrShortCode', null);
         if (poolEntry.containerId) {
             StateManager.setState('initiatorState.prePopulatedContainerId', poolEntry.containerId);
             currentContainerId = poolEntry.containerId;
@@ -1218,8 +1247,21 @@ window.ContainerInitiator = (function() {
             });
         }
 
-        // Assign the scanned QR code to this container (qrExcelRow already retrieved above)
-        if (qrExcelRow && window.QRCodeService) {
+        // Assign the scanned QR code to this container
+        const qrShortCode = StateManager.getState('initiatorState.qrShortCode');
+        if (qrShortCode && window.QRCodeService) {
+            // New backend pool system
+            (async () => {
+                try {
+                    await QRCodeService.assignPoolCode(qrShortCode, currentContainerId, barcodeString);
+                    console.log(`Pool code ${qrShortCode} assigned to ${currentContainerId}`);
+                    newContainer.qrShortCode = qrShortCode;
+                } catch (err) {
+                    console.error('Failed to assign pool code:', err);
+                }
+            })();
+        } else if (qrExcelRow && window.QRCodeService) {
+            // Legacy Excel row-based pool
             const assigned = QRCodeService.assignRowToContainer(qrExcelRow, currentContainerId);
             if (assigned) {
                 const poolEntry = QRCodeService.lookupByRow(qrExcelRow);
@@ -1493,8 +1535,9 @@ window.ContainerInitiator = (function() {
         const date = StateManager.getState('initiatorState.date') || '-';
         const location = StateManager.getState('initiatorState.location') || '-';
 
-        // Display container ID if available, otherwise show QR # format
-        const qrDisplayId = prePopulatedId || (qrExcelRow ? `#${qrExcelRow}` : '-');
+        // Display container ID if available, otherwise show shortCode or QR # format
+        const qrShortCode = StateManager.getState('initiatorState.qrShortCode');
+        const qrDisplayId = qrShortCode || prePopulatedId || (qrExcelRow ? `#${qrExcelRow}` : '-');
 
         summaryElement.innerHTML = `
             <div class="status-item">QR ID: <strong>${qrDisplayId}</strong></div>
@@ -1760,6 +1803,7 @@ window.ContainerInitiator = (function() {
         StateManager.setState('initiatorState', {
             currentStep: 'qr',
             qrExcelRow: null,
+            qrShortCode: null,
             prePopulatedContainerId: null,
             owner: null,
             strain: null,

@@ -1859,9 +1859,18 @@ async function saveContainerChanges() {
 function updateQrPoolStatus() {
     const statusEl = document.getElementById('qrPoolStatus');
     if (!statusEl || !window.QRCodeService) return;
-    const unassigned = QRCodeService.getUnassigned().length;
-    const assigned = QRCodeService.getAssigned().length;
-    statusEl.textContent = `${unassigned} available, ${assigned} assigned`;
+    // Use backend pool API
+    QRCodeService.getPoolCodes().then(res => {
+        const codes = res.codes || [];
+        const unassigned = codes.filter(c => c.status === 'unassigned').length;
+        const assigned = codes.filter(c => c.status === 'assigned').length;
+        statusEl.textContent = `${unassigned} available, ${assigned} assigned`;
+    }).catch(() => {
+        // Fallback to localStorage pool
+        const unassigned = QRCodeService.getUnassigned().length;
+        const assigned = QRCodeService.getAssigned().length;
+        statusEl.textContent = `${unassigned} available, ${assigned} assigned`;
+    });
 }
 
 async function generateQrBatch() {
@@ -1880,14 +1889,13 @@ async function generateQrBatch() {
 
     if (progressDiv) progressDiv.style.display = 'block';
     if (btn) { btn.disabled = true; btn.textContent = 'Generating...'; }
+    if (progressBar) progressBar.style.width = '50%';
+    if (progressText) progressText.textContent = `Generating ${count} codes...`;
 
     let result;
     try {
-        result = await QRCodeService.generateBatch(count, (done, total) => {
-            const pct = Math.round((done / total) * 100);
-            if (progressBar) progressBar.style.width = pct + '%';
-            if (progressText) progressText.textContent = `${done} / ${total}`;
-        });
+        // Use backend pool API for generation
+        result = await QRCodeService.generatePoolBatch(count, 'LW');
     } catch (error) {
         console.error('QR batch generation failed:', error);
         NotificationSystem.error('Failed to generate QR codes: ' + error.message);
@@ -1896,119 +1904,123 @@ async function generateQrBatch() {
         return;
     }
 
+    if (progressBar) progressBar.style.width = '100%';
     console.log('QR batch generation result:', result);
 
-    // Check if any were actually generated
-    if (result.generated === 0) {
+    if (!result.generated || result.generated === 0) {
         if (btn) {
             btn.textContent = '⚠️ None Generated';
             btn.style.background = '#dc3545';
         }
-        NotificationSystem.warning('No QR codes were generated. Make sure the backend server is running (npm run backend) and Excel is configured.');
+        NotificationSystem.warning('No QR codes were generated. Make sure the backend server is running.');
         setTimeout(() => {
-            if (btn) {
-                btn.disabled = false;
-                btn.textContent = 'Generate QR Batch';
-                btn.style.background = '#7c3aed';
-            }
+            if (btn) { btn.disabled = false; btn.textContent = 'Generate QR Batch'; btn.style.background = '#7c3aed'; }
             if (progressDiv) progressDiv.style.display = 'none';
         }, 3000);
         return;
     }
 
-    // Show success state on button
     if (btn) {
         btn.textContent = `✅ ${result.generated} Generated!`;
         btn.style.background = '#059669';
     }
 
-    // Update pool status
     updateQrPoolStatus();
 
-    // Refresh the QR picker in Container Initiator so new codes appear immediately
-    // Use a small delay to ensure localStorage is fully updated
     setTimeout(() => {
         if (window.ContainerInitiator && typeof ContainerInitiator.refreshQrPicker === 'function') {
             ContainerInitiator.refreshQrPicker();
-            console.log('QR picker refreshed after generation');
         }
     }, 100);
 
-    // Show success notification
-    NotificationSystem.success(`✅ Generated ${result.generated} QR codes${result.errors ? ` (${result.errors} errors)` : ''} - Available for selection now!`);
+    NotificationSystem.success(`✅ Generated ${result.generated} QR codes${result.errors ? ` (${result.errors} errors)` : ''}`);
 
-    // Reset button after delay
     setTimeout(() => {
-        if (btn) {
-            btn.disabled = false;
-            btn.textContent = 'Generate QR Batch';
-            btn.style.background = '#7c3aed';
-        }
+        if (btn) { btn.disabled = false; btn.textContent = 'Generate QR Batch'; btn.style.background = '#7c3aed'; }
         if (progressDiv) progressDiv.style.display = 'none';
     }, 2000);
 }
 
-function viewQrPool() {
+async function viewQrPool() {
     if (!window.QRCodeService) return;
-
-    const pool = QRCodeService.getPool();
-    const unassigned = pool.filter(qr => !qr.assignedContainerId);
-    const assigned = pool.filter(qr => qr.assignedContainerId);
 
     const modal = document.getElementById('containerDetailModal');
     const content = document.getElementById('containerDetailContent');
     if (!modal || !content) return;
 
-    let html = '<h3 style="margin-bottom: 15px;">QR Code Pool</h3>';
-    html += `<p style="margin-bottom: 10px;"><strong>${unassigned.length}</strong> available, <strong>${assigned.length}</strong> assigned`;
-    if (unassigned.length > 0) {
-        html += ` <button onclick="printUnassignedLabels()" style="margin-left: 10px; padding: 4px 12px; background: #2563eb; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 0.85rem;">🖨️ Print Unassigned</button>`;
-    }
-    html += `</p>`;
-
-    if (unassigned.length > 0) {
-        html += '<h4 style="margin: 15px 0 10px;">Available (Unassigned)</h4>';
-        html += '<div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px;">';
-        unassigned.forEach(qr => {
-            const displayId = qr.containerId || `#${qr.excelRow}`;
-            html += `
-                <div style="text-align: center; padding: 10px; border: 1px solid #e2e8f0; border-radius: 8px; background: white;">
-                    <img src="${qr.dataUrl}" alt="QR ID ${displayId}" style="width: 120px; height: 120px;" />
-                    <p style="margin: 6px 0 0; font-family: monospace; font-size: 0.9rem; font-weight: bold; color: #059669;">ID: ${displayId}</p>
-                </div>`;
-        });
-        html += '</div>';
-    }
-
-    if (assigned.length > 0) {
-        html += '<h4 style="margin: 20px 0 10px;">Assigned</h4>';
-        html += '<div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px;">';
-        assigned.forEach(qr => {
-            const displayId = qr.containerId || `#${qr.excelRow}`;
-            html += `
-                <div style="text-align: center; padding: 10px; border: 1px solid #10b981; border-radius: 8px; background: #f0fdf4;">
-                    <img src="${qr.dataUrl}" alt="QR ID ${displayId}" style="width: 120px; height: 120px;" />
-                    <p style="margin: 6px 0 0; font-family: monospace; font-size: 0.9rem; font-weight: bold; color: #059669;">ID: ${displayId}</p>
-                    <p style="margin: 2px 0 0; font-size: 0.75rem; color: #047857;">→ ${qr.assignedContainerId}</p>
-                </div>`;
-        });
-        html += '</div>';
-    }
-
-    if (pool.length === 0) {
-        html += '<p style="color: #6b7280; margin-top: 10px;">No QR codes generated yet. Use "Generate QR Batch" to create some.</p>';
-    }
-
-    content.innerHTML = html;
+    content.innerHTML = '<p style="text-align:center;padding:20px;">Loading pool data...</p>';
     modal.style.display = 'flex';
 
-    // Hide edit buttons since this isn't a container detail view
-    const editBtn = document.getElementById('editContainerBtn');
-    const saveBtn = document.getElementById('saveContainerBtn');
-    const cancelBtn = document.getElementById('cancelEditBtn');
-    if (editBtn) editBtn.style.display = 'none';
-    if (saveBtn) saveBtn.style.display = 'none';
-    if (cancelBtn) cancelBtn.style.display = 'none';
+    // Hide edit buttons
+    ['editContainerBtn', 'saveContainerBtn', 'cancelEditBtn'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.style.display = 'none';
+    });
+
+    try {
+        const [unassignedRes, assignedRes] = await Promise.all([
+            QRCodeService.getPoolCodes('unassigned'),
+            QRCodeService.getPoolCodes('assigned')
+        ]);
+
+        const unassigned = unassignedRes.codes || [];
+        const assigned = assignedRes.codes || [];
+
+        let html = '<h3 style="margin-bottom: 15px;">QR Code Pool</h3>';
+        html += `<p style="margin-bottom: 10px;"><strong>${unassigned.length}</strong> available, <strong>${assigned.length}</strong> assigned`;
+        if (unassigned.length > 0) {
+            html += ` <button onclick="printUnassignedLabels()" style="margin-left: 10px; padding: 4px 12px; background: #2563eb; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 0.85rem;">🖨️ Print Unassigned</button>`;
+        }
+        html += `</p>`;
+
+        if (unassigned.length > 0) {
+            html += '<h4 style="margin: 15px 0 10px;">Available (Unassigned)</h4>';
+            html += '<div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px;">';
+            unassigned.forEach(qr => {
+                html += `
+                    <div style="text-align: center; padding: 10px; border: 1px solid #e2e8f0; border-radius: 8px; background: white;">
+                        <img src="${qr.qrImageDataUrl}" alt="QR ${qr.shortCode}" style="width: 120px; height: 120px;" />
+                        <p style="margin: 6px 0 0; font-family: monospace; font-size: 0.9rem; font-weight: bold; color: #7c3aed;">${qr.shortCode}</p>
+                    </div>`;
+            });
+            html += '</div>';
+        }
+
+        if (assigned.length > 0) {
+            html += '<h4 style="margin: 20px 0 10px;">Assigned</h4>';
+            html += '<div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px;">';
+            assigned.forEach(qr => {
+                html += `
+                    <div style="text-align: center; padding: 10px; border: 1px solid #10b981; border-radius: 8px; background: #f0fdf4;">
+                        <img src="${qr.qrImageDataUrl}" alt="QR ${qr.shortCode}" style="width: 120px; height: 120px;" />
+                        <p style="margin: 6px 0 0; font-family: monospace; font-size: 0.9rem; font-weight: bold; color: #059669;">${qr.shortCode}</p>
+                        <p style="margin: 2px 0 0; font-size: 0.75rem; color: #047857;">→ ${qr.containerId}</p>
+                        <button onclick="unassignPoolCode('${qr.shortCode}')" style="margin-top:4px;padding:2px 8px;font-size:0.75rem;background:#ef4444;color:white;border:none;border-radius:4px;cursor:pointer;">Unassign</button>
+                    </div>`;
+            });
+            html += '</div>';
+        }
+
+        if (unassigned.length === 0 && assigned.length === 0) {
+            html += '<p style="color: #6b7280; margin-top: 10px;">No QR codes generated yet. Use "Generate QR Batch" to create some.</p>';
+        }
+
+        content.innerHTML = html;
+    } catch (err) {
+        content.innerHTML = `<p style="color: #dc2626;">Failed to load pool: ${err.message}</p>`;
+    }
+}
+
+async function unassignPoolCode(shortCode) {
+    if (!window.QRCodeService) return;
+    try {
+        await QRCodeService.unassignPoolCode(shortCode);
+        NotificationSystem.success(`Code ${shortCode} unassigned`);
+        updateQrPoolStatus();
+        viewQrPool(); // refresh
+    } catch (err) {
+        NotificationSystem.error('Failed to unassign: ' + err.message);
+    }
 }
 
 // Update pool status on page load
@@ -2155,21 +2167,15 @@ window.viewQrPool = viewQrPool;
 window.updateQrPoolStatus = updateQrPoolStatus;
 window.printUnassignedLabels = printUnassignedLabels;
 
-// Label printing
+// Label printing — uses backend print endpoint
 function printUnassignedLabels() {
-    if (window.LabelPrintService) {
-        LabelPrintService.printUnassigned();
-    } else {
-        NotificationSystem.error('Label print service not available');
-    }
+    const backendUrl = window.QRCodeService ? QRCodeService.backendUrl : 'http://localhost:3001';
+    window.open(`${backendUrl}/api/qrcodes/pool/print?status=unassigned&limit=50`, '_blank');
 }
 
 function printAssignedLabels() {
-    if (window.LabelPrintService) {
-        LabelPrintService.printNewAssignments();
-    } else {
-        NotificationSystem.error('Label print service not available');
-    }
+    const backendUrl = window.QRCodeService ? QRCodeService.backendUrl : 'http://localhost:3001';
+    window.open(`${backendUrl}/api/qrcodes/pool/print?status=assigned&limit=50`, '_blank');
 }
 
 function printTransferLabels(containerIds) {
@@ -2182,4 +2188,5 @@ function printTransferLabels(containerIds) {
 
 window.printAssignedLabels = printAssignedLabels;
 window.printTransferLabels = printTransferLabels;
+window.unassignPoolCode = unassignPoolCode;
 
