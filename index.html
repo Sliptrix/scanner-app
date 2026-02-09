@@ -316,9 +316,14 @@
                                 </div>
                             </div>
 
-                            <button class="btn btn-primary" id="cloud-sync-btn" style="width: 100%; padding: 18px 24px; font-size: 1.1rem; font-weight: 600; border-radius: 12px; margin-bottom: 20px;">
-                                🔄 Sync All Reference Data
-                            </button>
+                            <div style="display: flex; gap: 12px; margin-bottom: 20px;">
+                                <button class="btn btn-primary" id="cloud-sync-btn" style="flex: 2; padding: 18px 24px; font-size: 1.1rem; font-weight: 600; border-radius: 12px;">
+                                    🔄 Sync All Reference Data
+                                </button>
+                                <button class="btn" id="inventory-sync-to-cloud-btn" onclick="syncInventoryToCloud()" style="flex: 1; padding: 18px 24px; font-size: 1.05rem; font-weight: 600; border-radius: 12px; background: #059669; color: white; border: none; cursor: pointer;">
+                                    📤 Push to HQ
+                                </button>
+                            </div>
 
                             <div style="padding-top: 20px; border-top: 1px solid #bfdbfe;">
                                 <div id="cloud-sync-status" style="font-size: 0.95rem; color: #1e40af; font-weight: 500;">☁️ Cloud sync: Not synced</div>
@@ -407,12 +412,9 @@
                                         <button class="btn btn-secondary" onclick="if(window.LineageService) { LineageService.rebuildFromInventory(); NotificationSystem.success('Lineage rebuilt from inventory'); }" style="font-size: 0.9rem; padding: 12px 20px; border-radius: 8px;">
                                             🔄 Rebuild Lineage
                                         </button>
-                                        <!-- Hidden inventory sync buttons (kept for JS compatibility) -->
+                                        <!-- Hidden pull button (kept for JS compatibility) -->
                                         <button class="btn btn-secondary" id="inventory-sync-from-cloud-btn" onclick="syncInventoryFromCloud()" style="display: none;">
                                             📥 Pull Inventory
-                                        </button>
-                                        <button class="btn btn-secondary" id="inventory-sync-to-cloud-btn" onclick="syncInventoryToCloud()" style="display: none;">
-                                            📤 Push Inventory
                                         </button>
                                     </div>
                                 </div>
