@@ -29,6 +29,16 @@ const dom = new JSDOM(`<!DOCTYPE html>
 global.window = dom.window;
 global.document = dom.window.document;
 
+// Mock localStorage
+global.localStorage = {
+    _data: {},
+    getItem(key) { return this._data[key] || null; },
+    setItem(key, value) { this._data[key] = String(value); },
+    removeItem(key) { delete this._data[key]; },
+    clear() { this._data = {}; }
+};
+dom.window.localStorage = global.localStorage;
+
 // Load core modules
 const stateContent = fs.readFileSync(path.join(__dirname, '../src/js/core/state.js'), 'utf8');
 const notificationsContent = fs.readFileSync(path.join(__dirname, '../src/js/core/notifications.js'), 'utf8');
@@ -37,8 +47,12 @@ const builderBarcodeContent = fs.readFileSync(path.join(__dirname, '../src/js/mo
 
 // Execute modules
 eval(stateContent);
+global.Logger = window.Logger;
+global.DEBUG_MODE = window.DEBUG_MODE;
 eval(notificationsContent);
+global.NotificationSystem = window.NotificationSystem;
 eval(dataUtilsContent);
+global.DataUtils = window.DataUtils;
 eval(builderBarcodeContent);
 
 // Create global aliases

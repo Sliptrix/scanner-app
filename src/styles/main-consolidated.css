@@ -972,7 +972,7 @@ body {
     border-radius: 8px;
     margin: 15px 0;
     font-weight: 600;
-    display: none;
+    /* Note: display managed by JS and inline styles; default visible for initial hint text */
 }
 
 .feedback-success {

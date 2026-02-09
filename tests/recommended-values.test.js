@@ -146,7 +146,7 @@ function runRecommendedValuesTest() {
     console.log('🚀 Starting Recommended Values Test...');
 
     try {
-        setupTestEnvironment();
+        setupRecipeTestEnvironment();
 
         ['Initiation', 'Multiplication', 'Rooting'].forEach(setMediaTypeAndVerify);
 

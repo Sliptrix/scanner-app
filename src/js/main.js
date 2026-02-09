@@ -157,13 +157,16 @@ function initializeApp() {
     if (window.OneDriveSync && window.AuthManager) {
         // Build options from CLOUD_HQ_CONFIG (if available) or use defaults
         const cloudConfig = window.CLOUD_HQ_CONFIG || {};
-        const defaultShareUrl = 'https://netorgft8640892-my.sharepoint.com/:x:/r/personal/aterkonda_lonewolfgenetics_com/_layouts/15/Doc.aspx?sourcedoc=%7B4E2D4D05-505A-4790-84B7-2ECB59A4B65F%7D&file=Enhanced_Plant_Inventory_System.xlsx&action=default&mobileredirect=true&DefaultItemOpen=1';
+        
+        // SECURITY: No hardcoded SharePoint URL - must be configured via config/cloud-hq-config.js
+        if (!cloudConfig.shareUrl || cloudConfig.shareUrl.includes('YOUR_')) {
+            console.warn('[CloudSync] No shareUrl configured in CLOUD_HQ_CONFIG. Set it in config/cloud-hq-config.js');
+        }
         
         const syncOptions = {
-            // Use config shareUrl if available and not placeholder, else use default
             shareUrl: (cloudConfig.shareUrl && !cloudConfig.shareUrl.includes('YOUR_')) 
                 ? cloudConfig.shareUrl 
-                : defaultShareUrl,
+                : null,
             refreshIntervalMs: cloudConfig.refreshIntervalMs || 300000, // 5 minutes
             statusElementId: cloudConfig.ui?.statusElementId || 'cloud-sync-status',
             buttonElementId: cloudConfig.ui?.buttonElementId || 'cloud-sync-btn',
@@ -178,7 +181,7 @@ function initializeApp() {
         if (cloudConfig.shareUrl && !cloudConfig.shareUrl.includes('YOUR_')) {
             Logger.info('Using cloud config from CLOUD_HQ_CONFIG');
         } else {
-            Logger.debug('Using default cloud config (no custom config found)');
+            Logger.warn('Cloud sync disabled: no shareUrl configured in CLOUD_HQ_CONFIG');
         }
         
         OneDriveSync.init(AuthManager, syncOptions);
@@ -287,6 +290,27 @@ function setupEventListeners() {
         destInput.addEventListener('keypress', function(e) {
             if (e.key === 'Enter') {
                 handleDestContainerInput();
+            }
+        });
+    }
+    
+    // Global Search handler
+    const globalSearchInput = document.querySelector('.search-input');
+    if (globalSearchInput) {
+        globalSearchInput.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                const query = globalSearchInput.value.trim();
+                if (query) {
+                    performGlobalSearch(query);
+                }
+            }
+        });
+        globalSearchInput.addEventListener('input', function(e) {
+            const query = globalSearchInput.value.trim();
+            if (query.length >= 2) {
+                showGlobalSearchResults(query);
+            } else {
+                hideGlobalSearchResults();
             }
         });
     }
@@ -971,6 +995,117 @@ function exportInventory() {
         NotificationSystem.info('Export functionality not available');
     }
 }
+
+// Global Search Implementation
+function performGlobalSearch(query) {
+    const q = query.toLowerCase();
+    const results = [];
+    
+    // Search inventory
+    if (window.appState && window.appState.inventory) {
+        window.appState.inventory.forEach(item => {
+            const searchable = [
+                item.containerId, item.strain, item.owner, item.stage,
+                item.media, item.location, item.notes, item.sampleBarcode
+            ].filter(Boolean).join(' ').toLowerCase();
+            if (searchable.includes(q)) {
+                results.push({ type: 'inventory', item });
+            }
+        });
+    }
+    
+    // Search reference data (strains)
+    if (window.appState && window.appState.strains) {
+        window.appState.strains.forEach(strain => {
+            const name = (strain.name || strain.strainName || '').toLowerCase();
+            if (name.includes(q)) {
+                results.push({ type: 'strain', item: strain });
+            }
+        });
+    }
+    
+    if (results.length > 0) {
+        // Navigate to inventory view if inventory results found
+        if (results.some(r => r.type === 'inventory')) {
+            UIUtils.switchMode('inventory');
+            // Populate inventory search
+            const invSearch = document.getElementById('inventorySearch');
+            if (invSearch) {
+                invSearch.value = query;
+                invSearch.dispatchEvent(new Event('input'));
+            }
+        }
+        NotificationSystem.success(`Found ${results.length} result(s) for "${query}"`);
+    } else {
+        NotificationSystem.info(`No results found for "${query}"`);
+    }
+    hideGlobalSearchResults();
+}
+
+function showGlobalSearchResults(query) {
+    const q = query.toLowerCase();
+    let dropdown = document.getElementById('globalSearchDropdown');
+    if (!dropdown) {
+        dropdown = document.createElement('div');
+        dropdown.id = 'globalSearchDropdown';
+        dropdown.style.cssText = 'position:absolute;top:100%;left:0;right:0;background:#1e293b;border:1px solid #334155;border-radius:8px;max-height:300px;overflow-y:auto;z-index:1000;box-shadow:0 4px 12px rgba(0,0,0,0.3);';
+        const searchBox = document.querySelector('.search-box');
+        if (searchBox) {
+            searchBox.style.position = 'relative';
+            searchBox.appendChild(dropdown);
+        }
+    }
+    
+    const results = [];
+    
+    // Search inventory
+    if (window.appState && window.appState.inventory) {
+        window.appState.inventory.forEach(item => {
+            const searchable = [
+                item.containerId, item.strain, item.owner, item.stage, item.location
+            ].filter(Boolean).join(' ').toLowerCase();
+            if (searchable.includes(q)) {
+                results.push(`<div style="padding:8px 12px;cursor:pointer;border-bottom:1px solid #334155;color:#e2e8f0;" 
+                    onclick="performGlobalSearch('${query}')"}>
+                    📦 ${item.containerId || '?'} — ${item.strain || 'Unknown'} (${item.stage || '?'})
+                </div>`);
+            }
+        });
+    }
+    
+    // Search strains
+    if (window.appState && window.appState.strains) {
+        window.appState.strains.forEach(strain => {
+            const name = (strain.name || strain.strainName || '').toLowerCase();
+            if (name.includes(q)) {
+                results.push(`<div style="padding:8px 12px;cursor:pointer;border-bottom:1px solid #334155;color:#e2e8f0;" 
+                    onclick="performGlobalSearch('${query}')">
+                    🌱 ${strain.name || strain.strainName} (${strain.id || strain.strainId || '?'})
+                </div>`);
+            }
+        });
+    }
+    
+    if (results.length > 0) {
+        dropdown.innerHTML = results.slice(0, 10).join('');
+        dropdown.style.display = 'block';
+    } else if (query.length >= 2) {
+        dropdown.innerHTML = '<div style="padding:8px 12px;color:#94a3b8;">No results found</div>';
+        dropdown.style.display = 'block';
+    }
+}
+
+function hideGlobalSearchResults() {
+    const dropdown = document.getElementById('globalSearchDropdown');
+    if (dropdown) dropdown.style.display = 'none';
+}
+
+// Close search dropdown when clicking outside
+document.addEventListener('click', function(e) {
+    if (!e.target.closest('.search-box')) {
+        hideGlobalSearchResults();
+    }
+});
 
 function clearInventory() {
     if (window.InventoryManager && typeof window.InventoryManager.confirmClearInventory === 'function') {
@@ -1939,6 +2074,9 @@ window.clearTransfer = clearTransfer;
 window.toggleDiscardPanel = toggleDiscardPanel;
 window.adjustDiscardCount = adjustDiscardCount;
 window.exportInventory = exportInventory;
+window.performGlobalSearch = performGlobalSearch;
+window.showGlobalSearchResults = showGlobalSearchResults;
+window.hideGlobalSearchResults = hideGlobalSearchResults;
 window.clearInventory = clearInventory;
 window.toggleBarcodeDetails = toggleBarcodeDetails;
 window.emailIntakeForm = emailIntakeForm;

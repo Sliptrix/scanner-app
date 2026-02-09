@@ -18,6 +18,70 @@ if (typeof require !== 'undefined') {
     // Node.js environment
     const { runRecipeIntegrationTests } = require('./recipe-integration.test.js');
     const { runRecipeCreationTests } = require('./recipe-creation.test.js');
+
+    // Setup DOM environment for Node.js
+    const { JSDOM } = require('jsdom');
+    const dom = new JSDOM('<!DOCTYPE html><html><body></body></html>');
+    global.window = dom.window;
+    global.document = dom.window.document;
+    global.Event = dom.window.Event;
+    global.localStorage = {
+        _data: {},
+        getItem(key) { return this._data[key] || null; },
+        setItem(key, value) { this._data[key] = String(value); },
+        removeItem(key) { delete this._data[key]; },
+        clear() { this._data = {}; }
+    };
+    dom.window.localStorage = global.localStorage;
+}
+
+// Load source modules for Node.js
+if (typeof require !== 'undefined' && typeof window !== 'undefined') {
+    const _fs = require('fs');
+    const _path = require('path');
+    const _loadSrc = (p) => { try { eval(_fs.readFileSync(_path.join(__dirname, '..', p), 'utf8')); } catch(e) { /* skip */ } };
+    _loadSrc('src/js/core/state.js');
+    global.Logger = window.Logger || { debug(){}, info(){}, warn(){}, error(){} };
+    global.DEBUG_MODE = false;
+    global.UIUtils = window.UIUtils || { showNotification(m,t){ console.log(`[${t}] ${m}`); }, updateStats(){} };
+    window.UIUtils = global.UIUtils;
+    _loadSrc('src/js/core/notifications.js');
+    _loadSrc('src/js/modules/recipe/mediaData.js');
+    global.DEFAULT_RECIPES = window.DEFAULT_RECIPES || {};
+    global.RECIPE_TEMPLATE = window.RECIPE_TEMPLATE || {};
+    _loadSrc('src/js/modules/recipe/recipeStorage.js');
+    _loadSrc('src/js/modules/recipe/recipeCalculator.js');
+    _loadSrc('src/js/modules/recipe/recipeManager.js');
+}
+
+function setupRecipeTestEnvironment() {
+    document.body.innerHTML = `
+        <select id="mediaType">
+            <option value="Initiation">Initiation</option>
+            <option value="Multiplication">Multiplication</option>
+            <option value="Rooting">Rooting</option>
+        </select>
+        <select id="volume">
+            <option value="500mL">500mL</option>
+            <option value="1L">1L</option>
+            <option value="2L">2L</option>
+        </select>
+        <select id="basalSalt"><option value="M&S">M&S</option><option value="DKW">DKW</option></select>
+        <input id="basalSaltAmount" type="number" value="4.4" />
+        <select id="gellingAgent"><option value="Phytogel">Phytogel</option><option value="Agar">Agar</option></select>
+        <input id="gellingAgentAmount" type="number" value="2.3" />
+        <input id="gamborgVitamin" type="number" value="1.0" />
+        <input id="sucrose" type="number" value="30.0" />
+        <input id="ppm" type="number" value="1.0" />
+        <input id="phValue" type="number" value="5.8" />
+        <div id="postAutoclaveList"></div>
+        <input id="recipeName" placeholder="Recipe Name" />
+        <textarea id="recipeNotes"></textarea>
+        <select id="savedRecipeSelect"></select>
+        <div id="recipePreview"></div>
+        <div id="inventoryTableBody"></div>
+        <div id="notification"></div>
+    `;
 }
 
 // Test configuration

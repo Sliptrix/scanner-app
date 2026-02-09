@@ -607,6 +607,43 @@ body {
     border-top: 1px solid #e2e8f0;
 }
 
+/* Mobile Menu Toggle Button */
+.mobile-menu-toggle {
+    display: none;
+    position: fixed;
+    top: 16px;
+    left: 16px;
+    z-index: 1100;
+    width: 44px;
+    height: 44px;
+    border: none;
+    background: #1e293b;
+    color: white;
+    border-radius: 8px;
+    font-size: 1.5rem;
+    cursor: pointer;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+    transition: background 0.2s ease;
+    align-items: center;
+    justify-content: center;
+}
+
+.mobile-menu-toggle:hover {
+    background: #334155;
+}
+
+/* Mobile overlay when sidebar is open */
+.sidebar.mobile-open::before {
+    content: '';
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.5);
+    z-index: -1;
+}
+
 /* Responsive Design */
 @media (max-width: 1024px) {
     .sidebar {
@@ -623,6 +660,10 @@ body {
 }
 
 @media (max-width: 768px) {
+    .mobile-menu-toggle {
+        display: flex;
+    }
+
     .sidebar {
         transform: translateX(-100%);
         transition: transform 0.3s ease;
@@ -638,6 +679,7 @@ body {
 
     .top-header {
         padding: 16px 20px;
+        padding-left: 68px; /* Room for hamburger button */
     }
 
     .page-title {
@@ -655,6 +697,57 @@ body {
     .dashboard-section {
         padding: 20px;
     }
+
+    /* Stack batch stats on mobile */
+    .batch-stats-dashboard {
+        grid-template-columns: repeat(2, 1fr) !important;
+    }
+
+    /* Stack transfer grid on mobile */
+    .container-detail-grid {
+        grid-template-columns: 1fr;
+    }
+
+    /* Recipe form responsive */
+    .form-grid {
+        grid-template-columns: 1fr !important;
+    }
+}
+
+/* Focus-visible styles for keyboard accessibility */
+.nav-item:focus-visible,
+.btn:focus-visible,
+.btn-export:focus-visible,
+.btn-intake:focus-visible,
+.mobile-menu-toggle:focus-visible,
+.modal-close:focus-visible {
+    outline: 2px solid #10b981;
+    outline-offset: 2px;
+}
+
+.form-input:focus-visible,
+.form-control:focus-visible,
+.barcode-input:focus-visible,
+.search-input:focus-visible {
+    outline: none; /* Already has custom focus ring via box-shadow */
+}
+
+/* Skip to content link for screen readers */
+.skip-link {
+    position: absolute;
+    top: -40px;
+    left: 0;
+    background: #1e293b;
+    color: white;
+    padding: 8px 16px;
+    z-index: 10000;
+    transition: top 0.2s ease;
+    border-radius: 0 0 8px 0;
+    font-weight: 600;
+}
+
+.skip-link:focus {
+    top: 0;
 }
 
 /* Hide old sections when in dashboard mode */
@@ -1024,6 +1117,7 @@ body {
     cursor: pointer;
     transition: all 0.2s ease;
     margin-right: 10px;
+    position: relative;
 }
 
 .cloud-status-indicator:hover {

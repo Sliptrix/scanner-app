@@ -268,7 +268,12 @@ class MLEngineTestSuite {
 }
 
 // Make test suite available globally
-window.MLEngineTestSuite = MLEngineTestSuite;
+if (typeof window !== 'undefined') {
+    window.MLEngineTestSuite = MLEngineTestSuite;
+}
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = MLEngineTestSuite;
+}
 
 // Auto-run tests if this is loaded as a standalone script
 if (typeof window !== 'undefined' && window.document) {

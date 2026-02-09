@@ -8,7 +8,7 @@ window.TransferInputManager = (function() {
     const config = {
         minContainerId: 1,
         maxContainerId: 999999,
-        containerIdPattern: /^\d{1,6}$/
+        containerIdPattern: /^(C?\d{1,6}|\d{1,6})$/i
     };
 
     function initialize() {
@@ -97,7 +97,7 @@ window.TransferInputManager = (function() {
             return false;
         }
         if (!config.containerIdPattern.test(id)) {
-            NotificationSystem.error('Container ID must be 1-6 digits');
+            NotificationSystem.error('Container ID must be 1-6 digits, optionally prefixed with C');
             return false;
         }
         return true;
@@ -106,12 +106,18 @@ window.TransferInputManager = (function() {
     // Find container in inventory
     function findContainerInInventory(containerId) {
         const inventory = StateManager.getState('inventory');
-        const numericId = parseInt(containerId);
-        const containers = inventory.filter(item =>
-            item.containerId === containerId ||
-            item.containerId === numericId ||
-            parseInt(item.containerId) === numericId
-        );
+        const strId = String(containerId).trim();
+        // Extract numeric part (strip leading C if present)
+        const numericStr = strId.replace(/^C/i, '');
+        const numericId = parseInt(numericStr);
+        const containers = inventory.filter(item => {
+            const itemId = String(item.containerId).trim();
+            const itemNumeric = parseInt(itemId.replace(/^C/i, ''));
+            return itemId === strId ||
+                itemId.toLowerCase() === strId.toLowerCase() ||
+                itemNumeric === numericId ||
+                parseInt(itemId) === numericId;
+        });
 
         if (containers.length === 0) return null;
 

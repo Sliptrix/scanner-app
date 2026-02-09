@@ -5,17 +5,56 @@
 
 const express = require('express');
 const cors = require('cors');
+const helmet = require('helmet');
+const rateLimit = require('express-rate-limit');
+const morgan = require('morgan');
 const multer = require('multer');
 const { Client } = require('@microsoft/microsoft-graph-client');
 const QRCode = require('qrcode');
 require('isomorphic-fetch');
+const fs = require('fs');
+const path = require('path');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
 
-// In-memory storage for QR code mappings (short code -> barcode data)
-// In production, this should be a database
+// Persistent QR code mappings (short code -> barcode data)
+const QR_DATA_DIR = path.join(__dirname, 'data');
+const QR_DATA_FILE = path.join(QR_DATA_DIR, 'qr-mappings.json');
 const qrMappings = new Map();
+
+// Load QR mappings from disk on startup
+function loadQRMappings() {
+    try {
+        if (!fs.existsSync(QR_DATA_DIR)) {
+            fs.mkdirSync(QR_DATA_DIR, { recursive: true });
+        }
+        if (fs.existsSync(QR_DATA_FILE)) {
+            const data = JSON.parse(fs.readFileSync(QR_DATA_FILE, 'utf8'));
+            for (const [key, value] of Object.entries(data)) {
+                qrMappings.set(key, value);
+            }
+            console.log(`📂 Loaded ${qrMappings.size} QR mappings from disk`);
+        }
+    } catch (err) {
+        console.error('Failed to load QR mappings:', err.message);
+    }
+}
+
+// Save QR mappings to disk
+function saveQRMappings() {
+    try {
+        if (!fs.existsSync(QR_DATA_DIR)) {
+            fs.mkdirSync(QR_DATA_DIR, { recursive: true });
+        }
+        const obj = Object.fromEntries(qrMappings);
+        fs.writeFileSync(QR_DATA_FILE, JSON.stringify(obj, null, 2));
+    } catch (err) {
+        console.error('Failed to save QR mappings:', err.message);
+    }
+}
+
+loadQRMappings();
 
 // SECURITY: Configure CORS with specific origins in production
 const corsOptions = {
@@ -32,20 +71,45 @@ const corsOptions = {
 app.use(cors(corsOptions));
 app.use(express.json({ limit: '10mb' }));
 
-// SECURITY: Add security headers
-app.use((req, res, next) => {
-    // Prevent clickjacking
-    res.setHeader('X-Frame-Options', 'DENY');
-    // Prevent MIME type sniffing
-    res.setHeader('X-Content-Type-Options', 'nosniff');
-    // Enable XSS filter in older browsers
-    res.setHeader('X-XSS-Protection', '1; mode=block');
-    // Referrer policy
-    res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
-    // Permissions policy
-    res.setHeader('Permissions-Policy', 'geolocation=(), microphone=(), camera=()');
-    next();
+// SECURITY: Helmet sets comprehensive security headers (replaces manual header setting)
+app.use(helmet({
+    frameguard: { action: 'deny' },
+    contentSecurityPolicy: false, // CSP managed by frontend/nginx in production
+    crossOriginEmbedderPolicy: false // Allow cross-origin resources (QR images, etc.)
+}));
+
+// REQUEST LOGGING
+app.use(morgan(process.env.NODE_ENV === 'production' ? 'combined' : 'dev'));
+
+// RATE LIMITING: Prevent abuse
+const apiLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000, // 15 minutes
+    max: 100, // limit each IP to 100 requests per windowMs
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { error: 'Too many requests, please try again later.' }
 });
+app.use('/api/', apiLimiter);
+
+// Stricter rate limit for email sending
+const emailLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000,
+    max: 20,
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { error: 'Email rate limit exceeded. Try again later.' }
+});
+app.use('/api/email/send', emailLimiter);
+
+// Stricter rate limit for printing
+const printLimiter = rateLimit({
+    windowMs: 1 * 60 * 1000, // 1 minute
+    max: 30,
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { error: 'Print rate limit exceeded. Try again later.' }
+});
+app.use('/api/print/', printLimiter);
 
 // Configure multer for file uploads (in-memory)
 const storage = multer.memoryStorage();
@@ -103,12 +167,13 @@ app.post('/api/qrcodes', async (req, res) => {
         // Generate a short code
         const shortCode = generateShortCode();
 
-        // Store the mapping
+        // Store the mapping and persist to disk
         qrMappings.set(shortCode, {
             containerId,
             barcodeData,
             createdAt: new Date().toISOString()
         });
+        saveQRMappings();
 
         // Use custom destination URL (e.g. Excel deep link) if provided,
         // otherwise fall back to app URL with short code
@@ -388,9 +453,17 @@ app.post('/api/print/zpl', async (req, res) => {
             printerPort = parseInt(process.env.ZEBRA_PRINTER_PORT) || 9100
         } = req.body;
 
-        if (!zpl) {
-            return res.status(400).json({ error: 'Missing ZPL data' });
+        if (!zpl || typeof zpl !== 'string') {
+            return res.status(400).json({ error: 'Missing or invalid ZPL data' });
         }
+
+        // Validate ZPL size (prevent abuse - 1MB max)
+        if (zpl.length > 1024 * 1024) {
+            return res.status(400).json({ error: 'ZPL data too large (max 1MB)' });
+        }
+
+        // Validate copies
+        const numCopies = Math.min(Math.max(1, parseInt(copies) || 1), 50);
 
         if (!printerIp) {
             return res.status(400).json({
@@ -401,8 +474,8 @@ app.post('/api/print/zpl', async (req, res) => {
 
         // Repeat ZPL for copies
         let fullZPL = zpl;
-        if (copies > 1) {
-            fullZPL = zpl.repeat(copies);
+        if (numCopies > 1) {
+            fullZPL = zpl.repeat(numCopies);
         }
 
         // Send ZPL to printer via raw TCP socket
@@ -426,7 +499,7 @@ app.post('/api/print/zpl', async (req, res) => {
 
         res.json({
             success: true,
-            message: `Sent ${copies} label(s) to printer at ${printerIp}:${printerPort}`
+            message: `Sent ${numCopies} label(s) to printer at ${printerIp}:${printerPort}`
         });
 
     } catch (error) {
