@@ -225,6 +225,14 @@ window.UIUtils = {
             const uniqueStrainSet = new Set(window.appState.inventory.map(entry => entry.strain));
             uniqueStrains.textContent = uniqueStrainSet.size;
         }
+
+        // Update Dashboard metrics if DashboardManager is available
+        if (window.DashboardManager && typeof window.DashboardManager.updateDashboard === 'function') {
+            window.DashboardManager.updateDashboard();
+        }
+
+        // Fire inventoryUpdated event for any listeners
+        window.dispatchEvent(new CustomEvent('inventoryUpdated'));
     },
     
     // File upload UI management

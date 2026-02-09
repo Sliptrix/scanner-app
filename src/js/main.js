@@ -521,6 +521,7 @@ function loadSavedExcelDataOnStartup() {
     if (savedData.success) {
         // Update UI to show cached data is loaded
         UIUtils.updateDataStatus(true, savedData.metadata.fileName, true);
+        UIUtils.updateStats(); // Triggers dashboard refresh with loaded data
         
         NotificationSystem.success(
             `📁 Cached Excel data loaded: ${savedData.metadata.fileName} ` +
@@ -558,6 +559,7 @@ function loadExcelFile(file) {
             if (success) {
                 // Update UI
                 UIUtils.updateDataStatus(true, file.name, false);
+                UIUtils.updateStats(); // Triggers dashboard refresh
                 NotificationSystem.success(`📊 Excel data loaded and cached: ${file.name}`);
                 
                 // Update builder if active
