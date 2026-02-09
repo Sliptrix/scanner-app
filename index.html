@@ -917,8 +917,12 @@
                         <span>⚙️ QR Code Pool Management</span>
                         <span id="qrPoolStatus" style="font-size: 0.8rem; color: #6b7280; font-weight: 400;">Loading...</span>
                     </summary>
+                    <div id="qrNextIdInfo" style="margin-top: 8px; padding: 6px 10px; background: #ede9fe; border-radius: 4px; font-size: 0.8rem; color: #5b21b6; display: none;">
+                        Next batch starts at #<span id="qrNextIdValue">—</span>
+                    </div>
                     <div style="margin-top: 10px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
                         <input type="number" id="qrBatchCount" min="1" max="50" value="10" style="width: 60px; padding: 6px; border: 1px solid #d1d5db; border-radius: 4px; font-size: 0.85rem;">
+                        <input type="number" id="qrStartFromId" min="1" placeholder="Start from (auto)" title="Override starting ID (leave blank for auto)" style="width: 110px; padding: 6px; border: 1px solid #d1d5db; border-radius: 4px; font-size: 0.85rem;">
                         <button class="btn" id="qrBatchGenerateBtn" onclick="generateQrBatch()" style="background: #7c3aed; color: white; font-size: 0.85rem; padding: 6px 12px;">Generate QR Batch</button>
                         <button class="btn" id="qrPoolViewBtn" onclick="viewQrPool()" style="background: #6b7280; color: white; font-size: 0.85rem; padding: 6px 12px;">View Pool</button>
                         <button class="btn" onclick="printUnassignedLabels()" style="background: #2563eb; color: white; font-size: 0.85rem; padding: 6px 12px;">🖨️ Print Unassigned</button>

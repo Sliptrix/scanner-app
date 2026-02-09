@@ -1871,6 +1871,28 @@ function updateQrPoolStatus() {
         const assigned = QRCodeService.getAssigned().length;
         statusEl.textContent = `${unassigned} available, ${assigned} assigned`;
     });
+
+    // Fetch and display next available ID
+    fetchNextPoolId();
+}
+
+function fetchNextPoolId() {
+    if (!window.QRCodeService || typeof QRCodeService.getNextId !== 'function') return;
+    const infoEl = document.getElementById('qrNextIdInfo');
+    const valueEl = document.getElementById('qrNextIdValue');
+    if (!infoEl || !valueEl) return;
+
+    QRCodeService.getNextId().then(res => {
+        if (res.nextId) {
+            valueEl.textContent = res.nextId;
+            infoEl.style.display = 'block';
+            // Store for use during generation
+            window._qrNextId = res.nextId;
+        }
+    }).catch(err => {
+        console.warn('Could not fetch next pool ID:', err.message);
+        infoEl.style.display = 'none';
+    });
 }
 
 async function generateQrBatch() {
@@ -1892,10 +1914,14 @@ async function generateQrBatch() {
     if (progressBar) progressBar.style.width = '50%';
     if (progressText) progressText.textContent = `Generating ${count} codes...`;
 
+    // Determine startId: manual override > pre-fetched > auto
+    const startFromInput = document.getElementById('qrStartFromId');
+    let startId = startFromInput?.value ? parseInt(startFromInput.value) : (window._qrNextId || null);
+
     let result;
     try {
         // Use backend pool API for generation
-        result = await QRCodeService.generatePoolBatch(count, 'LW');
+        result = await QRCodeService.generatePoolBatch(count, 'LW', null, startId);
     } catch (error) {
         console.error('QR batch generation failed:', error);
         NotificationSystem.error('Failed to generate QR codes: ' + error.message);
@@ -1924,6 +1950,9 @@ async function generateQrBatch() {
         btn.textContent = `✅ ${result.generated} Generated!`;
         btn.style.background = '#059669';
     }
+
+    // Clear manual start-from input after successful generation
+    if (startFromInput) startFromInput.value = '';
 
     updateQrPoolStatus();
 

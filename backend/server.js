@@ -306,7 +306,7 @@ app.post('/api/qrcodes/pool/create-single', (req, res) => {
  */
 app.post('/api/qrcodes/pool/generate', async (req, res) => {
     try {
-        let { count, prefix } = req.body;
+        let { count, prefix, startId } = req.body;
         count = parseInt(count) || 10;
         prefix = (prefix || '').replace(/[^A-Za-z0-9]/g, '').substring(0, 4);
 
@@ -323,19 +323,24 @@ app.post('/api/qrcodes/pool/generate', async (req, res) => {
         const results = [];
         const errors = [];
 
-        // Determine next numeric ID from HQ workbook (source of truth) + local session
-        let nextId = 1;
+        // Determine next numeric ID
+        // If caller provided startId (pre-queried from /next-id), use it
+        let nextId = startId ? parseInt(startId) : 1;
         
-        // Check HQ workbook for highest Container_ID (use caller's token if available)
-        const token = extractBearerToken(req);
-        if (token) {
-            try {
-                const hqMax = await queryHQMaxContainerId(token);
-                if (hqMax >= nextId) nextId = hqMax + 1;
-                console.log(`📊 HQ workbook max Container_ID: ${hqMax}, next pool ID: ${nextId}`);
-            } catch (err) {
-                console.warn('⚠️ Could not query HQ workbook for max ID, using local state:', err.message);
+        if (!startId) {
+            // Check HQ workbook for highest Container_ID (use caller's token if available)
+            const token = extractBearerToken(req);
+            if (token) {
+                try {
+                    const hqMax = await queryHQMaxContainerId(token);
+                    if (hqMax >= nextId) nextId = hqMax + 1;
+                    console.log(`📊 HQ workbook max Container_ID: ${hqMax}, next pool ID: ${nextId}`);
+                } catch (err) {
+                    console.warn('⚠️ Could not query HQ workbook for max ID, using local state:', err.message);
+                }
             }
+        } else {
+            console.log(`📊 Using caller-provided startId: ${nextId}`);
         }
         
         // Also check any in-memory codes from this session

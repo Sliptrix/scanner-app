@@ -459,11 +459,46 @@ window.QRCodeService = {
      * @param {function} [onProgress] - callback(generated, total)
      * @returns {Promise<{generated, errors, codes}>}
      */
-    async generatePoolBatch(count, prefix, onProgress) {
+    /**
+     * Get the next available container ID from backend
+     * @returns {Promise<{nextId, hqMax, localMax}>}
+     */
+    async getNextId() {
+        const headers = {};
+        // Send auth token so backend can query HQ workbook
+        if (window.authManager && typeof authManager.getAccessToken === 'function') {
+            try {
+                const token = await authManager.getAccessToken();
+                if (token) headers['Authorization'] = `Bearer ${token}`;
+            } catch (e) {
+                console.warn('Could not get auth token for next-id query:', e);
+            }
+        }
+        const response = await fetch(`${this.backendUrl}/api/qrcodes/next-id`, { headers });
+        if (!response.ok) {
+            const err = await response.json().catch(() => ({}));
+            throw new Error(err.error || `HTTP ${response.status}`);
+        }
+        return response.json();
+    },
+
+    async generatePoolBatch(count, prefix, onProgress, startId) {
+        const headers = { 'Content-Type': 'application/json' };
+        // Send auth token so backend can query HQ workbook for next ID
+        if (window.authManager && typeof authManager.getAccessToken === 'function') {
+            try {
+                const token = await authManager.getAccessToken();
+                if (token) headers['Authorization'] = `Bearer ${token}`;
+            } catch (e) {
+                console.warn('Could not get auth token for pool generation:', e);
+            }
+        }
+        const body = { count, prefix };
+        if (startId) body.startId = startId;
         const response = await fetch(`${this.backendUrl}/api/qrcodes/pool/generate`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ count, prefix })
+            headers,
+            body: JSON.stringify(body)
         });
         if (!response.ok) {
             const err = await response.json().catch(() => ({}));
