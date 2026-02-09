@@ -386,6 +386,10 @@ body {
     background: linear-gradient(135deg, #fed7aa 0%, #fdba74 100%);
 }
 
+.metric-red {
+    background: linear-gradient(135deg, #fee2e2 0%, #fecaca 100%);
+}
+
 .metric-content {
     flex: 1;
 }

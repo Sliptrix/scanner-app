@@ -141,10 +141,10 @@
                 <!-- Metrics Cards -->
                 <div class="metrics-grid">
                     <div class="metric-card">
-                        <div class="metric-icon metric-green">🌱</div>
+                        <div class="metric-icon metric-green">🧫</div>
                         <div class="metric-content">
-                            <div class="metric-label">ACTIVE PLANTS</div>
-                            <div class="metric-value" id="activePlants">0</div>
+                            <div class="metric-label">ACTIVE CULTURES</div>
+                            <div class="metric-value" id="activeCultures">0</div>
                             <div class="metric-progress">
                                 <div class="progress-bar" style="width: 70%;"></div>
                             </div>
@@ -152,26 +152,26 @@
                     </div>
 
                     <div class="metric-card">
-                        <div class="metric-icon metric-blue">⭕</div>
+                        <div class="metric-icon metric-red">⚠️</div>
                         <div class="metric-content">
-                            <div class="metric-label">UNIQUE STRAINS</div>
-                            <div class="metric-value" id="uniqueStrains">0</div>
+                            <div class="metric-label">CONTAMINATION RATE</div>
+                            <div class="metric-value" id="contaminationRate">0%</div>
                         </div>
                     </div>
 
                     <div class="metric-card">
-                        <div class="metric-icon metric-blue">💧</div>
+                        <div class="metric-icon metric-blue">🧬</div>
                         <div class="metric-content">
-                            <div class="metric-label">MEDIA BATCHES</div>
-                            <div class="metric-value" id="mediaBatches">0</div>
+                            <div class="metric-label">MULTIPLICATION RATE</div>
+                            <div class="metric-value" id="multiplicationRate">0.0</div>
                         </div>
                     </div>
 
                     <div class="metric-card">
-                        <div class="metric-icon metric-orange">📈</div>
+                        <div class="metric-icon metric-orange">⏰</div>
                         <div class="metric-content">
-                            <div class="metric-label">EFFICIENCY</div>
-                            <div class="metric-value" id="efficiency">94%</div>
+                            <div class="metric-label">CONTAINERS NEEDING TRANSFER</div>
+                            <div class="metric-value" id="containersNeedingTransfer">0</div>
                         </div>
                     </div>
                 </div>
@@ -193,31 +193,38 @@
 
                 <!-- Analytics Grid -->
                 <div class="analytics-grid">
-                    <!-- Stage Distribution Chart -->
+                    <!-- Stage Pipeline (replaces Stage Distribution) -->
                     <div class="analytics-section">
-                        <div id="stageDistributionChart">
+                        <div id="stagePipelineChart">
                             <!-- Populated by ChartRenderer -->
                         </div>
                     </div>
 
-                    <!-- Transfer Timeline -->
+                    <!-- Strain Performance -->
                     <div class="analytics-section">
-                        <div id="transferTimelineChart">
+                        <div id="strainPerformanceChart">
                             <!-- Populated by ChartRenderer -->
                         </div>
                     </div>
 
-                    <!-- Media Batch Status -->
+                    <!-- Weekly Throughput -->
                     <div class="analytics-section">
-                        <div id="batchStatusChart">
+                        <div id="weeklyThroughputChart">
+                            <!-- Populated by ChartRenderer -->
+                        </div>
+                    </div>
+
+                    <!-- Media Consumption -->
+                    <div class="analytics-section">
+                        <div id="mediaConsumptionChart">
                             <!-- Populated by ChartRenderer -->
                         </div>
                         <div id="expiringBatchesWarning" style="display: none;"></div>
                     </div>
 
-                    <!-- Activity Heatmap -->
+                    <!-- Owner Workload -->
                     <div class="analytics-section">
-                        <div id="activityHeatmapChart">
+                        <div id="ownerWorkloadChart">
                             <!-- Populated by ChartRenderer -->
                         </div>
                     </div>

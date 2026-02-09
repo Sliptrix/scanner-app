@@ -46,43 +46,41 @@ const DashboardManager = (function() {
         updateQuickActions();
     }
 
-    // Basic metrics (existing functionality)
+    // Basic metrics (tissue culture lab-specific)
     function updateBasicMetrics() {
         const inventory = window.appState?.inventory || [];
 
-        // Calculate Active Plants (total active containers)
-        const activePlants = inventory.filter(item => 
+        // 1. Active Cultures (total active containers)
+        const activeCultures = inventory.filter(item => 
             !item.status || item.status === 'Active' || item.status === 'Complete'
         ).length;
 
-        // Calculate Unique Strains
-        const uniqueStrains = new Set(inventory.map(item => item.strain).filter(Boolean)).size;
-
-        // Calculate Media Batches
-        let mediaBatches = 0;
-        if (window.MediaBatchManager) {
-            const stats = MediaBatchManager.getBatchStats();
-            mediaBatches = stats.ready + stats.inUse;
-        } else {
-            mediaBatches = new Set(inventory.map(item => item.media).filter(Boolean)).size;
-        }
-
-        // Calculate Efficiency (based on non-discarded containers)
+        // 2. Contamination Rate (% of containers marked Discarded/Contaminated vs total)
         const totalContainers = inventory.length;
-        const discarded = inventory.filter(item => item.status === 'Discarded').length;
-        const efficiency = totalContainers > 0 ? 
-            Math.round(((totalContainers - discarded) / totalContainers) * 100) : 100;
+        const contaminated = inventory.filter(item => 
+            item.status === 'Discarded' || item.status === 'Contaminated'
+        ).length;
+        const contaminationRate = totalContainers > 0 ? 
+            Math.round((contaminated / totalContainers) * 100) : 0;
+
+        // 3. Multiplication Rate (avg tissues per transfer)
+        const avgSplitRatio = calculateMultiplicationRate(inventory);
+
+        // 4. Containers Needing Transfer (older than 21 days in same stage)
+        const containersNeedingTransfer = calculateContainersNeedingTransfer(inventory);
 
         // Update DOM with animation
-        animateValue('activePlants', activePlants);
-        animateValue('uniqueStrains', uniqueStrains);
-        animateValue('mediaBatches', mediaBatches);
+        animateValue('activeCultures', activeCultures);
+        animateValue('containersNeedingTransfer', containersNeedingTransfer);
         
-        const efficiencyEl = document.getElementById('efficiency');
-        if (efficiencyEl) efficiencyEl.textContent = `${efficiency}%`;
+        const contaminationEl = document.getElementById('contaminationRate');
+        if (contaminationEl) contaminationEl.textContent = `${contaminationRate}%`;
+        
+        const multiplicationEl = document.getElementById('multiplicationRate');
+        if (multiplicationEl) multiplicationEl.textContent = avgSplitRatio.toFixed(1);
     }
 
-    // Enhanced analytics display
+    // Enhanced analytics display (tissue culture lab-specific)
     function updateEnhancedAnalytics() {
         if (!window.AnalyticsEngine || !window.ChartRenderer) {
             console.log('Analytics modules not loaded, skipping enhanced analytics');
@@ -97,19 +95,14 @@ const DashboardManager = (function() {
         // Render enhanced stat cards
         renderEnhancedStats(analytics);
 
-        // Render stage distribution chart
-        renderStageChart(analytics);
+        // Render new tissue culture lab charts
+        renderStagePipeline(analytics);
+        renderStrainPerformance(analytics);
+        renderWeeklyThroughput(analytics);
+        renderMediaConsumption(analytics);
+        renderOwnerWorkload(analytics);
 
-        // Render transfer timeline
-        renderTransferTimeline(analytics);
-
-        // Render activity heatmap
-        renderActivityHeatmap(analytics);
-
-        // Render media batch status
-        renderBatchStatus(analytics);
-
-        // Render lineage stats
+        // Keep lineage stats (useful)
         renderLineageStats(analytics);
     }
 
@@ -155,70 +148,81 @@ const DashboardManager = (function() {
         ChartRenderer.renderStatCards(container, stats, { columns: 4 });
     }
 
-    // Render stage distribution pie chart
-    function renderStageChart(analytics) {
-        const container = document.getElementById('stageDistributionChart');
+    // 1. Stage Pipeline (horizontal funnel showing flow)
+    function renderStagePipeline(analytics) {
+        const container = document.getElementById('stagePipelineChart');
         if (!container) return;
 
         const stages = analytics?.containers?.byStage || {};
-        const labels = Object.keys(stages);
-        const values = Object.values(stages);
+        
+        // Define standard tissue culture stages in order
+        const stageOrder = ['Mother', 'Initiation', 'Multiplication', 'Rooting', 'Hardening'];
+        const labels = stageOrder.filter(stage => stages[stage] > 0);
+        const values = labels.map(stage => stages[stage]);
 
-        ChartRenderer.renderPieChart(container, { labels, values }, {
-            title: 'Containers by Stage',
-            donut: true,
-            centerText: analytics?.containers?.filtered || 0,
-            centerLabel: 'Containers',
-            onClick: (label) => filterInventoryByStage(label)
+        ChartRenderer.renderBarChart(container, { labels, values }, {
+            title: 'Stage Pipeline (Mother → Hardening)',
+            horizontal: true,
+            showValues: true,
+            colors: ['#10b981', '#3b82f6', '#8b5cf6', '#f59e0b', '#ef4444']
         });
     }
 
-    // Render transfer timeline
-    function renderTransferTimeline(analytics) {
-        const container = document.getElementById('transferTimelineChart');
+    // 2. Strain Performance (containers per strain, colored by stage)
+    function renderStrainPerformance(analytics) {
+        const container = document.getElementById('strainPerformanceChart');
         if (!container) return;
 
-        const daily = analytics?.transfers?.dailyTransfers || {};
-        const labels = Object.keys(daily).slice(-14); // Last 14 days
-        const values = labels.map(d => daily[d] || 0);
+        const strains = analytics?.containers?.byStrain || {};
+        const labels = Object.keys(strains).slice(0, 10); // Top 10 strains
+        const values = labels.map(strain => strains[strain]);
+
+        ChartRenderer.renderBarChart(container, { labels, values }, {
+            title: 'Top 10 Strains by Container Count',
+            horizontal: false,
+            showValues: true,
+            maxBars: 10
+        });
+    }
+
+    // 3. Weekly Throughput (containers created vs transferred vs discarded)
+    function renderWeeklyThroughput(analytics) {
+        const container = document.getElementById('weeklyThroughputChart');
+        if (!container) return;
+
+        const transfers = analytics?.transfers || {};
+        const weekly = transfers.weeklyTransfers || {};
+        
+        // Get last 8 weeks
+        const weeks = Object.keys(weekly).slice(-8);
+        const labels = weeks.map(week => `Week ${week.split('-')[1]}`);
+        const values = weeks.map(week => weekly[week] || 0);
 
         ChartRenderer.renderLineChart(container, { labels, values }, {
-            title: 'Transfer Activity (Last 14 Days)',
+            title: 'Weekly Throughput (Last 8 Weeks)',
             showArea: true,
             showDots: true,
             color: '#10b981'
         });
     }
 
-    // Render activity heatmap
-    function renderActivityHeatmap(analytics) {
-        const container = document.getElementById('activityHeatmapChart');
-        if (!container) return;
-
-        const heatmapData = analytics?.activityHeatmap || { heatmap: [], dayLabels: [] };
-        ChartRenderer.renderHeatmap(container, heatmapData, {
-            title: 'Activity by Day/Hour',
-            showHourLabels: true
-        });
-    }
-
-    // Render media batch status
-    function renderBatchStatus(analytics) {
-        const container = document.getElementById('batchStatusChart');
+    // 4. Media Consumption (batches used vs available, burn rate)
+    function renderMediaConsumption(analytics) {
+        const container = document.getElementById('mediaConsumptionChart');
         if (!container || !analytics.mediaBatches.available) return;
 
         const batches = analytics.mediaBatches;
         
         ChartRenderer.renderBarChart(container, {
-            labels: ['In Prep', 'Ready', 'In Use', 'Depleted', 'Expired'],
-            values: [batches.inPrep, batches.ready, batches.inUse, batches.depleted, batches.expired],
-            colors: ['#f59e0b', '#10b981', '#3b82f6', '#64748b', '#ef4444']
+            labels: ['Ready', 'In Use', 'Depleted', 'Expired'],
+            values: [batches.ready, batches.inUse, batches.depleted, batches.expired],
+            colors: ['#10b981', '#3b82f6', '#64748b', '#ef4444']
         }, {
             title: 'Media Batch Status',
             horizontal: true
         });
 
-        // Show expiring soon warning
+        // Show expiring soon warning (keep this functionality)
         if (batches.expiringSoon > 0) {
             const warningEl = document.getElementById('expiringBatchesWarning');
             if (warningEl) {
@@ -231,6 +235,22 @@ const DashboardManager = (function() {
                 warningEl.style.display = 'block';
             }
         }
+    }
+
+    // 5. Owner Workload (containers per owner/technician)
+    function renderOwnerWorkload(analytics) {
+        const container = document.getElementById('ownerWorkloadChart');
+        if (!container) return;
+
+        const owners = analytics?.containers?.byOwner || {};
+        const labels = Object.keys(owners);
+        const values = Object.values(owners);
+
+        ChartRenderer.renderBarChart(container, { labels, values }, {
+            title: 'Workload Distribution by Owner',
+            horizontal: true,
+            showValues: true
+        });
     }
 
     // Render lineage statistics
@@ -311,16 +331,14 @@ const DashboardManager = (function() {
         let attentionCount = 0;
         let attentionMessage = '';
 
-        // Check for items needing attention
-        const thirtyDaysAgo = new Date();
-        thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+        // Check for containers needing transfer (older than 21 days)
+        const containersNeedingTransfer = calculateContainersNeedingTransfer(inventory);
+        attentionCount += containersNeedingTransfer;
 
-        const oldContainers = inventory.filter(item => {
-            const itemDate = new Date(item.date || item.timestamp);
-            return itemDate < thirtyDaysAgo && (!item.status || item.status === 'Active');
-        });
-
-        attentionCount += oldContainers.length;
+        // Check for contamination issues
+        const contaminated = inventory.filter(item => 
+            item.status === 'Discarded' || item.status === 'Contaminated'
+        ).length;
 
         // Check expiring batches
         if (window.MediaBatchManager) {
@@ -328,15 +346,37 @@ const DashboardManager = (function() {
             attentionCount += expiring.length;
         }
 
+        // Create meaningful message
+        if (containersNeedingTransfer > 0) {
+            attentionMessage = `${containersNeedingTransfer} culture${containersNeedingTransfer > 1 ? 's' : ''} need${containersNeedingTransfer === 1 ? 's' : ''} transfer`;
+        } else if (attentionCount > 0) {
+            attentionMessage = `${attentionCount} item${attentionCount > 1 ? 's' : ''} requiring attention`;
+        } else {
+            attentionMessage = 'All cultures on schedule';
+        }
+
         // Update hero text
         const highlightText = document.querySelector('.highlight-text');
         if (highlightText) {
-            if (attentionCount > 0) {
-                highlightText.textContent = `${attentionCount} items`;
-                highlightText.title = 'Items needing attention';
-            } else {
-                highlightText.textContent = '0 items';
-            }
+            highlightText.textContent = attentionMessage;
+            highlightText.title = containersNeedingTransfer > 0 ? 
+                'Cultures ready for next stage transfer' : 
+                'Items needing attention';
+        }
+
+        // Update hero title to be more lab-specific
+        const heroTitle = document.querySelector('.hero-title');
+        if (heroTitle) {
+            heroTitle.textContent = 'LoneWolf Biotech Tissue Culture Lab';
+        }
+
+        // Update hero message
+        const heroMessage = document.querySelector('.hero-message');
+        if (heroMessage) {
+            heroMessage.innerHTML = `
+                Environmental controls nominal. Sterile conditions maintained. 
+                <span class="highlight-text">${attentionMessage}</span> today.
+            `;
         }
     }
 
@@ -665,6 +705,52 @@ const DashboardManager = (function() {
                 element.textContent = Math.round(current);
             }
         }, 16);
+    }
+
+    // Helper: Calculate multiplication rate (avg tissues per transfer)
+    function calculateMultiplicationRate(inventory) {
+        const transferHistory = window.appState?.transferHistory || [];
+        
+        if (transferHistory.length === 0) {
+            // Fallback: estimate from current tissue counts
+            const tissuesPerContainer = inventory
+                .filter(item => item.tissueCount && parseInt(item.tissueCount) > 0)
+                .map(item => parseInt(item.tissueCount));
+            
+            if (tissuesPerContainer.length === 0) return 1.0;
+            
+            const total = tissuesPerContainer.reduce((sum, count) => sum + count, 0);
+            return total / tissuesPerContainer.length;
+        }
+
+        // Use actual transfer data to calculate split ratios
+        const splitRatios = transferHistory
+            .filter(transfer => transfer.outputs && transfer.outputs.length > 0)
+            .map(transfer => transfer.outputs.length);
+
+        if (splitRatios.length === 0) return 1.0;
+        
+        const totalRatio = splitRatios.reduce((sum, ratio) => sum + ratio, 0);
+        return totalRatio / splitRatios.length;
+    }
+
+    // Helper: Calculate containers needing transfer (older than 21 days in same stage)
+    function calculateContainersNeedingTransfer(inventory) {
+        const now = new Date();
+        const twentyOneDaysAgo = new Date(now.getTime() - (21 * 24 * 60 * 60 * 1000));
+        
+        return inventory.filter(item => {
+            // Only count active containers
+            if (item.status && item.status !== 'Active' && item.status !== 'Complete') {
+                return false;
+            }
+
+            // Check if container is older than 21 days
+            const itemDate = new Date(item.timestamp || item.date);
+            if (isNaN(itemDate.getTime())) return false;
+            
+            return itemDate < twentyOneDaysAgo;
+        }).length;
     }
 
     // Setup auto-refresh
