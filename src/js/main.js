@@ -1914,9 +1914,8 @@ async function generateQrBatch() {
     if (progressBar) progressBar.style.width = '50%';
     if (progressText) progressText.textContent = `Generating ${count} codes...`;
 
-    // Determine startId: manual override > pre-fetched > auto
-    const startFromInput = document.getElementById('qrStartFromId');
-    let startId = startFromInput?.value ? parseInt(startFromInput.value) : (window._qrNextId || null);
+    // Always use pre-fetched next-id from HQ (no manual override)
+    let startId = window._qrNextId || null;
 
     let result;
     try {

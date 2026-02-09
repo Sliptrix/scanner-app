@@ -19,8 +19,59 @@ require('isomorphic-fetch');
 const fs = require('fs');
 const path = require('path');
 
+// ============================================================
+// Environment Variable Validation
+// ============================================================
+const REQUIRED_ENV = ['QR_API_KEY'];
+const OPTIONAL_ENV = ['CORS_ORIGINS', 'ADMIN_EMAILS', 'SHAREPOINT_WORKBOOK_URL'];
+
+const missingRequired = REQUIRED_ENV.filter(v => !process.env[v]);
+if (missingRequired.length > 0) {
+    console.error(`❌ FATAL: Missing required environment variables: ${missingRequired.join(', ')}`);
+    console.error('   Set them in backend/.env or your deployment environment.');
+    process.exit(1);
+}
+
+const missingOptional = OPTIONAL_ENV.filter(v => !process.env[v]);
+if (missingOptional.length > 0) {
+    console.warn(`⚠️  Missing optional environment variables: ${missingOptional.join(', ')}`);
+    console.warn('   The app will run but some features may be limited.');
+}
+
+// ============================================================
+// Structured Logging Helper
+// ============================================================
+function logInfo(msg, meta) {
+    const entry = { timestamp: new Date().toISOString(), level: 'info', message: msg, ...meta };
+    console.log(JSON.stringify(entry));
+}
+function logError(msg, meta) {
+    const entry = { timestamp: new Date().toISOString(), level: 'error', message: msg, ...meta };
+    console.error(JSON.stringify(entry));
+}
+function logWarn(msg, meta) {
+    const entry = { timestamp: new Date().toISOString(), level: 'warn', message: msg, ...meta };
+    console.warn(JSON.stringify(entry));
+}
+
+// ============================================================
+// Global Error Handlers
+// ============================================================
+process.on('uncaughtException', (err) => {
+    logError('Uncaught exception — shutting down', { error: err.message, stack: err.stack });
+    process.exit(1);
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+    logError('Unhandled promise rejection', { reason: String(reason), stack: reason?.stack });
+});
+
 const app = express();
 const PORT = process.env.PORT || 3001;
+
+// Serve frontend static files (unified single-process deployment)
+const frontendPath = path.join(__dirname, '..');
+app.use(express.static(frontendPath, { index: false })); // index:false so /s/:shortCode isn't shadowed
 
 // In-memory QR code mappings (short code -> barcode data)
 // Starts clean every boot — HQ workbook is the source of truth for next ID
@@ -35,7 +86,7 @@ console.log('🧹 Starting with clean QR mappings (HQ workbook is source of trut
 const corsOptions = {
     origin: process.env.CORS_ORIGINS 
         ? process.env.CORS_ORIGINS.split(',') 
-        : ['http://localhost:8000', 'http://localhost:3000', 'http://127.0.0.1:8000'],
+        : ['http://localhost:8000', 'http://localhost:3000', 'http://127.0.0.1:8000', 'https://scanner.lonewolfgenetics.com'],
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization'],
     credentials: true,
@@ -46,15 +97,35 @@ const corsOptions = {
 app.use(cors(corsOptions));
 app.use(express.json({ limit: '10mb' }));
 
-// SECURITY: Helmet sets comprehensive security headers (replaces manual header setting)
+// SECURITY: Helmet sets comprehensive security headers
 app.use(helmet({
     frameguard: { action: 'deny' },
-    contentSecurityPolicy: false, // CSP managed by frontend/nginx in production
+    hsts: { maxAge: 31536000, includeSubDomains: true, preload: true },
+    contentSecurityPolicy: {
+        directives: {
+            defaultSrc: ["'self'"],
+            scriptSrc: ["'self'", "'unsafe-inline'", "https://alcdn.msauth.net"],
+            styleSrc: ["'self'", "'unsafe-inline'"],
+            connectSrc: ["'self'", "https://login.microsoftonline.com", "https://graph.microsoft.com", "https://api.qr-code-generator.com"],
+            frameSrc: ["'self'", "https://login.microsoftonline.com"],
+            imgSrc: ["'self'", "data:", "blob:"],
+            fontSrc: ["'self'"],
+            objectSrc: ["'none'"],
+            baseUri: ["'self'"],
+            formAction: ["'self'"]
+        }
+    },
     crossOriginEmbedderPolicy: false // Allow cross-origin resources (QR images, etc.)
 }));
 
-// REQUEST LOGGING
-app.use(morgan(process.env.NODE_ENV === 'production' ? 'combined' : 'dev'));
+// REQUEST LOGGING — structured for production, pretty for dev
+if (process.env.NODE_ENV === 'production') {
+    app.use(morgan(':remote-addr :method :url :status :res[content-length] - :response-time ms', {
+        stream: { write: (msg) => logInfo(msg.trim(), { type: 'http' }) }
+    }));
+} else {
+    app.use(morgan('dev'));
+}
 
 // RATE LIMITING: Prevent abuse
 const apiLimiter = rateLimit({
@@ -65,6 +136,16 @@ const apiLimiter = rateLimit({
     message: { error: 'Too many requests, please try again later.' }
 });
 app.use('/api/', apiLimiter);
+
+// Higher rate limit for public-facing scan pages
+const scanLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000,
+    max: 300, // Public-facing, needs higher limit
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: '<html><body><h1>Too many requests</h1><p>Please try again later.</p></body></html>'
+});
+app.use('/s/', scanLimiter);
 
 // Stricter rate limit for email sending
 const emailLimiter = rateLimit({
@@ -305,6 +386,12 @@ app.post('/api/qrcodes/pool/create-single', (req, res) => {
  * Body: { count: 50, prefix: "LW" }
  */
 app.post('/api/qrcodes/pool/generate', async (req, res) => {
+    // Require auth token — users must always be signed in
+    const token = extractBearerToken(req);
+    if (!token) {
+        return res.status(401).json({ error: 'Authentication required. Please sign in.' });
+    }
+
     try {
         let { count, prefix, startId } = req.body;
         count = parseInt(count) || 10;
@@ -327,7 +414,7 @@ app.post('/api/qrcodes/pool/generate', async (req, res) => {
         // Priority: 1) HQ workbook (via token), 2) caller-provided startId, 3) in-memory local codes
         let nextId = 1;
         
-        const token = extractBearerToken(req);
+        // token already extracted above for auth check
         if (token) {
             try {
                 const hqMax = await queryHQMaxContainerId(token);
@@ -1654,21 +1741,44 @@ app.put('/api/container/:containerId', async (req, res) => {
 
 // Error handling middleware
 app.use((err, req, res, next) => {
-    console.error('Server error:', err);
+    logError('Unhandled route error', { error: err.message, path: req.path, stack: process.env.NODE_ENV !== 'production' ? err.stack : undefined });
     const response = { error: 'Internal server error' };
-    // SECURITY: Only expose error details in development
     if (process.env.NODE_ENV !== 'production') {
         response.message = err.message;
     }
     res.status(500).json(response);
 });
 
+// Catch-all: serve index.html for SPA routing
+app.get('*', (req, res) => {
+    if (!req.path.startsWith('/api/') && !req.path.startsWith('/s/')) {
+        res.sendFile(path.join(frontendPath, 'index.html'));
+    }
+});
+
 // Start server
-app.listen(PORT, () => {
+const server = app.listen(PORT, () => {
+    logInfo('Scanner Backend started', { port: PORT, env: process.env.NODE_ENV || 'development' });
     console.log(`🚀 Scanner Backend running on http://localhost:${PORT}`);
-    console.log(`📧 Email API available at http://localhost:${PORT}/api/email/send`);
-    console.log(`📱 QR Code API available at http://localhost:${PORT}/api/qrcodes`);
     console.log(`💚 Health check at http://localhost:${PORT}/health`);
 });
+
+// ============================================================
+// Graceful Shutdown
+// ============================================================
+function gracefulShutdown(signal) {
+    logInfo(`${signal} received. Shutting down gracefully...`);
+    server.close(() => {
+        logInfo('HTTP server closed. Exiting.');
+        process.exit(0);
+    });
+    setTimeout(() => {
+        logError('Forced shutdown after timeout');
+        process.exit(1);
+    }, 10000);
+}
+
+process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+process.on('SIGINT', () => gracefulShutdown('SIGINT'));
 
 module.exports = app;

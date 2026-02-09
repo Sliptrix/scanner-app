@@ -1,6 +1,64 @@
 # 🚀 Scanner App Production Deployment Guide
 
-This guide provides complete instructions for deploying the Lab Barcode Builder & Transfer System to production.
+Production URL: `https://scanner.lonewolfgenetics.com`
+
+---
+
+## ⚡ Quick Deploy
+
+### Option 1: Railway (Recommended — One Click)
+
+1. Push repo to GitHub
+2. Go to [railway.app](https://railway.app) → **New Project** → **Deploy from GitHub**
+3. Select this repo — Railway auto-detects `railway.json`
+4. Add environment variables from `backend/.env` in Railway dashboard
+5. Set custom domain: `scanner.lonewolfgenetics.com`
+6. Add CNAME DNS record: `scanner.lonewolfgenetics.com` → Railway-provided domain
+
+### Option 2: Docker
+
+```bash
+# Clone and deploy
+git clone https://github.com/YOUR_ORG/scanner-app.git
+cd scanner-app
+cp backend/.env.example backend/.env  # Edit with real values
+docker compose up -d
+
+# Runs on port 3001 — put behind nginx/caddy for HTTPS
+```
+
+### Option 3: Manual VPS (Ubuntu/Debian)
+
+```bash
+# Install Node.js 20
+curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
+sudo apt install -y nodejs
+
+# Clone and install
+git clone https://github.com/YOUR_ORG/scanner-app.git
+cd scanner-app/backend
+npm ci --production
+cp .env.example .env  # Edit with real values
+
+# Run with PM2
+npm install -g pm2
+cd /path/to/scanner-app
+pm2 start backend/server.js --name scanner
+pm2 save && pm2 startup
+```
+
+### DNS Setup (Squarespace)
+
+Add a CNAME record in Squarespace DNS:
+- **Host**: `scanner`
+- **Value**: Your deploy platform's domain (e.g., `scanner-app-production.up.railway.app`)
+- **TTL**: 3600
+
+### Azure AD: Add Production Redirect URI
+
+1. Go to [Azure Portal](https://portal.azure.com) → App registrations → LoneWolf Scanner App
+2. **Authentication** → Add redirect URI: `https://scanner.lonewolfgenetics.com`
+3. Save
 
 ---
 
