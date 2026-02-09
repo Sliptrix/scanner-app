@@ -232,7 +232,12 @@ window.UIUtils = {
         }
 
         // Fire inventoryUpdated event for any listeners
-        window.dispatchEvent(new CustomEvent('inventoryUpdated'));
+        try {
+            window.dispatchEvent(new CustomEvent('inventoryUpdated'));
+        } catch (e) {
+            // CustomEvent may not be available in test environments
+            console.warn('Could not dispatch inventoryUpdated event:', e.message);
+        }
     },
     
     // File upload UI management
