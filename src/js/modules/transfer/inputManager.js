@@ -218,17 +218,27 @@ window.TransferInputManager = (function() {
         }
     }
 
+    // SECURITY: Sanitize helper for dropdown options
+    function sanitizeForOption(str) {
+        if (!str) return '';
+        return String(str).replace(/[<>"&]/g, c => ({'<':'&lt;','>':'&gt;','"':'&quot;','&':'&amp;'}[c]));
+    }
+
     // Populate stage dropdown
     function populateStageOptions(currentStage) {
         const stageSelect = document.getElementById('updateStage');
         if (!stageSelect) return;
 
-        stageSelect.innerHTML = `<option value="keep-same">Keep Same (${currentStage})</option>`;
+        // SECURITY: Sanitize stage name before inserting into HTML
+        const safeStage = sanitizeForOption(currentStage);
+        stageSelect.innerHTML = `<option value="keep-same">Keep Same (${safeStage})</option>`;
         const stagesData = StateManager.getState('stagesTable');
         if (stagesData && typeof stagesData === 'object') {
             Object.entries(stagesData).forEach(([key, value]) => {
                 if (value !== currentStage) {
-                    stageSelect.innerHTML += `<option value="${key}">${value}</option>`;
+                    const safeKey = sanitizeForOption(key);
+                    const safeValue = sanitizeForOption(value);
+                    stageSelect.innerHTML += `<option value="${safeKey}">${safeValue}</option>`;
                 }
             });
         }
@@ -239,12 +249,16 @@ window.TransferInputManager = (function() {
         const mediaSelect = document.getElementById('updateMedia');
         if (!mediaSelect) return;
 
-        mediaSelect.innerHTML = `<option value="keep-same">Keep Same (${currentMedia})</option>`;
+        // SECURITY: Sanitize media name before inserting into HTML
+        const safeMedia = sanitizeForOption(currentMedia);
+        mediaSelect.innerHTML = `<option value="keep-same">Keep Same (${safeMedia})</option>`;
         const mediaData = StateManager.getState('mediaTable');
         if (mediaData && typeof mediaData === 'object') {
             Object.entries(mediaData).forEach(([key, value]) => {
                 if (value !== currentMedia) {
-                    mediaSelect.innerHTML += `<option value="${key}">${value}</option>`;
+                    const safeKey = sanitizeForOption(key);
+                    const safeValue = sanitizeForOption(value);
+                    mediaSelect.innerHTML += `<option value="${safeKey}">${safeValue}</option>`;
                 }
             });
         }
