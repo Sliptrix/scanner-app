@@ -321,9 +321,18 @@ app.post('/api/qrcodes/pool/generate', async (req, res) => {
         const results = [];
         const errors = [];
 
+        // Determine next numeric ID by finding the highest existing numeric shortCode
+        let nextId = 1;
+        for (const [code] of qrMappings) {
+            const num = parseInt(code, 10);
+            if (!isNaN(num) && num >= nextId) {
+                nextId = num + 1;
+            }
+        }
+
         for (let i = 0; i < count; i++) {
             try {
-                const shortCode = prefix ? generatePrefixedShortCode(prefix) : generateShortCode();
+                const shortCode = String(nextId + i);
                 const scanUrl = `${baseUrl}/s/${shortCode}`;
 
                 // Call QR code generator API
@@ -558,7 +567,7 @@ function generatePrefixedShortCode(prefix, maxRetries = 10) {
 app.get('/s/:shortCode', (req, res) => {
     const { shortCode } = req.params;
 
-    if (!/^[A-Za-z0-9]{2,8}$/.test(shortCode)) {
+    if (!/^[A-Za-z0-9]{1,8}$/.test(shortCode)) {
         return res.status(400).send(renderScanPage(null, 'Invalid QR code'));
     }
 
@@ -1047,7 +1056,7 @@ app.get('/api/qrcodes/:shortCode', (req, res) => {
     const { shortCode } = req.params;
 
     // SECURITY: Validate shortCode format (alphanumeric, 2-8 chars to support prefixed codes)
-    if (!/^[A-Za-z0-9]{2,8}$/.test(shortCode)) {
+    if (!/^[A-Za-z0-9]{1,8}$/.test(shortCode)) {
         return res.status(400).json({ error: 'Invalid short code format' });
     }
 

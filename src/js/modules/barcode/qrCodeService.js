@@ -549,11 +549,11 @@ window.QRCodeService = {
         input = input.trim();
 
         // Try full URL: .../s/{shortCode}
-        const urlMatch = input.match(/\/s\/([A-Za-z0-9]{2,8})(?:\?|$|#)/);
+        const urlMatch = input.match(/\/s\/([A-Za-z0-9]{1,8})(?:\?|$|#)/);
         if (urlMatch) return urlMatch[1];
 
-        // Try bare short code (2-8 alphanumeric)
-        if (/^[A-Za-z0-9]{2,8}$/.test(input)) return input;
+        // Try bare numeric ID (e.g., "42") or alphanumeric code
+        if (/^[A-Za-z0-9]{1,8}$/.test(input)) return input;
 
         return null;
     }

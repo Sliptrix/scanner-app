@@ -632,62 +632,40 @@ window.ContainerInitiator = (function() {
             return;
         }
 
-        // Try new pool system first (shortCode-based)
+        // Parse input to extract shortCode (numeric ID or alphanumeric code)
         const shortCode = QRCodeService.parsePoolQrInput(input);
-        if (shortCode) {
-            showFeedback('Looking up code...', 'info');
-            try {
-                const poolEntry = await QRCodeService.lookupPoolCode(shortCode);
-                if (!poolEntry) {
-                    showFeedback(`Code "${shortCode}" not found in pool. Generate a batch first.`, 'error');
-                    return;
-                }
-                if (poolEntry.status === 'assigned') {
-                    showFeedback(`Code "${shortCode}" is already assigned to container ${poolEntry.containerId}`, 'error');
-                    return;
-                }
+        if (!shortCode) {
+            showFeedback('Invalid input. Enter the numeric QR label ID (e.g., 42) or scan the label.', 'error');
+            return;
+        }
 
-                // Store the shortCode for assignment later
-                StateManager.setState('initiatorState.qrShortCode', shortCode);
-                StateManager.setState('initiatorState.qrExcelRow', null);
-                moveToStep('owner');
-                updateInitiatorUI();
-                showFeedback(`QR code: ${shortCode} selected ✓`, 'success');
+        showFeedback('Looking up QR code...', 'info');
+        try {
+            const poolEntry = await QRCodeService.lookupPoolCode(shortCode);
+            if (!poolEntry) {
+                showFeedback(`QR code #${shortCode} not found. Generate a batch first.`, 'error');
                 return;
-            } catch (err) {
-                console.warn('Backend pool lookup failed, trying legacy:', err);
             }
-        }
+            if (poolEntry.status === 'assigned') {
+                showFeedback(`QR code #${shortCode} is already assigned to container ${poolEntry.containerId}`, 'error');
+                return;
+            }
 
-        // Fallback to legacy Excel row-based pool
-        const excelRow = QRCodeService.parseQrInput(input);
-        if (!excelRow) {
-            showFeedback('Invalid QR code. Scan a pool label URL or enter a shortcode (e.g., LW4k2m)', 'error');
-            return;
+            // Store the shortCode for assignment later — use the numeric ID as the container ID
+            StateManager.setState('initiatorState.qrShortCode', shortCode);
+            StateManager.setState('initiatorState.qrExcelRow', null);
+            
+            // Use the QR numeric ID as the container ID
+            StateManager.setState('initiatorState.prePopulatedContainerId', shortCode);
+            currentContainerId = shortCode;
+            
+            moveToStep('owner');
+            updateInitiatorUI();
+            showFeedback(`QR label #${shortCode} selected ✓ — Container ID: ${shortCode}`, 'success');
+        } catch (err) {
+            console.error('Pool lookup failed:', err);
+            showFeedback('Failed to look up QR code. Is the backend running?', 'error');
         }
-
-        const poolEntry = QRCodeService.lookupByRow(excelRow);
-        if (!poolEntry) {
-            showFeedback(`QR code ID #${excelRow} not found in pool. Generate a batch first.`, 'error');
-            return;
-        }
-
-        if (poolEntry.assignedContainerId) {
-            showFeedback(`QR code ID #${excelRow} is already assigned to container ${poolEntry.assignedContainerId}`, 'error');
-            return;
-        }
-
-        StateManager.setState('initiatorState.qrExcelRow', excelRow);
-        StateManager.setState('initiatorState.qrShortCode', null);
-        if (poolEntry.containerId) {
-            StateManager.setState('initiatorState.prePopulatedContainerId', poolEntry.containerId);
-            currentContainerId = poolEntry.containerId;
-        }
-        moveToStep('owner');
-        updateInitiatorUI();
-
-        const displayId = poolEntry.containerId || `#${excelRow}`;
-        showFeedback(`QR code ID: ${displayId} selected`, 'success');
     }
 
     /**
@@ -1469,8 +1447,8 @@ window.ContainerInitiator = (function() {
         // Update prompt and hint based on step
         switch (currentStep) {
             case 'qr':
-                prompt.textContent = 'Scan QR Code Label:';
-                hint.textContent = 'Scan a pre-printed QR label or select from generated batch below';
+                prompt.textContent = 'Enter QR Label ID:';
+                hint.textContent = 'Enter the numeric ID from the pre-printed QR label (e.g., 1, 2, 3...)';
                 break;
             case 'owner':
                 prompt.textContent = 'Enter Owner ID:';
