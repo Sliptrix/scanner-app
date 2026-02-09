@@ -123,6 +123,18 @@ logs/
 config/auth-config.js
 config/cloud-hq-config.js
 
-# Keep templates in git
+# Backend environment files
+backend/.env
+
+# Keep templates and examples in git
 !config/auth-config.template.js
 !config/cloud-hq-config.template.js
+!backend/.env.example
+
+# Security - never commit these
+*.pem
+*.key
+*.crt
+*.p12
+secrets/
+credentials/

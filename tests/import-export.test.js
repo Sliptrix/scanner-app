@@ -1,6 +1,35 @@
 // Import/Export Functionality Tests
 // Tests for the data import and export features
 
+const { JSDOM } = require('jsdom');
+
+// Setup DOM environment for Node.js
+const dom = new JSDOM(`<!DOCTYPE html><html><head></head><body></body></html>`);
+global.window = dom.window;
+global.document = dom.window.document;
+
+// Mock localStorage
+const localStorageData = {};
+global.localStorage = {
+    getItem: (key) => localStorageData[key] || null,
+    setItem: (key, value) => { localStorageData[key] = String(value); },
+    removeItem: (key) => { delete localStorageData[key]; },
+    clear: () => { Object.keys(localStorageData).forEach(k => delete localStorageData[k]); }
+};
+dom.window.localStorage = global.localStorage;
+
+// Mock Blob and URL for export testing
+global.Blob = class Blob {
+    constructor(parts, options) {
+        this.parts = parts;
+        this.options = options;
+    }
+};
+global.URL = {
+    createObjectURL: () => 'blob:mock-url',
+    revokeObjectURL: () => {}
+};
+
 console.log('🧪 Running Import/Export Tests...');
 
 // Test data structures

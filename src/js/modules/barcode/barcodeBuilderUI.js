@@ -811,7 +811,17 @@ window.BarcodeBuilderUI = (function() {
     function showPrintPreview(containers, template, format) {
         const printWindow = window.open('', '_blank', 'width=800,height=600');
         
+        // SECURITY: Sanitize function for print preview content
+        const sanitizeForPrint = (str) => {
+            if (str === null || str === undefined) return '';
+            const div = document.createElement('div');
+            div.textContent = String(str);
+            return div.innerHTML;
+        };
+        
         const labelsHtml = containers.map(container => {
+            // SECURITY: Sanitize container ID before inserting into HTML
+            const safeContainerId = sanitizeForPrint(container.containerId);
             const barcodeData = generateBarcodeData(container.containerId, format);
             return `
                 <div class="print-label" style="
@@ -828,7 +838,7 @@ window.BarcodeBuilderUI = (function() {
                     <div class="barcode">${barcodeData.svg}</div>
                     ${template.showText ? `
                         <div style="font-size: ${template.fontSize}pt; font-weight: bold;">
-                            ${container.containerId}
+                            ${safeContainerId}
                         </div>
                     ` : ''}
                 </div>

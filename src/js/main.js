@@ -32,8 +32,37 @@ window.onerror = function(message, source, lineno, colno, error) {
 // Application initialization
 document.addEventListener('DOMContentLoaded', function() {
     Logger.debug('Lab Scanner System - Phase 3 Core Infrastructure loaded');
+    
+    // PERF: Measure app initialization time
+    const initStart = performance.now();
     initializeApp();
+    const initDuration = performance.now() - initStart;
+    console.log(`[Performance] App initialization: ${initDuration.toFixed(2)}ms`);
+    
+    // PERF: Track initialization in performance monitor
+    if (window.PerformanceMonitor) {
+        PerformanceMonitor.trackRender('AppInitialization', initDuration);
+    }
 });
+
+// PERF: Lazy initialization for non-critical modules
+function initializeLazyModules() {
+    // Use requestIdleCallback for non-critical initialization
+    const runWhenIdle = window.requestIdleCallback || ((cb) => setTimeout(cb, 100));
+    
+    runWhenIdle(() => {
+        // Initialize ML integration if available
+        if (window.MLIntegration && typeof MLIntegration.initialize === 'function') {
+            Logger.debug('Lazy-loading MLIntegration...');
+            MLIntegration.initialize();
+        }
+        
+        // Initialize analytics that aren't immediately visible
+        if (window.AnalyticsEngine && !window.AnalyticsEngine.isInitialized) {
+            Logger.debug('Lazy-loading AnalyticsEngine...');
+        }
+    }, { timeout: 3000 });
+}
 
 // Main application initialization
 function initializeApp() {
@@ -211,6 +240,9 @@ function initializeApp() {
     handleQRCodeScan();
 
     Logger.info('Lab Scanner System initialized successfully');
+    
+    // PERF: Defer non-critical module initialization
+    initializeLazyModules();
 }
 
 // Setup all event listeners
@@ -1264,6 +1296,26 @@ async function showContainerDetail(container) {
 
     // Store current container for editing
     window.currentEditingContainer = container;
+    
+    // SECURITY: Sanitize all container fields for safe HTML display
+    const s = UIUtils.sanitize.bind(UIUtils);
+    const safe = {
+        containerId: s(container.containerId) || 'N/A',
+        status: s(container.status) || 'N/A',
+        owner: s(container.owner) || 'N/A',
+        ownerId: s(container.ownerId) || 'N/A',
+        strain: s(container.strain) || 'N/A',
+        strainId: s(container.strainId) || 'N/A',
+        mediaType: s(container.mediaType || container.media) || 'N/A',
+        mediaId: s(container.mediaId) || 'N/A',
+        stage: s(container.stage) || 'N/A',
+        stageId: s(container.stageId) || 'N/A',
+        tissueCount: s(container.tissueCount) || 'N/A',
+        date: s(container.date) || 'N/A',
+        barcode: s(container.barcode || container.sampleBarcode) || 'N/A',
+        containerLineage: s(container.containerLineage) || '',
+        qrcoDeUrl: s(container.qrcoDeUrl) || ''
+    };
 
     // Compute Excel deep link for QR destination
     let excelDeepLink = '';
@@ -1278,75 +1330,75 @@ async function showContainerDetail(container) {
             console.warn('Failed to resolve Excel row for detail modal:', e);
         }
     }
-    const qrDestUrl = excelDeepLink || `${window.location.origin}?c=${container.containerId}`;
+    const qrDestUrl = excelDeepLink || `${window.location.origin}?c=${s(container.containerId)}`;
 
-    // Build detail view HTML
+    // Build detail view HTML with sanitized values
     const html = `
         <div class="container-detail-grid">
             <div class="container-detail-field">
                 <label>Container ID</label>
-                <div class="value" data-field="containerId">${container.containerId || 'N/A'}</div>
+                <div class="value" data-field="containerId">${safe.containerId}</div>
             </div>
             <div class="container-detail-field">
                 <label>Status</label>
-                <div class="value" data-field="status">${container.status || 'N/A'}</div>
+                <div class="value" data-field="status">${safe.status}</div>
             </div>
             <div class="container-detail-field">
                 <label>Owner</label>
-                <div class="value" data-field="owner">${container.owner || 'N/A'}</div>
+                <div class="value" data-field="owner">${safe.owner}</div>
             </div>
             <div class="container-detail-field">
                 <label>Owner ID</label>
-                <div class="value" data-field="ownerId">${container.ownerId || 'N/A'}</div>
+                <div class="value" data-field="ownerId">${safe.ownerId}</div>
             </div>
             <div class="container-detail-field">
                 <label>Strain</label>
-                <div class="value" data-field="strain">${container.strain || 'N/A'}</div>
+                <div class="value" data-field="strain">${safe.strain}</div>
             </div>
             <div class="container-detail-field">
                 <label>Strain ID</label>
-                <div class="value" data-field="strainId">${container.strainId || 'N/A'}</div>
+                <div class="value" data-field="strainId">${safe.strainId}</div>
             </div>
             <div class="container-detail-field">
                 <label>Media Type</label>
-                <div class="value" data-field="mediaType">${container.mediaType || container.media || 'N/A'}</div>
+                <div class="value" data-field="mediaType">${safe.mediaType}</div>
             </div>
             <div class="container-detail-field">
                 <label>Media ID</label>
-                <div class="value" data-field="mediaId">${container.mediaId || 'N/A'}</div>
+                <div class="value" data-field="mediaId">${safe.mediaId}</div>
             </div>
             <div class="container-detail-field">
                 <label>Stage</label>
-                <div class="value" data-field="stage">${container.stage || 'N/A'}</div>
+                <div class="value" data-field="stage">${safe.stage}</div>
             </div>
             <div class="container-detail-field">
                 <label>Stage ID</label>
-                <div class="value" data-field="stageId">${container.stageId || 'N/A'}</div>
+                <div class="value" data-field="stageId">${safe.stageId}</div>
             </div>
             <div class="container-detail-field">
                 <label>Tissue Count</label>
-                <div class="value" data-field="tissueCount">${container.tissueCount || 'N/A'}</div>
+                <div class="value" data-field="tissueCount">${safe.tissueCount}</div>
             </div>
             <div class="container-detail-field">
                 <label>Date</label>
-                <div class="value" data-field="date">${container.date || 'N/A'}</div>
+                <div class="value" data-field="date">${safe.date}</div>
             </div>
             <div class="container-detail-field full-width">
                 <label>Barcode</label>
-                <div class="value" data-field="barcode" style="font-family: monospace; font-size: 0.95rem;">${container.barcode || container.sampleBarcode || 'N/A'}</div>
+                <div class="value" data-field="barcode" style="font-family: monospace; font-size: 0.95rem;">${safe.barcode}</div>
             </div>
-            ${container.containerLineage ? `
+            ${safe.containerLineage ? `
             <div class="container-detail-field full-width">
                 <label>Container Lineage</label>
-                <div class="value" data-field="containerLineage">${container.containerLineage}</div>
+                <div class="value" data-field="containerLineage">${safe.containerLineage}</div>
             </div>
             ` : ''}
         </div>
 
         <div class="qr-code-instructions">
             <h4>QR Code</h4>
-            ${container.qrcoDeUrl ? `
-                <p style="margin: 4px 0;"><strong>Assigned QR:</strong> <a href="${container.qrcoDeUrl}" target="_blank">${container.qrcoDeUrl}</a></p>
+            ${safe.qrcoDeUrl ? `
+                <p style="margin: 4px 0;"><strong>Assigned QR:</strong> <a href="${safe.qrcoDeUrl}" target="_blank" rel="noopener noreferrer">${safe.qrcoDeUrl}</a></p>
             ` : `
                 <p style="margin: 0 0 4px 0; font-size: 0.85rem;"><strong>Assign pre-printed QR code:</strong></p>
                 <div style="display: flex; gap: 6px; margin-bottom: 8px;">
@@ -1402,7 +1454,9 @@ async function showContainerDetail(container) {
             }
 
             const statusEl = document.getElementById('detailQrAssignStatus');
-            if (statusEl) statusEl.innerHTML = `<span style="color: #059669;">Assigned: <strong>${shortCode}</strong></span>`;
+            // SECURITY: Sanitize shortCode before inserting into HTML
+            const safeShortCode = UIUtils.sanitize(shortCode);
+            if (statusEl) statusEl.innerHTML = `<span style="color: #059669;">Assigned: <strong>${safeShortCode}</strong></span>`;
             detailAssignInput.readOnly = true;
             detailAssignBtn.disabled = true;
             detailAssignBtn.textContent = 'Assigned';

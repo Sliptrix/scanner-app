@@ -161,11 +161,21 @@ window.OneDriveSync = {
      * @returns {Promise<Object>} Sync result
      */
     async manualSync() {
-        // Debounce: prevent concurrent syncs
+        // PERF: Debounce - prevent concurrent syncs
         if (this.isRunning) {
             console.log('OneDriveSync: Sync already in progress, skipping');
             return { success: false, error: 'Sync already in progress' };
         }
+        
+        // PERF: Throttle - prevent API hammering
+        const now = Date.now();
+        const timeSinceLastSync = now - this._lastSyncAttempt;
+        if (timeSinceLastSync < this._minSyncIntervalMs) {
+            const waitTime = this._minSyncIntervalMs - timeSinceLastSync;
+            console.log(`OneDriveSync: Throttling sync, wait ${waitTime}ms`);
+            return { success: false, error: `Please wait ${Math.ceil(waitTime / 1000)}s before syncing again` };
+        }
+        this._lastSyncAttempt = now;
 
         console.log('OneDriveSync: Starting manual sync...');
         this.isRunning = true;
