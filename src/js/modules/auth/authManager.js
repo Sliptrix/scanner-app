@@ -223,17 +223,34 @@ window.AuthManager = {
         // Setup inactivity timeout
         this.setupInactivityTimeout();
         
+        // Check if there's a pending QR scan that triggered login
+        const pendingQR = sessionStorage.getItem('pendingQRScan');
+        
         // Restore last active mode or default to intake
         const lastMode = sessionStorage.getItem('lastActiveMode') || 'intake';
         if (window.UIUtils && typeof window.UIUtils.switchMode === 'function') {
             setTimeout(() => {
                 window.UIUtils.switchMode(lastMode);
                 console.log(`Restored mode: ${lastMode}`);
-            }, 100); // Small delay to ensure app is fully loaded
+            }, 100);
         }
         
         if (window.NotificationSystem) {
             NotificationSystem.success(`Welcome, ${this.currentUser.name || this.currentUser.username}!`);
+        }
+
+        // If a QR scan was pending, re-trigger it after a delay to let data sync complete
+        if (pendingQR) {
+            console.log('Pending QR scan detected after login, will process after data loads...');
+            if (window.NotificationSystem) {
+                NotificationSystem.info('Loading your scanned container...');
+            }
+            // Give cloud sync time to complete, then re-run QR handler
+            setTimeout(() => {
+                if (typeof handleQRCodeScan === 'function') {
+                    handleQRCodeScan();
+                }
+            }, 3000);
         }
     },
     

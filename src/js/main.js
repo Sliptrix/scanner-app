@@ -240,6 +240,7 @@ function initializeApp() {
     NotificationSystem.info('Lab system ready! Load Excel data to begin.');
 
     // Check for QR code scan (URL parameter ?c=shortCode)
+    // Also check sessionStorage for params saved before login redirect
     handleQRCodeScan();
 
     Logger.info('Lab Scanner System initialized successfully');
@@ -1231,20 +1232,73 @@ async function handleQRCodeScan() {
     try {
         const urlParams = new URLSearchParams(window.location.search);
 
-        const containerParam = urlParams.get('c') || urlParams.get('container');
-        const barcodeParam = urlParams.get('barcode');
+        let containerParam = urlParams.get('c') || urlParams.get('container');
+        let barcodeParam = urlParams.get('barcode');
+
+        // If no URL params, check sessionStorage (saved before login redirect)
+        if (!containerParam && !barcodeParam) {
+            const savedScan = sessionStorage.getItem('pendingQRScan');
+            if (savedScan) {
+                try {
+                    const parsed = JSON.parse(savedScan);
+                    containerParam = parsed.container || null;
+                    barcodeParam = parsed.barcode || null;
+                    console.log('Restored QR scan from sessionStorage:', parsed);
+                } catch (e) {
+                    console.warn('Failed to parse saved QR scan:', e);
+                }
+                sessionStorage.removeItem('pendingQRScan');
+            }
+        }
 
         if (!containerParam && !barcodeParam) {
             return; // No QR scan parameter present
         }
 
+        // Save QR params in case we need to redirect for login
+        sessionStorage.setItem('pendingQRScan', JSON.stringify({
+            container: containerParam,
+            barcode: barcodeParam
+        }));
+
         console.log('QR code scanned!', `Container: ${containerParam}`);
 
-        // Wait for data to be loaded
+        // If not signed in, prompt login (params are saved in sessionStorage)
+        if (window.AuthManager && !AuthManager.isSignedIn()) {
+            console.log('User not signed in, redirecting to login. QR params saved.');
+            NotificationSystem.info('Please sign in to view container details...');
+            // Small delay so user sees the message
+            setTimeout(() => AuthManager.signIn(), 500);
+            return;
+        }
+
+        // Wait for data to be loaded (longer timeout — cloud sync can take a while)
         let waitCount = 0;
-        while (!window.appState.isDataLoaded && waitCount < 20) {
+        const maxWait = 40; // 20 seconds
+        while (!window.appState.isDataLoaded && waitCount < maxWait) {
             await new Promise(resolve => setTimeout(resolve, 500));
             waitCount++;
+        }
+
+        // If data still not loaded, try triggering a sync
+        if (!window.appState.isDataLoaded && window.OneDriveSync && AuthManager.isSignedIn()) {
+            console.log('Data not loaded after wait, triggering cloud sync...');
+            NotificationSystem.info('Loading data from HQ workbook...');
+            try {
+                if (typeof quickCloudSync === 'function') {
+                    await quickCloudSync();
+                } else if (window.OneDriveSync.syncNow) {
+                    await OneDriveSync.syncNow();
+                }
+                // Wait a bit more for data to propagate
+                let extraWait = 0;
+                while (!window.appState.isDataLoaded && extraWait < 20) {
+                    await new Promise(resolve => setTimeout(resolve, 500));
+                    extraWait++;
+                }
+            } catch (syncError) {
+                console.warn('Cloud sync failed during QR scan:', syncError);
+            }
         }
 
         // Find the container in inventory
@@ -1266,12 +1320,16 @@ async function handleQRCodeScan() {
 
         if (!container) {
             console.warn(`Container not found for QR scan. Container: ${containerParam}, Barcode: ${barcodeParam}`);
+            sessionStorage.removeItem('pendingQRScan');
             NotificationSystem.warning(`Container not found in inventory. It may not be loaded yet.`);
             window.history.replaceState({}, document.title, window.location.pathname);
             return;
         }
 
         console.log(`✅ Container found:`, container);
+
+        // Clear saved QR scan — we found the container
+        sessionStorage.removeItem('pendingQRScan');
 
         // SMART ROUTING: Check if user has SharePoint permissions
         const hasSharePointAccess = window.AuthManager && window.AuthManager.isSignedIn();
