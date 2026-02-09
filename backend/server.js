@@ -197,9 +197,23 @@ app.post('/api/qrcodes', async (req, res) => {
         });
         saveQRMappings();
 
-        // Use custom destination URL (e.g. Excel deep link) if provided,
-        // otherwise fall back to scan page URL
-        const destinationUrl = customDestUrl || `${baseUrl}/s/${shortCode}`;
+        // Build destination URL priority:
+        // 1. Custom destination URL passed by client
+        // 2. SharePoint HQ workbook deep link (if SHAREPOINT_WORKBOOK_URL is set)
+        // 3. Scan page fallback
+        let destinationUrl;
+        if (customDestUrl) {
+            destinationUrl = customDestUrl;
+        } else if (process.env.SHAREPOINT_WORKBOOK_URL) {
+            // Deep link into SharePoint Excel with the container ID as a search hint
+            // The workbook opens and user can Ctrl+F to find the container
+            const spUrl = process.env.SHAREPOINT_WORKBOOK_URL;
+            // Append activeCell or wdFindString param to help locate the row
+            const separator = spUrl.includes('?') ? '&' : '?';
+            destinationUrl = `${spUrl}${separator}wdFindString=${encodeURIComponent(containerId)}`;
+        } else {
+            destinationUrl = `${baseUrl}/s/${shortCode}`;
+        }
 
         // Generate QR code as data URL
         const qrDataUrl = await QRCode.toDataURL(destinationUrl, {
