@@ -49,19 +49,23 @@ const DashboardManager = (function() {
     // Basic metrics (tissue culture lab-specific)
     function updateBasicMetrics() {
         const inventory = window.appState?.inventory || [];
+        
+        // Get analytics for trend calculation
+        const analytics = window.AnalyticsEngine ? 
+            AnalyticsEngine.getAnalytics({ dateRange: currentDateRange }) : null;
 
         // 1. Active Cultures (total active containers)
         const activeCultures = inventory.filter(item => 
             !item.status || item.status === 'Active' || item.status === 'Complete'
         ).length;
 
-        // 2. Contamination Rate (% of containers marked Discarded/Contaminated vs total)
+        // 2. Survival Rate (% of containers that are Active or Complete vs total)
         const totalContainers = inventory.length;
-        const contaminated = inventory.filter(item => 
-            item.status === 'Discarded' || item.status === 'Contaminated'
+        const surviving = inventory.filter(item => 
+            !item.status || item.status === 'Active' || item.status === 'Complete'
         ).length;
-        const contaminationRate = totalContainers > 0 ? 
-            Math.round((contaminated / totalContainers) * 100) : 0;
+        const survivalRate = totalContainers > 0 ? 
+            (surviving / totalContainers) * 100 : 0;
 
         // 3. Multiplication Rate (avg tissues per transfer)
         const avgSplitRatio = calculateMultiplicationRate(inventory);
@@ -69,15 +73,14 @@ const DashboardManager = (function() {
         // 4. Containers Needing Transfer (older than 21 days in same stage)
         const containersNeedingTransfer = calculateContainersNeedingTransfer(inventory);
 
-        // Update DOM with animation
-        animateValue('activeCultures', activeCultures);
-        animateValue('containersNeedingTransfer', containersNeedingTransfer);
+        // Update DOM with proper formatting and trends
+        updateMetricCard('activeCultures', activeCultures, '', null);
+        updateMetricCard('contaminationRate', contaminationRate, '%', null, 1);
+        updateMetricCard('multiplicationRate', avgSplitRatio, '', null, 1);
+        updateMetricCard('containersNeedingTransfer', containersNeedingTransfer, '', null);
         
-        const contaminationEl = document.getElementById('contaminationRate');
-        if (contaminationEl) contaminationEl.textContent = `${contaminationRate}%`;
-        
-        const multiplicationEl = document.getElementById('multiplicationRate');
-        if (multiplicationEl) multiplicationEl.textContent = avgSplitRatio.toFixed(1);
+        // Update contamination rate color coding
+        updateContaminationRateColor(contaminationRate);
     }
 
     // Enhanced analytics display (tissue culture lab-specific)
@@ -111,6 +114,12 @@ const DashboardManager = (function() {
         const container = document.getElementById('enhancedStatsContainer');
         if (!container) return;
 
+        // Clear container if no analytics data
+        if (!analytics) {
+            container.innerHTML = '';
+            return;
+        }
+
         // Safely access nested analytics data with defaults
         const containers = analytics?.containers || { total: 0, tissueCount: 0 };
         const transfers = analytics?.transfers || { total: 0, avgSplitRatio: 0 };
@@ -131,24 +140,42 @@ const DashboardManager = (function() {
                 color: '#3b82f6'
             },
             {
-                label: 'Transfers',
+                label: 'Active Transfers',
                 value: transfers.total || 0,
                 trend: trends.transfers,
                 icon: '🔄',
                 color: '#8b5cf6'
             },
             {
-                label: 'Avg Split Ratio',
-                value: (transfers.avgSplitRatio || 0).toFixed(1),
-                icon: '📊',
-                color: '#f59e0b'
+                label: 'Success Rate',
+                value: containers.total > 0 ? 
+                    (((containers.total - (containers.discarded || 0)) / containers.total) * 100).toFixed(1) + '%' : 
+                    '—',
+                icon: '✅',
+                color: '#059669'
             }
         ];
 
-        ChartRenderer.renderStatCards(container, stats, { columns: 4 });
+        // Use ChartRenderer if available, otherwise create simple cards
+        if (window.ChartRenderer && ChartRenderer.renderStatCards) {
+            ChartRenderer.renderStatCards(container, stats, { columns: 4 });
+        } else {
+            // Fallback to simple HTML if ChartRenderer not available
+            container.innerHTML = stats.map(stat => `
+                <div class="stat-card" style="background: ${stat.color}20; border-left: 4px solid ${stat.color}; padding: 16px; border-radius: 8px;">
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                        <span style="font-size: 1.5rem;">${stat.icon}</span>
+                        <div>
+                            <div style="font-size: 1.5rem; font-weight: bold; color: #0f172a;">${stat.value}</div>
+                            <div style="font-size: 0.8rem; color: #64748b; font-weight: 600; text-transform: uppercase;">${stat.label}</div>
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+        }
     }
 
-    // 1. Stage Pipeline (horizontal funnel showing flow)
+    // 1. Stage Pipeline (professional visual flow)
     function renderStagePipeline(analytics) {
         const container = document.getElementById('stagePipelineChart');
         if (!container) return;
@@ -157,15 +184,34 @@ const DashboardManager = (function() {
         
         // Define standard tissue culture stages in order
         const stageOrder = ['Mother', 'Initiation', 'Multiplication', 'Rooting', 'Hardening'];
-        const labels = stageOrder.filter(stage => stages[stage] > 0);
-        const values = labels.map(stage => stages[stage]);
-
-        ChartRenderer.renderBarChart(container, { labels, values }, {
-            title: 'Stage Pipeline (Mother → Hardening)',
-            horizontal: true,
-            showValues: true,
-            colors: ['#10b981', '#3b82f6', '#8b5cf6', '#f59e0b', '#ef4444']
+        const stageLabels = stageOrder.filter(stage => stages[stage] || stages[stage] === 0);
+        
+        let html = `
+            <div class="chart-container stage-pipeline-container">
+                <div class="chart-title">Production Stage Pipeline</div>
+                <div class="stage-pipeline-flow">
+        `;
+        
+        stageLabels.forEach((stage, index) => {
+            const count = stages[stage] || 0;
+            html += `
+                <div class="stage-pipeline-step">
+                    <div class="pipeline-stage-count">${count}</div>
+                    <div class="pipeline-stage-name">${stage}</div>
+                </div>
+            `;
+            
+            if (index < stageLabels.length - 1) {
+                html += '<div class="stage-pipeline-arrow">→</div>';
+            }
         });
+        
+        html += `
+                </div>
+            </div>
+        `;
+        
+        container.innerHTML = html;
     }
 
     // 2. Strain Performance (containers per strain, colored by stage)
@@ -177,8 +223,21 @@ const DashboardManager = (function() {
         const labels = Object.keys(strains).slice(0, 10); // Top 10 strains
         const values = labels.map(strain => strains[strain]);
 
+        if (labels.length === 0) {
+            container.innerHTML = `
+                <div class="chart-container">
+                    <div class="chart-title">Strain Performance</div>
+                    <div class="chart-body" style="display: flex; align-items: center; justify-content: center; height: 200px; color: #94a3b8; flex-direction: column; gap: 12px;">
+                        <span style="font-size: 2.5rem;">🧬</span>
+                        <span>No strain data available</span>
+                    </div>
+                </div>
+            `;
+            return;
+        }
+
         ChartRenderer.renderBarChart(container, { labels, values }, {
-            title: 'Top 10 Strains by Container Count',
+            title: 'Top Strains by Container Count',
             horizontal: false,
             showValues: true,
             maxBars: 10
@@ -195,11 +254,25 @@ const DashboardManager = (function() {
         
         // Get last 8 weeks
         const weeks = Object.keys(weekly).slice(-8);
-        const labels = weeks.map(week => `Week ${week.split('-')[1]}`);
+        
+        if (weeks.length === 0) {
+            container.innerHTML = `
+                <div class="chart-container">
+                    <div class="chart-title">Weekly Throughput</div>
+                    <div class="chart-body" style="display: flex; align-items: center; justify-content: center; height: 200px; color: #94a3b8; flex-direction: column; gap: 12px;">
+                        <span style="font-size: 2.5rem;">📈</span>
+                        <span>No transfer data available</span>
+                    </div>
+                </div>
+            `;
+            return;
+        }
+
+        const labels = weeks.map(week => `Week ${week.split('-')[1] || week}`);
         const values = weeks.map(week => weekly[week] || 0);
 
         ChartRenderer.renderLineChart(container, { labels, values }, {
-            title: 'Weekly Throughput (Last 8 Weeks)',
+            title: 'Weekly Throughput',
             showArea: true,
             showDots: true,
             color: '#10b981'
@@ -209,13 +282,42 @@ const DashboardManager = (function() {
     // 4. Media Consumption (batches used vs available, burn rate)
     function renderMediaConsumption(analytics) {
         const container = document.getElementById('mediaConsumptionChart');
-        if (!container || !analytics.mediaBatches.available) return;
+        if (!container) return;
 
-        const batches = analytics.mediaBatches;
+        const batches = analytics?.mediaBatches || {};
+        
+        if (!batches.available || Object.keys(batches).length === 0) {
+            container.innerHTML = `
+                <div class="chart-container">
+                    <div class="chart-title">Media Batch Status</div>
+                    <div class="chart-body" style="display: flex; align-items: center; justify-content: center; height: 200px; color: #94a3b8; flex-direction: column; gap: 12px;">
+                        <span style="font-size: 2.5rem;">💧</span>
+                        <span>No media batch data available</span>
+                    </div>
+                </div>
+            `;
+            return;
+        }
+        
+        const totalBatches = (batches.ready || 0) + (batches.inUse || 0) + 
+                           (batches.depleted || 0) + (batches.expired || 0);
+        
+        if (totalBatches === 0) {
+            container.innerHTML = `
+                <div class="chart-container">
+                    <div class="chart-title">Media Batch Status</div>
+                    <div class="chart-body" style="display: flex; align-items: center; justify-content: center; height: 200px; color: #64748b; flex-direction: column; gap: 12px;">
+                        <span style="font-size: 2.5rem;">💧</span>
+                        <span>No media batches found</span>
+                    </div>
+                </div>
+            `;
+            return;
+        }
         
         ChartRenderer.renderBarChart(container, {
             labels: ['Ready', 'In Use', 'Depleted', 'Expired'],
-            values: [batches.ready, batches.inUse, batches.depleted, batches.expired],
+            values: [batches.ready || 0, batches.inUse || 0, batches.depleted || 0, batches.expired || 0],
             colors: ['#10b981', '#3b82f6', '#64748b', '#ef4444']
         }, {
             title: 'Media Batch Status',
@@ -223,9 +325,9 @@ const DashboardManager = (function() {
         });
 
         // Show expiring soon warning (keep this functionality)
-        if (batches.expiringSoon > 0) {
-            const warningEl = document.getElementById('expiringBatchesWarning');
-            if (warningEl) {
+        const warningEl = document.getElementById('expiringBatchesWarning');
+        if (warningEl) {
+            if (batches.expiringSoon > 0) {
                 warningEl.innerHTML = `
                     <div class="warning-banner">
                         ⚠️ <strong>${batches.expiringSoon}</strong> batches expiring within 7 days
@@ -233,6 +335,8 @@ const DashboardManager = (function() {
                     </div>
                 `;
                 warningEl.style.display = 'block';
+            } else {
+                warningEl.style.display = 'none';
             }
         }
     }
@@ -246,8 +350,21 @@ const DashboardManager = (function() {
         const labels = Object.keys(owners);
         const values = Object.values(owners);
 
+        if (labels.length === 0) {
+            container.innerHTML = `
+                <div class="chart-container">
+                    <div class="chart-title">Technician Workload Distribution</div>
+                    <div class="chart-body" style="display: flex; align-items: center; justify-content: center; height: 200px; color: #94a3b8; flex-direction: column; gap: 12px;">
+                        <span style="font-size: 2.5rem;">👥</span>
+                        <span>No ownership data available</span>
+                    </div>
+                </div>
+            `;
+            return;
+        }
+
         ChartRenderer.renderBarChart(container, { labels, values }, {
-            title: 'Workload Distribution by Owner',
+            title: 'Technician Workload Distribution',
             horizontal: true,
             showValues: true
         });
@@ -328,55 +445,60 @@ const DashboardManager = (function() {
     // Update hero banner message
     function updateHeroBanner() {
         const inventory = window.appState?.inventory || [];
-        let attentionCount = 0;
-        let attentionMessage = '';
+        let actionItems = [];
 
         // Check for containers needing transfer (older than 21 days)
         const containersNeedingTransfer = calculateContainersNeedingTransfer(inventory);
-        attentionCount += containersNeedingTransfer;
+        if (containersNeedingTransfer > 0) {
+            actionItems.push(`${containersNeedingTransfer} culture${containersNeedingTransfer > 1 ? 's' : ''} ready for transfer`);
+        }
 
-        // Check for contamination issues
+        // Check for high contamination rate
+        const totalContainers = inventory.length;
         const contaminated = inventory.filter(item => 
             item.status === 'Discarded' || item.status === 'Contaminated'
         ).length;
+        const contaminationRate = totalContainers > 0 ? (contaminated / totalContainers) * 100 : 0;
+        
+        if (contaminationRate > 10) {
+            actionItems.push('contamination rate above 10%');
+        }
 
         // Check expiring batches
         if (window.MediaBatchManager) {
             const expiring = MediaBatchManager.getExpiringBatches(7);
-            attentionCount += expiring.length;
+            if (expiring.length > 0) {
+                actionItems.push(`${expiring.length} media batch${expiring.length > 1 ? 'es' : ''} expiring soon`);
+            }
         }
 
-        // Create meaningful message
-        if (containersNeedingTransfer > 0) {
-            attentionMessage = `${containersNeedingTransfer} culture${containersNeedingTransfer > 1 ? 's' : ''} need${containersNeedingTransfer === 1 ? 's' : ''} transfer`;
-        } else if (attentionCount > 0) {
-            attentionMessage = `${attentionCount} item${attentionCount > 1 ? 's' : ''} requiring attention`;
+        // Create status message
+        let statusMessage;
+        if (actionItems.length === 0) {
+            statusMessage = 'All systems optimal. Lab operations running smoothly.';
+        } else if (actionItems.length === 1) {
+            statusMessage = `Action required: ${actionItems[0]}.`;
         } else {
-            attentionMessage = 'All cultures on schedule';
+            statusMessage = `Multiple items require attention: ${actionItems.join(', ')}.`;
         }
 
         // Update hero text
-        const highlightText = document.querySelector('.highlight-text');
-        if (highlightText) {
-            highlightText.textContent = attentionMessage;
-            highlightText.title = containersNeedingTransfer > 0 ? 
-                'Cultures ready for next stage transfer' : 
-                'Items needing attention';
-        }
-
-        // Update hero title to be more lab-specific
-        const heroTitle = document.querySelector('.hero-title');
-        if (heroTitle) {
-            heroTitle.textContent = 'LoneWolf Biotech Tissue Culture Lab';
-        }
-
-        // Update hero message
         const heroMessage = document.querySelector('.hero-message');
         if (heroMessage) {
+            const activeCultures = inventory.filter(item => 
+                !item.status || item.status === 'Active' || item.status === 'Complete'
+            ).length;
+            
             heroMessage.innerHTML = `
-                Environmental controls nominal. Sterile conditions maintained. 
-                <span class="highlight-text">${attentionMessage}</span> today.
+                <strong>${activeCultures}</strong> active cultures in production. 
+                <span class="highlight-text">${statusMessage}</span>
             `;
+        }
+
+        // Update hero title to be more professional
+        const heroTitle = document.querySelector('.hero-title');
+        if (heroTitle) {
+            heroTitle.textContent = 'LoneWolf Biotech Tissue Culture Laboratory';
         }
     }
 
@@ -751,6 +873,58 @@ const DashboardManager = (function() {
             
             return itemDate < twentyOneDaysAgo;
         }).length;
+    }
+
+    // Helper: Update metric card with proper formatting and trends
+    function updateMetricCard(metricId, value, suffix = '', trend = null, decimals = 0) {
+        const valueEl = document.getElementById(metricId);
+        const trendEl = document.getElementById(metricId + 'Trend');
+        
+        if (valueEl) {
+            if (value === null || value === undefined || (typeof value === 'number' && isNaN(value))) {
+                valueEl.textContent = '—';
+            } else {
+                const formattedValue = decimals > 0 ? value.toFixed(decimals) : Math.round(value);
+                valueEl.textContent = formattedValue + suffix;
+            }
+        }
+        
+        if (trendEl && trend !== null) {
+            updateTrendIndicator(trendEl, trend);
+        }
+    }
+
+    // Helper: Update trend indicator
+    function updateTrendIndicator(element, trend) {
+        if (!element || !trend) {
+            element.textContent = '—';
+            element.className = 'metric-trend neutral';
+            return;
+        }
+
+        const { direction, value } = trend;
+        const arrow = direction === 'up' ? '↑' : direction === 'down' ? '↓' : '→';
+        const displayValue = value ? Math.abs(value).toFixed(1) + '%' : '';
+        
+        element.textContent = arrow + ' ' + displayValue;
+        element.className = `metric-trend ${direction}`;
+    }
+
+    // Helper: Update contamination rate color coding
+    function updateContaminationRateColor(rate) {
+        const card = document.getElementById('contaminationCard');
+        if (!card) return;
+
+        // Remove existing contamination classes
+        card.classList.remove('contamination-good', 'contamination-warning', 'contamination-danger');
+        
+        if (rate < 5) {
+            card.classList.add('contamination-good');
+        } else if (rate <= 10) {
+            card.classList.add('contamination-warning');
+        } else {
+            card.classList.add('contamination-danger');
+        }
     }
 
     // Setup auto-refresh

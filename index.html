@@ -143,35 +143,48 @@
                     <div class="metric-card">
                         <div class="metric-icon metric-green">🧫</div>
                         <div class="metric-content">
-                            <div class="metric-label">ACTIVE CULTURES</div>
-                            <div class="metric-value" id="activeCultures">0</div>
-                            <div class="metric-progress">
-                                <div class="progress-bar" style="width: 70%;"></div>
+                            <div class="metric-header">
+                                <div class="metric-label">ACTIVE CULTURES</div>
+                                <div class="metric-trend" id="activeCulturesTrend">—</div>
                             </div>
+                            <div class="metric-value" id="activeCultures">—</div>
+                            <div class="metric-subtitle">Total active containers in production</div>
                         </div>
                     </div>
 
-                    <div class="metric-card">
-                        <div class="metric-icon metric-red">⚠️</div>
+                    <div class="metric-card" id="survivalCard">
+                        <div class="metric-icon metric-green">🌿</div>
                         <div class="metric-content">
-                            <div class="metric-label">CONTAMINATION RATE</div>
-                            <div class="metric-value" id="contaminationRate">0%</div>
+                            <div class="metric-header">
+                                <div class="metric-label">SURVIVAL RATE</div>
+                                <div class="metric-trend" id="survivalTrend">—</div>
+                            </div>
+                            <div class="metric-value" id="survivalRate">—</div>
+                            <div class="metric-subtitle">Active + Complete vs total containers</div>
                         </div>
                     </div>
 
                     <div class="metric-card">
                         <div class="metric-icon metric-blue">🧬</div>
                         <div class="metric-content">
-                            <div class="metric-label">MULTIPLICATION RATE</div>
-                            <div class="metric-value" id="multiplicationRate">0.0</div>
+                            <div class="metric-header">
+                                <div class="metric-label">MULTIPLICATION RATE</div>
+                                <div class="metric-trend" id="multiplicationTrend">—</div>
+                            </div>
+                            <div class="metric-value" id="multiplicationRate">—</div>
+                            <div class="metric-subtitle">Average tissues per transfer</div>
                         </div>
                     </div>
 
                     <div class="metric-card">
                         <div class="metric-icon metric-orange">⏰</div>
                         <div class="metric-content">
-                            <div class="metric-label">CONTAINERS NEEDING TRANSFER</div>
-                            <div class="metric-value" id="containersNeedingTransfer">0</div>
+                            <div class="metric-header">
+                                <div class="metric-label">CONTAINERS NEEDING TRANSFER</div>
+                                <div class="metric-trend" id="transferNeedsTrend">—</div>
+                            </div>
+                            <div class="metric-value" id="containersNeedingTransfer">—</div>
+                            <div class="metric-subtitle">Ready for next stage (>21 days)</div>
                         </div>
                     </div>
                 </div>
@@ -225,6 +238,13 @@
                     <!-- Owner Workload -->
                     <div class="analytics-section">
                         <div id="ownerWorkloadChart">
+                            <!-- Populated by ChartRenderer -->
+                        </div>
+                    </div>
+
+                    <!-- Rooting & Survival Breakdown -->
+                    <div class="analytics-section">
+                        <div id="survivalBreakdownChart">
                             <!-- Populated by ChartRenderer -->
                         </div>
                     </div>
