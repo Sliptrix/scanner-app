@@ -34,11 +34,17 @@ window.TransferInputManager = (function() {
 
     // Process source container
     function processSourceContainer(containerId) {
+        if (!containerId) return false;
         if (!validateContainerId(containerId)) return false;
 
         const containerData = findContainerInInventory(containerId);
         if (!containerData) {
-            NotificationSystem.error(`Container ${containerId} not found in inventory`);
+            const inventory = StateManager.getState('inventory');
+            if (!inventory || !Array.isArray(inventory) || inventory.length === 0) {
+                NotificationSystem.error('Inventory not loaded. Please wait for data to load or refresh.');
+            } else {
+                NotificationSystem.error(`Container ${containerId} not found in inventory`);
+            }
             return false;
         }
 
@@ -106,6 +112,10 @@ window.TransferInputManager = (function() {
     // Find container in inventory
     function findContainerInInventory(containerId) {
         const inventory = StateManager.getState('inventory');
+        if (!inventory || !Array.isArray(inventory) || inventory.length === 0) {
+            console.warn('findContainerInInventory: inventory not loaded or empty');
+            return null;
+        }
         const strId = String(containerId).trim();
         // Extract numeric part (strip leading C if present)
         const numericStr = strId.replace(/^C/i, '');
@@ -211,6 +221,7 @@ window.TransferInputManager = (function() {
         if (transferBtn) {
             const canTransfer = source && source.data;
             transferBtn.disabled = !canTransfer;
+            transferBtn.title = canTransfer ? '' : 'Add containers first';
 
             if (canTransfer) {
                 const splitCount = StateManager.getState('transferState.splitCount') || 1;

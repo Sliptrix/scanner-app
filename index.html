@@ -235,7 +235,7 @@
                 <div class="recent-intake" style="margin-top: 20px;">
                     <div class="section-header">
                         <h3>Recent Intake</h3>
-                        <a href="#" class="view-all-link" onclick="switchMode('intake')">View All</a>
+                        <a href="#" class="view-all-link" onclick="switchMode('inventory'); return false;">View All</a>
                     </div>
                     <div class="intake-table-wrapper">
                         <table class="intake-table">
@@ -574,6 +574,7 @@
                 <!-- Step 3: Confirm & Process -->
                 <div style="margin-top: 16px; display: flex; gap: 10px;">
                     <button class="btn btn-primary" id="transferBtn" onclick="processTransfer()" disabled
+                            title="Add containers first"
                             style="flex: 1; padding: 14px; font-size: 1.1rem; font-weight: bold; border-radius: 10px;">
                         Process Transfer
                     </button>

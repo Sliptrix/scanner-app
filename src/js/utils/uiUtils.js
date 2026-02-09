@@ -160,6 +160,12 @@ window.UIUtils = {
             referenceSection.classList.toggle('active', mode === 'reference');
         }
 
+        // Media Batch Tracking only visible on dashboard and recipes (Media Lab) pages
+        const batchSection = document.getElementById('batchSection');
+        if (batchSection) {
+            batchSection.classList.toggle('active', mode === 'dashboard' || mode === 'recipes');
+        }
+
         // Update sidebar nav items
         document.querySelectorAll('.sidebar-nav .nav-item').forEach(btn => {
             const btnMode = btn.getAttribute('data-mode');

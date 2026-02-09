@@ -1386,11 +1386,16 @@ body {
 
 /* Media Batch Section Styles */
 .batch-section {
+    display: none;
     background: #f8f9fa;
     border-radius: 12px;
     padding: 25px;
     border: 2px solid #e9ecef;
     margin-top: 20px;
+}
+
+.batch-section.active {
+    display: block;
 }
 
 .batch-stats-dashboard {
