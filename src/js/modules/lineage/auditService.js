@@ -163,10 +163,10 @@ window.AuditService = (function() {
             }
         }
         
-        // Dev mode fallback
+        // No authenticated user available
         return {
-            id: 'dev-user',
-            name: 'Dev Mode User',
+            id: 'unknown',
+            name: 'Unknown User',
             email: null
         };
     }

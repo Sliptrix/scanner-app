@@ -63,12 +63,6 @@ window.QRCodeService = {
      * @returns {Promise<{generated: number, errors: number, startRow: number}>}
      */
     async generateBatch(count, onProgress) {
-        // In dev mode, skip OneDriveSync entirely and use fallback
-        if (window.isDevMode) {
-            console.log('QRCodeService: Dev mode detected, using fallback QR generation');
-            return this._generateBatchFallback(count, onProgress);
-        }
-        
         // Read pre-populated rows from Excel
         const blankRows = await this._findBlankPrePopulatedRows(count);
 

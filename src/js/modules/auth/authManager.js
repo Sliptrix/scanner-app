@@ -422,41 +422,6 @@ function signOut() {
     AuthManager.signOut();
 }
 
-/**
- * Enter dev mode - bypass authentication for local testing
- * Only available when running on localhost
- */
-function enterDevMode() {
-    // Only allow dev mode on localhost
-    if (!window.location.hostname.includes('localhost') && !window.location.hostname.includes('127.0.0.1')) {
-        alert('Dev mode is only available on localhost');
-        return;
-    }
-    
-    console.log('Entering dev mode - bypassing authentication');
-    
-    // Set a mock user
-    AuthManager.currentUser = {
-        username: 'dev@localhost.test',
-        name: 'Dev Mode User',
-        localAccountId: 'dev-mode-user'
-    };
-    
-    // Mark as dev mode
-    window.isDevMode = true;
-    
-    // Update UI to show app
-    AuthManager.updateUI(true);
-    
-    // Notify user
-    if (window.NotificationSystem) {
-        NotificationSystem.info('Running in Dev Mode - Authentication bypassed');
-    }
-    
-    console.log('Dev mode activated');
-}
-
 // Expose to window
 window.signIn = signIn;
 window.signOut = signOut;
-window.enterDevMode = enterDevMode;
