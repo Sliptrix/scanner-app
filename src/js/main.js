@@ -775,6 +775,9 @@ async function quickCloudSync() {
             ContainerInitiator.updateNextAvailableId();
             Logger.debug('Updated next available container ID after quick cloud sync');
         }
+        // Refresh QR pool next ID from synced data
+        updateNextIdFromSyncedData();
+        fetchNextPoolId();
     } catch (error) {
         console.error('Quick cloud sync error:', error);
         if (window.NotificationSystem) {
@@ -1874,6 +1877,48 @@ function updateQrPoolStatus() {
 
     // Fetch and display next available ID
     fetchNextPoolId();
+}
+
+/**
+ * Read max Container_ID from frontend's synced inventory data
+ * and update the QR pool next ID display. This avoids needing
+ * a separate Graph API call since we already have the data.
+ */
+function updateNextIdFromSyncedData() {
+    try {
+        // Check appState for inventory data
+        const inventory = window.appState?.inventoryData || window.appState?.activeInventory || [];
+        let maxId = 0;
+        
+        // Scan all inventory items for highest numeric Container_ID
+        if (Array.isArray(inventory)) {
+            inventory.forEach(item => {
+                const cid = parseInt(item.Container_ID || item.containerId || item.Asset_ID || '', 10);
+                if (!isNaN(cid) && cid > maxId) maxId = cid;
+            });
+        }
+        
+        // Also check if EnhancedDataLayer has the data
+        if (maxId === 0 && window.EnhancedDataLayer) {
+            const items = EnhancedDataLayer.getAllInventory ? EnhancedDataLayer.getAllInventory() : [];
+            items.forEach(item => {
+                const cid = parseInt(item.Container_ID || item.containerId || item.Asset_ID || '', 10);
+                if (!isNaN(cid) && cid > maxId) maxId = cid;
+            });
+        }
+        
+        if (maxId > 0) {
+            const nextId = maxId + 1;
+            window._qrNextId = nextId;
+            const valueEl = document.getElementById('qrNextIdValue');
+            const infoEl = document.getElementById('qrNextIdInfo');
+            if (valueEl) valueEl.textContent = nextId;
+            if (infoEl) infoEl.style.display = 'block';
+            console.log(`📊 Updated QR next ID from synced data: max Container_ID = ${maxId}, next = ${nextId}`);
+        }
+    } catch (err) {
+        console.warn('Could not update next ID from synced data:', err.message);
+    }
 }
 
 function fetchNextPoolId() {
