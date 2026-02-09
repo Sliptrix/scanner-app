@@ -1077,12 +1077,14 @@ function showGlobalSearchResults(query) {
     
     // Search strains
     if (window.appState && window.appState.strains) {
+        const s = UIUtils.sanitize;
         window.appState.strains.forEach(strain => {
             const name = (strain.name || strain.strainName || '').toLowerCase();
             if (name.includes(q)) {
+                const safeQuery = s(query).replace(/'/g, '&#39;');
                 results.push(`<div style="padding:8px 12px;cursor:pointer;border-bottom:1px solid #334155;color:#e2e8f0;" 
-                    onclick="performGlobalSearch('${query}')">
-                    🌱 ${strain.name || strain.strainName} (${strain.id || strain.strainId || '?'})
+                    onclick="performGlobalSearch('${safeQuery}')">
+                    🌱 ${s(strain.name || strain.strainName)} (${s(strain.id || strain.strainId || '?')})
                 </div>`);
             }
         });
@@ -1677,8 +1679,10 @@ function toggleContainerEdit() {
                 </select>
             `;
         } else {
-            // Text input
-            field.innerHTML = `<input type="text" data-field="${fieldName}" value="${currentValue}" />`;
+            // Text input — SECURITY: sanitize value to prevent attribute injection
+            const safeValue = UIUtils.sanitize(currentValue).replace(/"/g, '&quot;');
+            const safeField = UIUtils.sanitize(fieldName).replace(/"/g, '&quot;');
+            field.innerHTML = `<input type="text" data-field="${safeField}" value="${safeValue}" />`;
         }
     });
 

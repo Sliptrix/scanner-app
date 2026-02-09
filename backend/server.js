@@ -1,6 +1,9 @@
 /**
  * Scanner Backend Server
- * Handles email sending via Microsoft Graph API
+ * Handles email sending via Microsoft Graph API, QR code generation,
+ * and label printing for LoneWolf Biotech Lab Tracker System.
+ * 
+ * @module server
  */
 require('dotenv').config();
 
@@ -124,19 +127,27 @@ app.get('/health', (req, res) => {
 });
 
 /**
- * Generate a short code (6 characters, alphanumeric, similar to qrco.de style)
+ * Generate a short code (6 characters, alphanumeric, similar to qrco.de style).
+ * Uses crypto.randomBytes for better randomness and limits retries to prevent
+ * infinite recursion if the keyspace becomes saturated.
+ * @param {number} [maxRetries=10] - Maximum collision retries
+ * @returns {string} Unique 6-character alphanumeric code
+ * @throws {Error} If unable to generate a unique code within maxRetries
  */
-function generateShortCode() {
+function generateShortCode(maxRetries = 10) {
+    const crypto = require('crypto');
     const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
-    let code = '';
-    for (let i = 0; i < 6; i++) {
-        code += chars.charAt(Math.floor(Math.random() * chars.length));
+    for (let attempt = 0; attempt < maxRetries; attempt++) {
+        const bytes = crypto.randomBytes(6);
+        let code = '';
+        for (let i = 0; i < 6; i++) {
+            code += chars[bytes[i] % chars.length];
+        }
+        if (!qrMappings.has(code)) {
+            return code;
+        }
     }
-    // Check if code already exists, regenerate if it does
-    if (qrMappings.has(code)) {
-        return generateShortCode();
-    }
-    return code;
+    throw new Error('Failed to generate unique short code after maximum retries');
 }
 
 /**
@@ -163,6 +174,14 @@ app.post('/api/qrcodes', async (req, res) => {
                 error: 'Missing required fields',
                 required: ['containerId', 'barcodeData']
             });
+        }
+
+        // SECURITY: Validate input lengths to prevent abuse
+        if (typeof containerId !== 'string' || containerId.length > 200) {
+            return res.status(400).json({ error: 'containerId must be a string under 200 characters' });
+        }
+        if (typeof barcodeData !== 'string' || barcodeData.length > 500) {
+            return res.status(400).json({ error: 'barcodeData must be a string under 500 characters' });
         }
 
         // Generate a short code
@@ -220,6 +239,12 @@ app.post('/api/qrcodes', async (req, res) => {
  */
 app.post('/api/qr-generate', async (req, res) => {
     try {
+        // SECURITY: Validate request body has expected fields
+        const { qr_code_text } = req.body;
+        if (!qr_code_text || typeof qr_code_text !== 'string' || qr_code_text.length > 2000) {
+            return res.status(400).json({ error: 'Invalid or missing qr_code_text (max 2000 chars)' });
+        }
+
         // SECURITY: Load API key from environment variable only
         const qrApiKey = process.env.QR_API_KEY;
         if (!qrApiKey) {
@@ -259,6 +284,11 @@ app.post('/api/qr-generate', async (req, res) => {
 app.get('/api/qrcodes/:shortCode', (req, res) => {
     const { shortCode } = req.params;
 
+    // SECURITY: Validate shortCode format (alphanumeric, 6 chars)
+    if (!/^[A-Za-z0-9]{6}$/.test(shortCode)) {
+        return res.status(400).json({ error: 'Invalid short code format' });
+    }
+
     if (!qrMappings.has(shortCode)) {
         return res.status(404).json({
             error: 'Short code not found',
@@ -276,10 +306,13 @@ app.get('/api/qrcodes/:shortCode', (req, res) => {
 });
 
 /**
- * Get all QR code mappings (for debugging)
+ * Get all QR code mappings (development only — disabled in production)
  * GET /api/qrcodes
  */
 app.get('/api/qrcodes', (req, res) => {
+    if (process.env.NODE_ENV === 'production') {
+        return res.status(403).json({ error: 'This endpoint is disabled in production' });
+    }
     const mappings = Array.from(qrMappings.entries()).map(([shortCode, data]) => ({
         shortCode,
         ...data
@@ -387,11 +420,11 @@ app.post('/api/email/send', async (req, res) => {
 
     } catch (error) {
         console.error('Error sending email:', error);
-        res.status(500).json({ 
-            error: 'Failed to send email',
-            message: error.message,
-            details: error.toString()
-        });
+        const emailError = { error: 'Failed to send email' };
+        if (process.env.NODE_ENV !== 'production') {
+            emailError.message = error.message;
+        }
+        res.status(500).json(emailError);
     }
 });
 
@@ -473,6 +506,12 @@ app.post('/api/print/zpl', async (req, res) => {
             });
         }
 
+        // SECURITY: Validate printer IP format to prevent SSRF
+        const ipRegex = /^(\d{1,3}\.){3}\d{1,3}$/;
+        if (!ipRegex.test(printerIp)) {
+            return res.status(400).json({ error: 'Invalid printer IP format' });
+        }
+
         // Repeat ZPL for copies
         let fullZPL = zpl;
         if (numCopies > 1) {
@@ -515,10 +554,12 @@ app.post('/api/print/zpl', async (req, res) => {
 // Error handling middleware
 app.use((err, req, res, next) => {
     console.error('Server error:', err);
-    res.status(500).json({ 
-        error: 'Internal server error',
-        message: err.message 
-    });
+    const response = { error: 'Internal server error' };
+    // SECURITY: Only expose error details in development
+    if (process.env.NODE_ENV !== 'production') {
+        response.message = err.message;
+    }
+    res.status(500).json(response);
 });
 
 // Start server

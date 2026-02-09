@@ -4,7 +4,7 @@ A comprehensive laboratory management system for barcode generation, container t
 
 ## 🚀 Current Status: Production Ready
 
-**Version:** 2.4  
+**Version:** 2.5  
 **Branch:** feature/production-enhancements-2026-02
 
 ---

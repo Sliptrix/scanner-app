@@ -429,15 +429,17 @@ const DashboardManager = (function() {
             return;
         }
 
+        const s = window.UIUtils ? UIUtils.sanitize : (v => String(v || ''));
         tbody.innerHTML = recentItems.map(item => {
             const stageClass = getStageClass(item.stage);
+            const safeId = s(item.containerId || 'N/A');
             return `
-                <tr class="clickable-row" onclick="DashboardManager.viewContainer('${item.containerId}')">
-                    <td><strong>${item.containerId || 'N/A'}</strong></td>
-                    <td>${item.strain || 'Unknown'}</td>
-                    <td><span class="stage-badge ${stageClass}">${item.stage || 'N/A'}</span></td>
+                <tr class="clickable-row" onclick="DashboardManager.viewContainer('${safeId}')">
+                    <td><strong>${safeId}</strong></td>
+                    <td>${s(item.strain || 'Unknown')}</td>
+                    <td><span class="stage-badge ${stageClass}">${s(item.stage || 'N/A')}</span></td>
                     <td>${formatDate(item.date || item.timestamp)}</td>
-                    <td><strong>${item.tissueCount || 1}</strong></td>
+                    <td><strong>${typeof item.tissueCount === 'number' ? item.tissueCount : 1}</strong></td>
                 </tr>
             `;
         }).join('');
