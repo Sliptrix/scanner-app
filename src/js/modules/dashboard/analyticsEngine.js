@@ -473,14 +473,17 @@ window.AnalyticsEngine = (function() {
      * Filter items by date range
      */
     function filterByDateRange(items, dateRange, dateField = 'date') {
-        const start = new Date(dateRange.start);
-        start.setHours(0, 0, 0, 0);
-        const end = new Date(dateRange.end);
-        end.setHours(23, 59, 59, 999);
+        // Parse date strings as UTC to avoid timezone issues
+        const startParts = dateRange.start.split('-');
+        const start = new Date(Date.UTC(startParts[0], startParts[1] - 1, startParts[2], 0, 0, 0, 0));
+        const endParts = dateRange.end.split('-');
+        const end = new Date(Date.UTC(endParts[0], endParts[1] - 1, endParts[2], 23, 59, 59, 999));
 
         return items.filter(item => {
-            const itemDate = new Date(item[dateField] || item.timestamp || item.createdAt);
-            return itemDate >= start && itemDate <= end;
+            const rawDate = item[dateField] || item.timestamp || item.createdAt;
+            if (!rawDate) return false;
+            const itemDate = new Date(rawDate);
+            return !isNaN(itemDate.getTime()) && itemDate >= start && itemDate <= end;
         });
     }
 
