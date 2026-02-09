@@ -73,7 +73,10 @@ window.AuthManager = {
         try {
             // Create MSAL instance
             this.msalInstance = new msal.PublicClientApplication(this.msalConfig);
-            await this.msalInstance.initialize();
+            // MSAL v2 doesn't have initialize() — only v3+ does
+            if (typeof this.msalInstance.initialize === 'function') {
+                await this.msalInstance.initialize();
+            }
             
             // Handle redirect response if returning from login
             const response = await this.msalInstance.handleRedirectPromise();

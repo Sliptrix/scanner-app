@@ -1241,6 +1241,8 @@
     <script src="src/js/modules/intake/pdfGenerator.js"></script>
     <script src="src/js/modules/intake/intakeMain.js"></script>
     <!-- Authentication Module -->
+    <script src="config/auth-config.js" onerror="console.log('auth-config.js not found, using defaults')"></script>
+    <script src="config/cloud-hq-config.js" onerror="console.log('cloud-hq-config.js not found, using defaults')"></script>
     <script src="src/js/modules/auth/authManager.js?v=3"></script>
     <!-- Cloud Sync Module -->
     <script src="src/js/modules/cloud/oneDriveSync.js?v=2.3"></script>
@@ -1253,11 +1255,6 @@
     
     <!-- Barcode Builder UI (Phase 5) -->
     <script src="src/js/modules/barcode/barcodeBuilderUI.js"></script>
-    
-    <!-- Configuration Files (optional - copy from templates and customize) -->
-    <!-- These provide environment-specific settings without hardcoding -->
-    <script src="config/auth-config.js" onerror="console.log('auth-config.js not found, using defaults')"></script>
-    <script src="config/cloud-hq-config.js" onerror="console.log('cloud-hq-config.js not found, using defaults')"></script>
     
     <!-- Main Application -->
     <script src="src/js/main.js?v=2.3"></script>
