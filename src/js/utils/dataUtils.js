@@ -233,20 +233,74 @@ window.DataUtils = {
         }
     },
     
+    // Helper: find a sheet by trying multiple name variants (exact match)
+    _findSheet: function(workbook, names) {
+        for (const name of names) {
+            if (workbook.Sheets[name]) return workbook.Sheets[name];
+        }
+        return null;
+    },
+
+    // Helper: parse a sheet with title-row detection.
+    // Some HQ workbook sheets have a title row before the header row.
+    // We detect this by looking for a row where multiple cells match expected header names.
+    _sheetToJsonSmart: function(sheet, expectedHeaders) {
+        if (!sheet) return [];
+        // First try array-of-arrays to detect header row
+        const aoa = XLSX.utils.sheet_to_json(sheet, { header: 1, blankrows: false });
+        if (!aoa.length) return [];
+
+        let headerRowIndex = 0;
+        const lowerExpected = (expectedHeaders || []).map(h => h.toLowerCase().replace(/[_ ]/g, ''));
+
+        // Search first 5 rows for the best header match
+        if (lowerExpected.length > 0) {
+            let bestScore = 0;
+            for (let i = 0; i < Math.min(aoa.length, 5); i++) {
+                const row = aoa[i];
+                if (!Array.isArray(row)) continue;
+                const score = row.filter(cell => {
+                    if (!cell) return false;
+                    const norm = String(cell).toLowerCase().replace(/[_ ]/g, '');
+                    return lowerExpected.includes(norm);
+                }).length;
+                if (score > bestScore) {
+                    bestScore = score;
+                    headerRowIndex = i;
+                }
+            }
+        }
+
+        // Build objects from headerRowIndex
+        const headerRow = aoa[headerRowIndex] || [];
+        const dataRows = aoa.slice(headerRowIndex + 1);
+        return dataRows.map(rowArr => {
+            const obj = {};
+            headerRow.forEach((h, idx) => {
+                if (h) obj[String(h).trim()] = rowArr[idx];
+            });
+            return obj;
+        }).filter(row => Object.keys(row).length > 0);
+    },
+
     // Excel data processing utilities
     processExcelData: function(workbook, fileName = 'Unknown File') {
         try {
-            this.loadStrains(workbook.Sheets['Strains']);
-            this.loadOwners(workbook.Sheets['Owners']);
-            this.loadStages(workbook.Sheets['Stages']);
-            this.loadLocations(workbook.Sheets['Locations']);
-            this.loadMediaTypes(workbook.Sheets['Media_Types']);
-            this.loadStrainOwnerMapping(workbook.Sheets['Strain_Owner_Mapping'] || workbook.Sheets['Strain-Owner']);
+            // Use fallback sheet names for HQ workbook compatibility
+            this.loadStrains(this._findSheet(workbook, ['Strains', 'Ref_Strains']));
+            this.loadOwners(this._findSheet(workbook, ['Owners', 'Ref_Owners']));
+            this.loadStages(this._findSheet(workbook, ['Stages', 'Ref_Stages']));
+            this.loadLocations(this._findSheet(workbook, ['Locations', 'Ref_Locations']));
+            this.loadMediaTypes(this._findSheet(workbook, ['Media_Types', 'Ref_Media_Types']));
+            this.loadStrainOwnerMapping(this._findSheet(workbook, ['Strain_Owner_Mapping', 'Strain-Owner']));
 
             // Load strain abbreviations if available (for flexible input resolution)
-            this.loadStrainAbbreviations(workbook.Sheets['Ref_Strains'] || workbook.Sheets['Strains']);
+            this.loadStrainAbbreviations(this._findSheet(workbook, ['Ref_Strains', 'Strains']));
             // Load owner alternates if available
-            this.loadOwnerAlternates(workbook.Sheets['Ref_Owners'] || workbook.Sheets['Owners']);
+            this.loadOwnerAlternates(this._findSheet(workbook, ['Ref_Owners', 'Owners']));
+
+            // Load Active_Inventory if present (HQ workbook)
+            this.loadActiveInventory(workbook);
 
             window.appState.isDataLoaded = true;
 
@@ -258,6 +312,7 @@ window.DataUtils = {
             Logger.debug(`Owners: ${Object.keys(window.appState.ownersTable).length}`);
             Logger.debug(`Stages: ${Object.keys(window.appState.stagesTable).length}`);
             Logger.debug(`Strain-Owner Mappings: ${Object.keys(window.appState.strainOwnerMapping || {}).length}`);
+            Logger.debug(`Inventory: ${window.appState.inventory ? window.appState.inventory.length : 0}`);
 
             // Rebuild InventoryLookupService with new data
             if (window.InventoryLookupService && window.InventoryLookupService.isInitialized()) {
@@ -340,48 +395,167 @@ window.DataUtils = {
     
     loadStrains: function(sheet) {
         if (!sheet) return;
-        const data = XLSX.utils.sheet_to_json(sheet);
+        const data = this._sheetToJsonSmart(sheet, ['Strain ID', 'Strain_ID', 'Strain', 'Strain_Name']);
         data.forEach(row => {
-            if (row['Strain ID'] && row['Strain']) {
-                window.appState.strainsTable[parseInt(row['Strain ID'])] = row['Strain'];
+            const id = row['Strain ID'] || row['Strain_ID'] || row['StrainID'];
+            const name = row['Strain'] || row['Strain_Name'] || row['StrainName'];
+            if (id && name) {
+                window.appState.strainsTable[parseInt(id)] = name;
             }
         });
     },
     
     loadOwners: function(sheet) {
         if (!sheet) return;
-        const data = XLSX.utils.sheet_to_json(sheet);
+        const data = this._sheetToJsonSmart(sheet, ['Owner ID', 'Owner_Code', 'Owner', 'Owner_Name']);
         data.forEach(row => {
-            if (row['Owner ID'] && row['Owner']) {
-                window.appState.ownersTable[row['Owner ID']] = row['Owner'];
+            const id = row['Owner ID'] || row['Owner_Code'] || row['OwnerID'];
+            const name = row['Owner'] || row['Owner_Name'] || row['OwnerName'];
+            if (id && name) {
+                window.appState.ownersTable[id] = name;
             }
         });
     },
     
     loadStages: function(sheet) {
         if (!sheet) return;
-        const data = XLSX.utils.sheet_to_json(sheet);
+        const data = this._sheetToJsonSmart(sheet, ['Propogation Stages ID', 'Stage_ID', 'Stage', 'Stage_Name']);
         data.forEach(row => {
-            if (row['Propogation Stages ID'] && row['Propogation Stages']) {
-                window.appState.stagesTable[parseInt(row['Propogation Stages ID'])] = row['Propogation Stages'];
+            const id = row['Propogation Stages ID'] || row['Stage_ID'] || row['StageID'];
+            const name = row['Propogation Stages'] || row['Stage_Name'] || row['StageName'] || row['Stage'];
+            if (id && name) {
+                window.appState.stagesTable[parseInt(id)] = name;
             }
         });
     },
     
     loadLocations: function(sheet) {
         if (!sheet) return;
-        const data = XLSX.utils.sheet_to_json(sheet);
-        window.appState.locationsTable = data.map(row => row['Locations']).filter(Boolean);
+        const data = this._sheetToJsonSmart(sheet, ['Locations', 'Location_Name', 'Location']);
+        window.appState.locationsTable = data.map(row => 
+            row['Locations'] || row['Location_Name'] || row['Location'] || row['LocationName']
+        ).filter(Boolean);
     },
     
     loadMediaTypes: function(sheet) {
         if (!sheet) return;
-        const data = XLSX.utils.sheet_to_json(sheet);
+        const data = this._sheetToJsonSmart(sheet, ['Media ID', 'Media_Code', 'Media Type', 'Media_Name']);
         data.forEach(row => {
-            if (row['Media ID'] && row['Media Type']) {
-                window.appState.mediaTypesTable[row['Media ID']] = row['Media Type'];
+            const id = row['Media ID'] || row['Media_Code'] || row['MediaID'];
+            const name = row['Media Type'] || row['Media_Name'] || row['MediaType'];
+            if (id && name) {
+                window.appState.mediaTypesTable[id] = name;
             }
         });
+    },
+
+    // Load Active_Inventory from workbook (HQ workbook support)
+    loadActiveInventory: function(workbook) {
+        // Find Active_Inventory sheet
+        const sheetName = workbook.SheetNames.find(n => 
+            n.toLowerCase().replace(/[_ ]/g, '') === 'activeinventory'
+        );
+        if (!sheetName) return;
+
+        const sheet = workbook.Sheets[sheetName];
+        if (!sheet) return;
+
+        Logger.debug('Loading Active_Inventory sheet...');
+
+        const aoa = XLSX.utils.sheet_to_json(sheet, { header: 1, blankrows: false, cellDates: true });
+        if (!aoa.length) return;
+
+        // Find header row by looking for Container_ID
+        let headerRowIndex = 0;
+        for (let i = 0; i < Math.min(aoa.length, 10); i++) {
+            const row = aoa[i];
+            if (!Array.isArray(row)) continue;
+            if (row.some(cell => cell && String(cell).toLowerCase().trim() === 'container_id')) {
+                headerRowIndex = i;
+                break;
+            }
+        }
+
+        const headerRow = aoa[headerRowIndex] || [];
+        const dataRows = aoa.slice(headerRowIndex + 1);
+        if (!dataRows.length) return;
+
+        // Build row objects
+        const rows = dataRows.map(rowArr => {
+            const obj = {};
+            headerRow.forEach((h, idx) => {
+                if (h) obj[String(h).trim()] = rowArr[idx];
+            });
+            return obj;
+        }).filter(row => Object.keys(row).length > 0);
+
+        // Helper to find field by candidate names (case-insensitive, ignoring _ and spaces)
+        const getField = (row, candidates) => {
+            for (const key of Object.keys(row)) {
+                let norm = key.toLowerCase().trim().replace(/[_ ]/g, '');
+                norm = norm.replace(/\d+$/, ''); // strip XLSX duplicate suffixes
+                if (candidates.some(c => c.toLowerCase().replace(/[_ ]/g, '') === norm)) {
+                    return row[key];
+                }
+            }
+            return undefined;
+        };
+
+        const inventory = [];
+        rows.forEach(row => {
+            const containerIdValue = getField(row, ['Container_ID']);
+            if (containerIdValue === undefined || containerIdValue === null || containerIdValue === '') return;
+
+            const rawId = parseInt(String(containerIdValue).trim(), 10);
+            if (isNaN(rawId)) return;
+
+            const containerId = String(rawId).padStart(6, '0');
+
+            const strainName = getField(row, ['Strain_Name', 'Strain']) || getField(row, ['Strain_ID']);
+            const ownerName = getField(row, ['Owner', 'Owner_Name']);
+            const stage = getField(row, ['Stage']);
+            const location = getField(row, ['Location', 'Room', 'Rack']);
+            const media = getField(row, ['Media', 'Media_Type']);
+            const quantity = getField(row, ['Quantity', 'TissueCount', 'Tissue_Count']);
+            const dateCreated = getField(row, ['DateCreated', 'Date_Created', 'Date']);
+            const notes = getField(row, ['Notes', 'Comment', 'Comments']);
+            const status = getField(row, ['Status']);
+
+            // Format date
+            let formattedDate = '';
+            if (dateCreated) {
+                if (dateCreated instanceof Date) {
+                    const y = dateCreated.getFullYear();
+                    const m = String(dateCreated.getMonth() + 1).padStart(2, '0');
+                    const d = String(dateCreated.getDate()).padStart(2, '0');
+                    formattedDate = `${y}${m}${d}`;
+                } else {
+                    formattedDate = String(dateCreated);
+                }
+            }
+
+            inventory.push({
+                containerId: containerId,
+                strain: strainName ? String(strainName) : '',
+                owner: ownerName ? String(ownerName) : '',
+                stage: stage ? String(stage) : '',
+                location: location ? String(location) : '',
+                media: media ? String(media) : '',
+                tissueCount: quantity ? parseInt(quantity, 10) || 0 : 0,
+                dateCreated: formattedDate,
+                notes: notes ? String(notes) : '',
+                status: status ? String(status) : 'Active',
+                source: 'excel'
+            });
+        });
+
+        if (inventory.length > 0) {
+            window.appState.inventory = inventory;
+            Logger.debug(`Active_Inventory loaded: ${inventory.length} entries`);
+
+            // Dispatch event so dashboard auto-refreshes
+            window.dispatchEvent(new Event('inventoryUpdated'));
+        }
     },
     
     // Load strain-to-owner mapping data

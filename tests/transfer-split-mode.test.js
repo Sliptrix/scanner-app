@@ -30,11 +30,16 @@ const dom = new JSDOM(`<!DOCTYPE html>
     <div id="splitSummary"></div>
     <div id="newContainersList"></div>
     <div id="transferFeedback"></div>
+    <div id="totalProcessed"></div>
+    <div id="uniqueStrains"></div>
+    <div id="sessionCount"></div>
 </body>
 </html>`);
 
 global.window = dom.window;
 global.document = dom.window.document;
+global.Event = dom.window.Event;
+global.CustomEvent = dom.window.CustomEvent;
 
 // Mock localStorage for Node.js environment
 const localStorageData = {};
