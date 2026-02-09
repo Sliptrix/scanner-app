@@ -105,6 +105,11 @@ window.IntakeDataManager = {
             };
         }
         
+        // Ensure sub-objects exist
+        if (!this.strainOwnerData.strainOwnerMapping) this.strainOwnerData.strainOwnerMapping = {};
+        if (!this.strainOwnerData.strainNameMapping) this.strainOwnerData.strainNameMapping = {};
+        if (!this.strainOwnerData.ownerCounts) this.strainOwnerData.ownerCounts = {};
+        
         // Add to mappings
         this.strainOwnerData.strainOwnerMapping[strainID] = ownerID;
         this.strainOwnerData.strainNameMapping[strainID] = strainName;

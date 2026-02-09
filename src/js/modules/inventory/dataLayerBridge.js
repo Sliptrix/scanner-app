@@ -165,6 +165,7 @@ const DataLayerBridge = (function() {
     function setupInventoryListeners() {
         // Listen for EnhancedDataLayer events
         window.addEventListener('inventoryUpdated', function(e) {
+            if (!e.detail) return;
             const { item, action } = e.detail;
             
             // Push to AppState for backward compatibility
@@ -182,6 +183,7 @@ const DataLayerBridge = (function() {
         });
 
         window.addEventListener('enhancedDataLoaded', function(e) {
+            if (!e.detail) return;
             const data = e.detail;
             updateInventoryTable(data.inventory);
             updateStats(EnhancedDataLayer.getStats());

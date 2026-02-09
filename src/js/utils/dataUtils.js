@@ -292,7 +292,13 @@ window.DataUtils = {
             this.loadStages(this._findSheet(workbook, ['Stages', 'Ref_Stages']));
             this.loadLocations(this._findSheet(workbook, ['Locations', 'Ref_Locations']));
             this.loadMediaTypes(this._findSheet(workbook, ['Media_Types', 'Ref_Media_Types']));
-            this.loadStrainOwnerMapping(this._findSheet(workbook, ['Strain_Owner_Mapping', 'Strain-Owner']));
+            const mappingSheet = this._findSheet(workbook, ['Strain_Owner_Mapping', 'Strain-Owner']);
+            if (mappingSheet) {
+                this.loadStrainOwnerMapping(mappingSheet);
+            } else {
+                // Build strain-owner mapping from Ref_Strains OWNER column if no dedicated sheet
+                this.buildStrainOwnerMappingFromStrains(this._findSheet(workbook, ['Ref_Strains', 'Strains']));
+            }
 
             // Load strain abbreviations if available (for flexible input resolution)
             this.loadStrainAbbreviations(this._findSheet(workbook, ['Ref_Strains', 'Strains']));
@@ -583,7 +589,32 @@ window.DataUtils = {
         
         Logger.debug('Strain-Owner mapping loaded:', window.appState.strainOwnerMapping);
     },
-    
+
+    // Build strain-owner mapping from Ref_Strains OWNER column (HQ workbook)
+    buildStrainOwnerMappingFromStrains: function(sheet) {
+        if (!sheet) {
+            Logger.debug('No strains sheet for strain-owner mapping, skipping');
+            return;
+        }
+        const data = this._sheetToJsonSmart(sheet, ['Strain_ID', 'Strain_Name', 'OWNER']);
+        window.appState.strainOwnerMapping = {};
+        window.appState.strainOwners = {};
+        let count = 0;
+        data.forEach(row => {
+            const strainId = row['Strain_ID'] || row['Strain ID'] || row['StrainID'];
+            const owner = row['OWNER'] || row['Owner'] || row['owner'];
+            if (strainId && owner) {
+                const normalizedId = parseInt(strainId).toString();
+                const ownerStr = String(owner).trim();
+                window.appState.strainOwnerMapping[normalizedId] = ownerStr.toUpperCase();
+                // Also populate strainOwners (array format used by InventoryLookupService)
+                window.appState.strainOwners[normalizedId] = [ownerStr];
+                count++;
+            }
+        });
+        Logger.debug(`Built strain-owner mapping from Ref_Strains OWNER column: ${count} entries`);
+    },
+
     // Load demo strain-to-owner mapping for testing
     loadDemoStrainOwnerMapping: function() {
         console.log('Loading demo strain-to-owner mapping data');
@@ -622,6 +653,11 @@ window.DataUtils = {
                     return response.json();
                 })
                 .then(function(data) {
+                    // Don't overwrite data already loaded from Excel
+                    if (window.appState.isDataLoaded && Object.keys(window.appState.strainsTable || {}).length > 0) {
+                        console.log('JSON fallback skipped — Excel data already loaded');
+                        return;
+                    }
                     console.log('Loading data from JSON file:', data);
                     
                     // Load strain-owner mapping
@@ -813,6 +849,12 @@ window.DataUtils = {
                     return response.json();
                 })
                 .then(function(data) {
+                    // Don't overwrite data already loaded from Excel
+                    if (window.appState.isDataLoaded && Object.keys(window.appState.strainsTable || {}).length > 0) {
+                        console.log('JSON fallback async skipped — Excel data already loaded');
+                        resolve();
+                        return;
+                    }
                     console.log('Loading data from JSON file:', data);
 
                     // Load strain-owner mapping
