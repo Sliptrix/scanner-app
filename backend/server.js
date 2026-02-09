@@ -324,31 +324,31 @@ app.post('/api/qrcodes/pool/generate', async (req, res) => {
         const errors = [];
 
         // Determine next numeric ID
-        // If caller provided startId (pre-queried from /next-id), use it
-        let nextId = startId ? parseInt(startId) : 1;
+        // Priority: 1) HQ workbook (via token), 2) caller-provided startId, 3) in-memory local codes
+        let nextId = 1;
         
-        if (!startId) {
-            // Check HQ workbook for highest Container_ID (use caller's token if available)
-            const token = extractBearerToken(req);
-            if (token) {
-                try {
-                    const hqMax = await queryHQMaxContainerId(token);
-                    if (hqMax >= nextId) nextId = hqMax + 1;
-                    console.log(`📊 HQ workbook max Container_ID: ${hqMax}, next pool ID: ${nextId}`);
-                } catch (err) {
-                    console.warn('⚠️ Could not query HQ workbook for max ID, using local state:', err.message);
-                }
+        const token = extractBearerToken(req);
+        if (token) {
+            try {
+                const hqMax = await queryHQMaxContainerId(token);
+                if (hqMax >= nextId) nextId = hqMax + 1;
+                console.log(`📊 HQ workbook max Container_ID: ${hqMax}, next pool ID: ${nextId}`);
+            } catch (err) {
+                console.warn('⚠️ Could not query HQ workbook for max ID:', err.message);
             }
-        } else {
+        }
+        
+        // If no HQ data and caller provided startId, use it
+        if (nextId === 1 && startId) {
+            nextId = parseInt(startId);
             console.log(`📊 Using caller-provided startId: ${nextId}`);
         }
         
-        // Also check any in-memory codes from this session
-        for (const [code] of qrMappings) {
-            const num = parseInt(code, 10);
-            if (!isNaN(num) && num >= nextId) {
-                nextId = num + 1;
-            }
+        // Floor: never go below what we already generated this session
+        const localMax = getMaxContainerIdLocal();
+        if (localMax >= nextId) {
+            nextId = localMax + 1;
+            console.log(`📊 Bumped to ${nextId} based on in-memory codes`);
         }
 
         for (let i = 0; i < count; i++) {
@@ -1070,6 +1070,34 @@ function escapeHtml(str) {
 }
 
 /**
+ * GET /api/qrcodes/next-id
+ * Returns the next available container ID based on HQ workbook data.
+ * Requires Bearer token for Graph API access.
+ */
+app.get('/api/qrcodes/next-id', async (req, res) => {
+    try {
+        const token = extractBearerToken(req);
+        let hqMax = 0;
+        
+        if (token) {
+            try {
+                hqMax = await queryHQMaxContainerId(token);
+            } catch (err) {
+                console.warn('⚠️ HQ workbook query failed:', err.message);
+            }
+        }
+        
+        const localMax = getMaxContainerIdLocal();
+        const nextId = Math.max(hqMax, localMax) + 1;
+        
+        res.json({ success: true, nextId, hqMax, localMax });
+    } catch (error) {
+        console.error('Next ID error:', error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
+/**
  * Lookup a short code to get container information (JSON API)
  * GET /api/qrcodes/:shortCode
  */
@@ -1421,34 +1449,6 @@ function getMaxContainerIdLocal() {
     }
     return max;
 }
-
-/**
- * GET /api/qrcodes/next-id
- * Returns the next available container ID based on HQ workbook data.
- * Requires Bearer token for Graph API access.
- */
-app.get('/api/qrcodes/next-id', async (req, res) => {
-    try {
-        const token = extractBearerToken(req);
-        let hqMax = 0;
-        
-        if (token) {
-            try {
-                hqMax = await queryHQMaxContainerId(token);
-            } catch (err) {
-                console.warn('⚠️ HQ workbook query failed:', err.message);
-            }
-        }
-        
-        const localMax = getMaxContainerIdLocal();
-        const nextId = Math.max(hqMax, localMax) + 1;
-        
-        res.json({ success: true, nextId, hqMax, localMax });
-    } catch (error) {
-        console.error('Next ID error:', error);
-        res.status(500).json({ error: 'Internal server error' });
-    }
-});
 
 /**
  * GET /api/container/:containerId/details
