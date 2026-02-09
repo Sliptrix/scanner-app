@@ -71,7 +71,7 @@ const PORT = process.env.PORT || 3001;
 
 // Serve frontend static files (unified single-process deployment)
 const frontendPath = path.join(__dirname, '..');
-app.use(express.static(frontendPath, { index: false })); // index:false so /s/:shortCode isn't shadowed
+app.use(express.static(frontendPath));
 
 // In-memory QR code mappings (short code -> barcode data)
 // Starts clean every boot — HQ workbook is the source of truth for next ID
