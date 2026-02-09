@@ -314,7 +314,7 @@ app.get('/s/:shortCode', (req, res) => {
 });
 
 /**
- * Render a mobile-friendly HTML page for scanned containers
+ * Render enhanced mobile-friendly scan page with 3-tier auth (no-auth, authenticated, admin)
  */
 function renderScanPage(data, error) {
     if (error) {
@@ -335,60 +335,126 @@ function renderScanPage(data, error) {
 <div class="card">
   <div class="icon">⚠️</div>
   <h1>Container Not Found</h1>
-  <p>${error}</p>
+  <p>${escapeHtml(error)}</p>
   <div class="brand">🐺 LoneWolf Biotech Lab Tracker</div>
 </div>
 </body></html>`;
     }
 
-    // Parse barcode data to extract fields
     const fields = parseBarcodeData(data.barcodeData);
+    const containerId = escapeHtml(data.containerId);
+    const spUrl = process.env.SHAREPOINT_WORKBOOK_URL || '';
+    const workbookLink = spUrl ? `${spUrl}${spUrl.includes('?') ? '&' : '?'}wdFindString=${encodeURIComponent(data.containerId)}` : '';
 
     return `<!DOCTYPE html>
 <html lang="en"><head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Container ${data.containerId} — LoneWolf Biotech</title>
+<title>Container ${containerId} — LoneWolf Biotech</title>
+<script src="https://alcdn.msauth.net/browser/2.32.2/js/msal-browser.min.js"></script>
 <style>
   *{margin:0;padding:0;box-sizing:border-box}
-  body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:linear-gradient(135deg,#f0fdf4 0%,#ecfdf5 50%,#f0f9ff 100%);min-height:100vh;padding:20px}
-  .container{max-width:480px;margin:0 auto}
-  .header{text-align:center;margin-bottom:20px;padding:24px 0}
-  .header .icon{font-size:2.5rem;margin-bottom:8px}
-  .header h1{font-size:1.4rem;color:#166534;font-weight:700}
-  .header .id{font-size:2rem;color:#059669;font-weight:800;letter-spacing:1px;margin-top:4px}
-  .card{background:#fff;border-radius:16px;padding:24px;margin-bottom:16px;box-shadow:0 2px 12px rgba(0,0,0,0.06);border:1px solid #e2e8f0}
-  .card h2{font-size:0.85rem;text-transform:uppercase;letter-spacing:1px;color:#94a3b8;margin-bottom:16px;font-weight:600}
-  .field{display:flex;justify-content:space-between;align-items:center;padding:12px 0;border-bottom:1px solid #f1f5f9}
+  body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:linear-gradient(135deg,#f0fdf4 0%,#ecfdf5 50%,#f0f9ff 100%);min-height:100vh;padding:16px}
+  .wrap{max-width:480px;margin:0 auto}
+  .header{text-align:center;padding:20px 0 16px}
+  .header .logo{font-size:2.2rem;margin-bottom:4px}
+  .header h1{font-size:1.2rem;color:#166534;font-weight:700}
+  .header .cid{font-size:1.8rem;color:#059669;font-weight:800;letter-spacing:1px;margin-top:2px}
+  .user-bar{display:flex;align-items:center;justify-content:space-between;background:#fff;border-radius:12px;padding:10px 16px;margin-bottom:12px;box-shadow:0 1px 4px rgba(0,0,0,0.06);font-size:0.85rem}
+  .user-bar .name{color:#1e293b;font-weight:600}
+  .user-bar .admin-badge{background:#7c3aed;color:#fff;font-size:0.7rem;padding:2px 8px;border-radius:10px;margin-left:8px}
+  .user-bar button{background:none;border:none;color:#ef4444;cursor:pointer;font-size:0.85rem;font-weight:500}
+  .card{background:#fff;border-radius:16px;padding:20px;margin-bottom:12px;box-shadow:0 2px 12px rgba(0,0,0,0.06);border:1px solid #e2e8f0}
+  .card h2{font-size:0.8rem;text-transform:uppercase;letter-spacing:1px;color:#94a3b8;margin-bottom:14px;font-weight:600}
+  .field{display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid #f1f5f9}
   .field:last-child{border-bottom:none}
-  .field-label{font-size:0.9rem;color:#64748b;font-weight:500}
-  .field-value{font-size:0.95rem;color:#1e293b;font-weight:600;text-align:right;max-width:60%}
-  .stage-badge{display:inline-block;padding:4px 12px;border-radius:20px;font-size:0.85rem;font-weight:600}
-  .stage-initiation{background:#dbeafe;color:#1e40af}
-  .stage-multiplication{background:#dcfce7;color:#166534}
-  .stage-rooting{background:#fef3c7;color:#92400e}
-  .stage-hardening{background:#fce7f3;color:#9d174d}
-  .stage-stock{background:#e0e7ff;color:#3730a3}
-  .raw{background:#f8fafc;border-radius:12px;padding:16px;margin-top:8px}
-  .raw-label{font-size:0.75rem;color:#94a3b8;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px}
-  .raw-value{font-family:'SF Mono',Monaco,Consolas,monospace;font-size:0.8rem;color:#475569;word-break:break-all;line-height:1.5}
-  .brand{text-align:center;margin-top:24px;padding:16px 0;font-size:0.8rem;color:#94a3b8}
+  .field-label{font-size:0.85rem;color:#64748b;font-weight:500;min-width:35%}
+  .field-value{font-size:0.9rem;color:#1e293b;font-weight:600;text-align:right;max-width:60%;word-break:break-word}
+  .badge{display:inline-block;padding:3px 10px;border-radius:20px;font-size:0.8rem;font-weight:600}
+  .b-initiation{background:#dbeafe;color:#1e40af}
+  .b-multiplication{background:#dcfce7;color:#166534}
+  .b-rooting{background:#fef3c7;color:#92400e}
+  .b-hardening{background:#fce7f3;color:#9d174d}
+  .b-stock{background:#e0e7ff;color:#3730a3}
+  .btn{display:block;width:100%;padding:14px;border:none;border-radius:12px;font-size:0.95rem;font-weight:600;cursor:pointer;text-align:center;margin-bottom:10px;transition:all 0.2s}
+  .btn-ms{background:#2563eb;color:#fff}.btn-ms:hover{background:#1d4ed8}
+  .btn-link{background:#f0fdf4;color:#166534;border:1px solid #bbf7d0}.btn-link:hover{background:#dcfce7}
+  .btn-edit{background:#7c3aed;color:#fff}.btn-edit:hover{background:#6d28d9}
+  .btn-save{background:#059669;color:#fff}.btn-save:hover{background:#047857}
+  .btn-cancel{background:#f1f5f9;color:#64748b}.btn-cancel:hover{background:#e2e8f0}
+  .btn-row{display:flex;gap:8px}.btn-row .btn{flex:1}
+  .edit-field{width:100%;padding:8px 12px;border:2px solid #e2e8f0;border-radius:8px;font-size:0.9rem;font-family:inherit;transition:border-color 0.2s}
+  .edit-field:focus{outline:none;border-color:#7c3aed}
+  select.edit-field{background:#fff}
+  textarea.edit-field{resize:vertical;min-height:60px}
+  .loading{text-align:center;padding:40px;color:#94a3b8}
+  .loading .spinner{display:inline-block;width:32px;height:32px;border:3px solid #e2e8f0;border-top-color:#059669;border-radius:50%;animation:spin 0.8s linear infinite}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  .error-msg{background:#fef2f2;color:#dc2626;padding:12px 16px;border-radius:10px;font-size:0.85rem;margin-bottom:12px;text-align:center}
+  .success-msg{background:#f0fdf4;color:#059669;padding:12px 16px;border-radius:10px;font-size:0.85rem;margin-bottom:12px;text-align:center}
+  .raw{background:#f8fafc;border-radius:10px;padding:14px;margin-top:6px}
+  .raw-label{font-size:0.7rem;color:#94a3b8;text-transform:uppercase;letter-spacing:1px;margin-bottom:6px}
+  .raw-value{font-family:'SF Mono',Monaco,Consolas,monospace;font-size:0.75rem;color:#475569;word-break:break-all;line-height:1.5}
+  .brand{text-align:center;margin-top:20px;padding:12px 0;font-size:0.8rem;color:#94a3b8}
   .brand strong{color:#166534}
-  .timestamp{text-align:center;font-size:0.75rem;color:#cbd5e1;margin-top:8px}
+  .fade-in{animation:fadeIn 0.3s ease}
+  @keyframes fadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+  .hidden{display:none}
+  a.btn{text-decoration:none}
 </style>
 </head><body>
-<div class="container">
+<div class="wrap">
   <div class="header">
-    <div class="icon">🧬</div>
-    <h1>Container Specimen</h1>
-    <div class="id">#${escapeHtml(data.containerId)}</div>
+    <div class="logo">🐺</div>
+    <h1>LoneWolf Biotech</h1>
+    <div class="cid">#${containerId}</div>
   </div>
 
-  <div class="card">
+  <!-- User bar (shown when authenticated) -->
+  <div id="userBar" class="user-bar hidden">
+    <div><span class="name" id="userName"></span><span id="adminBadge" class="admin-badge hidden">Admin</span></div>
+    <button onclick="signOut()">Sign out</button>
+  </div>
+
+  <!-- Status messages -->
+  <div id="errorMsg" class="error-msg hidden"></div>
+  <div id="successMsg" class="success-msg hidden"></div>
+
+  <!-- Tier 1: Basic info (always shown) -->
+  <div id="basicCard" class="card">
     <h2>Specimen Details</h2>
     ${fields.map(f => `<div class="field">
-      <span class="field-label">${f.label}</span>
-      <span class="field-value${f.badgeClass ? ' stage-badge ' + f.badgeClass : ''}">${escapeHtml(f.value)}</span>
+      <span class="field-label">${escapeHtml(f.label)}</span>
+      <span class="field-value${f.badgeClass ? ' badge ' + f.badgeClass.replace('stage-', 'b-') : ''}">${escapeHtml(f.value)}</span>
     </div>`).join('\n    ')}
+  </div>
+
+  <!-- Tier 2: Full details (shown after auth) -->
+  <div id="fullCard" class="card hidden fade-in">
+    <h2>Full Container Record</h2>
+    <div id="fullFields"></div>
+  </div>
+
+  <!-- Edit panel (Tier 3 - admin only) -->
+  <div id="editCard" class="card hidden fade-in">
+    <h2>Edit Container</h2>
+    <div id="editFields"></div>
+    <div class="btn-row" style="margin-top:16px">
+      <button class="btn btn-cancel" onclick="cancelEdit()">Cancel</button>
+      <button class="btn btn-save" id="saveBtn" onclick="saveChanges()">Save Changes</button>
+    </div>
+  </div>
+
+  <!-- Loading state -->
+  <div id="loadingState" class="loading hidden">
+    <div class="spinner"></div>
+    <p style="margin-top:12px">Loading container data…</p>
+  </div>
+
+  <!-- Actions -->
+  <div id="actions">
+    <button class="btn btn-ms" id="signInBtn" onclick="signIn()">🔐 Sign in with Microsoft</button>
+    <button class="btn btn-edit hidden" id="editBtn" onclick="startEdit()">✏️ Edit Container</button>
+    ${workbookLink ? `<a class="btn btn-link" href="${escapeHtml(workbookLink)}" target="_blank">📊 Open in HQ Workbook</a>` : ''}
   </div>
 
   <div class="card">
@@ -399,8 +465,229 @@ function renderScanPage(data, error) {
   </div>
 
   <div class="brand">🐺 <strong>LoneWolf Biotech</strong> Lab Tracker</div>
-  <div class="timestamp">Registered ${data.createdAt ? new Date(data.createdAt).toLocaleDateString('en-US', {year:'numeric',month:'long',day:'numeric'}) : 'N/A'}</div>
 </div>
+
+<script>
+(function() {
+  const CONTAINER_ID = ${JSON.stringify(data.containerId)};
+  const API_BASE = window.location.origin;
+
+  // MSAL config
+  const msalConfig = {
+    auth: {
+      clientId: 'c5fd0c6d-55ab-46ac-aa66-af2befec9560',
+      authority: 'https://login.microsoftonline.com/a1b92892-5ecd-4f98-ae48-e552b6767726',
+      redirectUri: window.location.origin + window.location.pathname
+    },
+    cache: { cacheLocation: 'sessionStorage', storeAuthStateInCookie: false }
+  };
+
+  const msalApp = new msal.PublicClientApplication(msalConfig);
+  const loginRequest = { scopes: ['User.Read', 'Files.Read.All', 'Files.ReadWrite.All'] };
+
+  let currentAccount = null;
+  let currentToken = null;
+  let fullData = null;
+  let isAdmin = false;
+
+  // Check if already logged in
+  const accounts = msalApp.getAllAccounts();
+  if (accounts.length > 0) {
+    currentAccount = accounts[0];
+    acquireTokenSilent();
+  }
+
+  function show(id) { document.getElementById(id).classList.remove('hidden'); }
+  function hide(id) { document.getElementById(id).classList.add('hidden'); }
+  function showError(msg) { const el = document.getElementById('errorMsg'); el.textContent = msg; show('errorMsg'); setTimeout(() => hide('errorMsg'), 6000); }
+  function showSuccess(msg) { const el = document.getElementById('successMsg'); el.textContent = msg; show('successMsg'); setTimeout(() => hide('successMsg'), 4000); }
+
+  function esc(s) { const d = document.createElement('div'); d.textContent = s || ''; return d.innerHTML; }
+
+  function stageBadgeClass(stage) {
+    const s = (stage || '').toLowerCase();
+    if (s.includes('multi')) return 'b-multiplication';
+    if (s.includes('init')) return 'b-initiation';
+    if (s.includes('root')) return 'b-rooting';
+    if (s.includes('hard')) return 'b-hardening';
+    if (s.includes('stock')) return 'b-stock';
+    return '';
+  }
+
+  async function acquireTokenSilent() {
+    try {
+      const resp = await msalApp.acquireTokenSilent({ ...loginRequest, account: currentAccount });
+      currentToken = resp.accessToken;
+      onAuthenticated(currentAccount);
+    } catch (e) {
+      // Silent failed, user needs to sign in interactively
+      console.log('Silent token failed:', e);
+    }
+  }
+
+  window.signIn = async function() {
+    try {
+      const resp = await msalApp.loginPopup(loginRequest);
+      currentAccount = resp.account;
+      currentToken = resp.accessToken;
+      onAuthenticated(currentAccount);
+    } catch (e) {
+      if (e.errorCode !== 'user_cancelled') showError('Sign-in failed: ' + (e.message || e));
+    }
+  };
+
+  window.signOut = function() {
+    msalApp.logoutPopup({ account: currentAccount }).catch(() => {});
+    currentAccount = null; currentToken = null; fullData = null; isAdmin = false;
+    hide('userBar'); hide('fullCard'); hide('editCard'); hide('editBtn'); hide('adminBadge');
+    show('signInBtn');
+  };
+
+  async function onAuthenticated(account) {
+    hide('signInBtn');
+    document.getElementById('userName').textContent = account.name || account.username;
+    show('userBar');
+
+    // Fetch full details
+    show('loadingState');
+    try {
+      const res = await fetch(API_BASE + '/api/container/' + encodeURIComponent(CONTAINER_ID) + '/details', {
+        headers: { 'Authorization': 'Bearer ' + currentToken }
+      });
+      hide('loadingState');
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        showError(err.error || 'Failed to load details (HTTP ' + res.status + ')');
+        return;
+      }
+
+      const json = await res.json();
+      fullData = json.data;
+      renderFullDetails(fullData);
+      show('fullCard');
+
+      // Check admin via /me (backend does the real check, this is just for UI)
+      checkAdmin(account);
+    } catch (e) {
+      hide('loadingState');
+      showError('Network error: ' + e.message);
+    }
+  }
+
+  function checkAdmin(account) {
+    // Simple UI hint: check email pattern. Real admin check happens on backend.
+    fetch('https://graph.microsoft.com/v1.0/me', { headers: { 'Authorization': 'Bearer ' + currentToken } })
+      .then(r => r.json())
+      .then(me => {
+        const email = (me.mail || me.userPrincipalName || '').toLowerCase();
+        // We can't know ADMIN_EMAILS client-side, so show edit for all authenticated users
+        // The backend will reject non-admins. But we optimistically show the button.
+        // A smarter approach: try a preflight or add an /api/me/role endpoint
+        isAdmin = true; // optimistic — backend enforces
+        show('editBtn');
+        show('adminBadge');
+      }).catch(() => {});
+  }
+
+  const DISPLAY_ORDER = ['Container_ID','Strain','Owner','Stage','Location','Media_Type','Date_Created','Date_Modified','Notes','Contamination_Status','Transfer_Count','Parent_Container'];
+
+  function renderFullDetails(data) {
+    const container = document.getElementById('fullFields');
+    // Order: known fields first, then any extras
+    const shown = new Set();
+    let html = '';
+    for (const key of DISPLAY_ORDER) {
+      if (data[key] !== undefined) {
+        shown.add(key);
+        html += renderField(key, data[key]);
+      }
+    }
+    for (const [key, val] of Object.entries(data)) {
+      if (!shown.has(key) && val) {
+        html += renderField(key, val);
+      }
+    }
+    container.innerHTML = html;
+  }
+
+  function renderField(key, val) {
+    const label = key.replace(/_/g, ' ');
+    const isStage = key === 'Stage';
+    const bc = isStage ? stageBadgeClass(val) : '';
+    return '<div class="field"><span class="field-label">' + esc(label) + '</span><span class="field-value' + (bc ? ' badge ' + bc : '') + '">' + esc(val) + '</span></div>';
+  }
+
+  const EDITABLE = {
+    'Location': 'text',
+    'Stage': 'select',
+    'Notes': 'textarea',
+    'Contamination_Status': 'select'
+  };
+  const STAGE_OPTIONS = ['Initiation','Multiplication','Rooting','Hardening','Stock'];
+  const CONTAM_OPTIONS = ['Clean','Suspected','Confirmed','Treated','Discarded'];
+
+  window.startEdit = function() {
+    if (!fullData) return;
+    let html = '';
+    for (const [field, type] of Object.entries(EDITABLE)) {
+      const val = fullData[field] || '';
+      const label = field.replace(/_/g, ' ');
+      html += '<div style="margin-bottom:14px"><label style="display:block;font-size:0.8rem;color:#64748b;margin-bottom:4px;font-weight:500">' + esc(label) + '</label>';
+      if (type === 'select') {
+        const opts = field === 'Stage' ? STAGE_OPTIONS : CONTAM_OPTIONS;
+        html += '<select class="edit-field" data-field="' + field + '">' + opts.map(o => '<option' + (o === val ? ' selected' : '') + '>' + esc(o) + '</option>').join('') + '</select>';
+      } else if (type === 'textarea') {
+        html += '<textarea class="edit-field" data-field="' + field + '">' + esc(val) + '</textarea>';
+      } else {
+        html += '<input class="edit-field" data-field="' + field + '" value="' + esc(val) + '">';
+      }
+      html += '</div>';
+    }
+    document.getElementById('editFields').innerHTML = html;
+    show('editCard');
+    hide('editBtn');
+  };
+
+  window.cancelEdit = function() {
+    hide('editCard');
+    show('editBtn');
+  };
+
+  window.saveChanges = async function() {
+    const updates = {};
+    document.querySelectorAll('.edit-field').forEach(el => {
+      const field = el.dataset.field;
+      const newVal = el.value.trim();
+      if (fullData[field] !== newVal) updates[field] = newVal;
+    });
+    if (Object.keys(updates).length === 0) { showError('No changes to save'); return; }
+
+    const btn = document.getElementById('saveBtn');
+    btn.disabled = true; btn.textContent = 'Saving…';
+
+    try {
+      const res = await fetch(API_BASE + '/api/container/' + encodeURIComponent(CONTAINER_ID), {
+        method: 'PUT',
+        headers: { 'Authorization': 'Bearer ' + currentToken, 'Content-Type': 'application/json' },
+        body: JSON.stringify(updates)
+      });
+      const json = await res.json();
+      if (!res.ok) { showError(json.error || 'Save failed'); return; }
+
+      fullData = json.data;
+      renderFullDetails(fullData);
+      hide('editCard');
+      show('editBtn');
+      showSuccess('Container updated successfully ✓');
+    } catch (e) {
+      showError('Network error: ' + e.message);
+    } finally {
+      btn.disabled = false; btn.textContent = 'Save Changes';
+    }
+  };
+})();
+</script>
 </body></html>`;
 }
 
@@ -731,6 +1018,221 @@ app.post('/api/print/zpl', async (req, res) => {
             error: 'Failed to print',
             message: error.message
         });
+    }
+});
+
+// ============================================================
+// Container Details API (Graph API proxy for scan page)
+// ============================================================
+
+/**
+ * Extract Bearer token from Authorization header
+ */
+function extractBearerToken(req) {
+    const auth = req.headers.authorization;
+    if (auth && auth.startsWith('Bearer ')) return auth.slice(7);
+    return null;
+}
+
+/**
+ * GET /api/container/:containerId/details
+ * Proxy: uses caller's access token to read Active_Inventory from HQ workbook
+ */
+app.get('/api/container/:containerId/details', async (req, res) => {
+    try {
+        const token = extractBearerToken(req);
+        if (!token) return res.status(401).json({ error: 'Bearer token required' });
+
+        const { containerId } = req.params;
+        if (!containerId || containerId.length > 200) {
+            return res.status(400).json({ error: 'Invalid containerId' });
+        }
+
+        // Parse workbook info from SHAREPOINT_WORKBOOK_URL
+        // We need the driveItem id from the sourcedoc param
+        const spUrl = process.env.SHAREPOINT_WORKBOOK_URL || '';
+        const sourcedocMatch = spUrl.match(/sourcedoc=%7B([^%}]+)%7D/i) || spUrl.match(/sourcedoc=\{([^}]+)\}/i);
+        if (!sourcedocMatch) {
+            return res.status(500).json({ error: 'SHAREPOINT_WORKBOOK_URL not configured properly' });
+        }
+        const itemId = sourcedocMatch[1];
+
+        // Determine drive path — the URL contains the user's OneDrive path
+        const personalMatch = spUrl.match(/personal\/([^/]+)/);
+        if (!personalMatch) {
+            return res.status(500).json({ error: 'Cannot parse SharePoint user from URL' });
+        }
+        const driveUser = personalMatch[1].replace(/_/g, '.').replace(/\.lonewolfgenetics\.com$/, '@lonewolfgenetics.com');
+
+        // Use Graph API to read the worksheet
+        const graphBase = `https://graph.microsoft.com/v1.0`;
+        // Try using the shared item approach via driveItem id
+        // First get the used range of Active_Inventory sheet
+        const sheetName = 'Active_Inventory';
+        
+        // Use sites/drives approach - call with user's token
+        // For personal OneDrive files, use /users/{email}/drive/items/{id}
+        const rangeUrl = `${graphBase}/users/${encodeURIComponent(driveUser)}/drive/items/${itemId}/workbook/worksheets('${sheetName}')/usedRange`;
+
+        const graphRes = await fetch(rangeUrl, {
+            headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' }
+        });
+
+        if (!graphRes.ok) {
+            const errText = await graphRes.text();
+            console.error('Graph API error:', graphRes.status, errText);
+            return res.status(graphRes.status === 401 ? 401 : 502).json({
+                error: graphRes.status === 401 ? 'Token expired or insufficient permissions' : 'Failed to read workbook',
+                details: process.env.NODE_ENV !== 'production' ? errText : undefined
+            });
+        }
+
+        const rangeData = await graphRes.json();
+        const rows = rangeData.values || [];
+        if (rows.length < 2) {
+            return res.status(404).json({ error: 'No data in worksheet' });
+        }
+
+        // First row is headers
+        const headers = rows[0].map(h => String(h || '').trim());
+        const containerIdCol = headers.findIndex(h => h.toLowerCase().replace(/[_\s]/g, '') === 'containerid');
+        if (containerIdCol === -1) {
+            return res.status(500).json({ error: 'Container_ID column not found in worksheet' });
+        }
+
+        // Find matching row
+        const matchIdx = rows.findIndex((row, i) => i > 0 && String(row[containerIdCol] || '').trim() === containerId);
+        if (matchIdx === -1) {
+            return res.status(404).json({ error: 'Container not found in workbook' });
+        }
+
+        // Build object from headers + row
+        const rowData = {};
+        headers.forEach((h, i) => {
+            if (h) rowData[h] = rows[matchIdx][i] != null ? String(rows[matchIdx][i]) : '';
+        });
+
+        res.json({ success: true, data: rowData, rowIndex: matchIdx });
+    } catch (error) {
+        console.error('Container details error:', error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
+/**
+ * PUT /api/container/:containerId
+ * Admin-only: update fields in the HQ workbook
+ */
+app.put('/api/container/:containerId', async (req, res) => {
+    try {
+        const token = extractBearerToken(req);
+        if (!token) return res.status(401).json({ error: 'Bearer token required' });
+
+        const { containerId } = req.params;
+        const updates = req.body;
+        if (!updates || typeof updates !== 'object' || Object.keys(updates).length === 0) {
+            return res.status(400).json({ error: 'No updates provided' });
+        }
+
+        // Allowed editable fields
+        const editableFields = ['Location', 'Stage', 'Notes', 'Contamination_Status'];
+        const invalidFields = Object.keys(updates).filter(k => !editableFields.includes(k));
+        if (invalidFields.length > 0) {
+            return res.status(400).json({ error: `Non-editable fields: ${invalidFields.join(', ')}` });
+        }
+
+        // Check admin status via /me
+        const meRes = await fetch('https://graph.microsoft.com/v1.0/me', {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (!meRes.ok) return res.status(401).json({ error: 'Invalid token' });
+        const meData = await meRes.json();
+        const userEmail = (meData.mail || meData.userPrincipalName || '').toLowerCase();
+
+        const adminEmails = (process.env.ADMIN_EMAILS || '').split(',').map(e => e.trim().toLowerCase()).filter(Boolean);
+        if (!adminEmails.includes(userEmail)) {
+            return res.status(403).json({ error: 'Admin access required' });
+        }
+
+        // Parse workbook info
+        const spUrl = process.env.SHAREPOINT_WORKBOOK_URL || '';
+        const sourcedocMatch = spUrl.match(/sourcedoc=%7B([^%}]+)%7D/i) || spUrl.match(/sourcedoc=\{([^}]+)\}/i);
+        const personalMatch = spUrl.match(/personal\/([^/]+)/);
+        if (!sourcedocMatch || !personalMatch) {
+            return res.status(500).json({ error: 'SHAREPOINT_WORKBOOK_URL not configured' });
+        }
+        const itemId = sourcedocMatch[1];
+        const driveUser = personalMatch[1].replace(/_/g, '.').replace(/\.lonewolfgenetics\.com$/, '@lonewolfgenetics.com');
+
+        const graphBase = 'https://graph.microsoft.com/v1.0';
+        const sheetName = 'Active_Inventory';
+
+        // Read current data to find row and column indices
+        const rangeUrl = `${graphBase}/users/${encodeURIComponent(driveUser)}/drive/items/${itemId}/workbook/worksheets('${sheetName}')/usedRange`;
+        const rangeRes = await fetch(rangeUrl, {
+            headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' }
+        });
+        if (!rangeRes.ok) {
+            return res.status(502).json({ error: 'Failed to read workbook' });
+        }
+
+        const rangeData = await rangeRes.json();
+        const rows = rangeData.values || [];
+        const headers = rows[0].map(h => String(h || '').trim());
+        const containerIdCol = headers.findIndex(h => h.toLowerCase().replace(/[_\s]/g, '') === 'containerid');
+        if (containerIdCol === -1) return res.status(500).json({ error: 'Container_ID column not found' });
+
+        const matchIdx = rows.findIndex((row, i) => i > 0 && String(row[containerIdCol] || '').trim() === containerId);
+        if (matchIdx === -1) return res.status(404).json({ error: 'Container not found' });
+
+        // Update each field individually via cell address
+        const startAddress = rangeData.address || '';
+        // address is like 'Active_Inventory!A1:Z100' — extract the sheet reference
+        for (const [field, value] of Object.entries(updates)) {
+            const colIdx = headers.indexOf(field);
+            if (colIdx === -1) continue;
+
+            // Convert column index to letter (A, B, ..., Z, AA, ...)
+            const colLetter = colIdx < 26 ? String.fromCharCode(65 + colIdx) : 'A' + String.fromCharCode(65 + colIdx - 26);
+            const cellAddress = `${colLetter}${matchIdx + 1}`; // +1 because Excel is 1-indexed
+
+            const cellUrl = `${graphBase}/users/${encodeURIComponent(driveUser)}/drive/items/${itemId}/workbook/worksheets('${sheetName}')/range(address='${cellAddress}')`;
+            const cellRes = await fetch(cellUrl, {
+                method: 'PATCH',
+                headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+                body: JSON.stringify({ values: [[String(value)]] })
+            });
+            if (!cellRes.ok) {
+                const errText = await cellRes.text();
+                console.error(`Failed to update ${field} at ${cellAddress}:`, errText);
+            }
+        }
+
+        // Also update Date_Modified if it exists
+        const dateModCol = headers.findIndex(h => h.toLowerCase().replace(/[_\s]/g, '') === 'datemodified');
+        if (dateModCol !== -1) {
+            const colLetter = dateModCol < 26 ? String.fromCharCode(65 + dateModCol) : 'A' + String.fromCharCode(65 + dateModCol - 26);
+            const cellUrl = `${graphBase}/users/${encodeURIComponent(driveUser)}/drive/items/${itemId}/workbook/worksheets('${sheetName}')/range(address='${colLetter}${matchIdx + 1}')`;
+            await fetch(cellUrl, {
+                method: 'PATCH',
+                headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+                body: JSON.stringify({ values: [[new Date().toISOString().split('T')[0]]] })
+            }).catch(() => {});
+        }
+
+        // Return updated data
+        const rowData = {};
+        headers.forEach((h, i) => {
+            if (h) rowData[h] = rows[matchIdx][i] != null ? String(rows[matchIdx][i]) : '';
+        });
+        // Apply the updates to the response
+        Object.assign(rowData, updates);
+        if (dateModCol !== -1) rowData[headers[dateModCol]] = new Date().toISOString().split('T')[0];
+
+        res.json({ success: true, data: rowData, updatedBy: userEmail });
+    } catch (error) {
+        console.error('Container update error:', error);
+        res.status(500).json({ error: 'Internal server error' });
     }
 });
 
