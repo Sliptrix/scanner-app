@@ -460,9 +460,9 @@ window.QRCodeService = {
     async getNextId() {
         const headers = {};
         // Send auth token so backend can query HQ workbook
-        if (window.authManager && typeof authManager.getAccessToken === 'function') {
+        if (window.AuthManager && typeof AuthManager.getAccessToken === 'function') {
             try {
-                const token = await authManager.getAccessToken();
+                const token = await AuthManager.getAccessToken();
                 if (token) headers['Authorization'] = `Bearer ${token}`;
             } catch (e) {
                 console.warn('Could not get auth token for next-id query:', e);
@@ -479,9 +479,9 @@ window.QRCodeService = {
     async generatePoolBatch(count, prefix, onProgress, startId) {
         const headers = { 'Content-Type': 'application/json' };
         // Send auth token so backend can query HQ workbook for next ID
-        if (window.authManager && typeof authManager.getAccessToken === 'function') {
+        if (window.AuthManager && typeof AuthManager.getAccessToken === 'function') {
             try {
-                const token = await authManager.getAccessToken();
+                const token = await AuthManager.getAccessToken();
                 if (token) headers['Authorization'] = `Bearer ${token}`;
             } catch (e) {
                 console.warn('Could not get auth token for pool generation:', e);
