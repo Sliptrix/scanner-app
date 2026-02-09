@@ -585,6 +585,15 @@ window.ContainerInitiator = (function() {
             return;
         }
         
+        // Safety: if input is purely numeric and we're not on QR step,
+        // it's likely a container ID that should be processed as QR first
+        if (currentStep !== 'qr' && inputValue && /^\d+$/.test(inputValue) && !StateManager.getState('initiatorState.qrShortCode')) {
+            console.warn(`⚠️ Numeric input "${inputValue}" on step "${currentStep}" without QR set — redirecting to QR step`);
+            StateManager.setState('initiatorState.currentStep', 'qr');
+            await processQrInput();
+            return;
+        }
+        
         switch (currentStep) {
             case 'qr':
                 console.log('Processing QR scan input...');

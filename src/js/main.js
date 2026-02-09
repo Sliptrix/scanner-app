@@ -2059,6 +2059,20 @@ function assignPoolCodeFromView(shortCode) {
 
     // Show the step wizard, pre-fill, and trigger processing
     setTimeout(() => {
+        // CRITICAL: Reset initiator to QR step before processing
+        // Without this, the shortCode gets processed as an owner/strain instead of QR input
+        if (window.StateManager) {
+            StateManager.setState('initiatorState.currentStep', 'qr');
+            StateManager.setState('initiatorState.owner', null);
+            StateManager.setState('initiatorState.strain', null);
+            StateManager.setState('initiatorState.media', null);
+            StateManager.setState('initiatorState.stage', null);
+            StateManager.setState('initiatorState.tissue', null);
+            StateManager.setState('initiatorState.date', null);
+            StateManager.setState('initiatorState.location', null);
+            StateManager.setState('initiatorState.completed', false);
+        }
+
         const wizard = document.getElementById('initiatorStepWizard');
         if (wizard) wizard.style.display = 'block';
 
