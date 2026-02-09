@@ -246,9 +246,11 @@
 /* ========================================
    STAT CARDS
    ======================================== */
-.stat-cards-grid {
+.stat-cards-grid,
+.stat-cards-container {
     display: grid;
     gap: 16px;
+    margin-bottom: 20px;
 }
 
 .stat-card {
@@ -381,6 +383,7 @@
     padding: 24px;
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
     border: 1px solid #e2e8f0;
+    min-height: 200px;
 }
 
 .analytics-section h3 {
@@ -391,6 +394,11 @@
     display: flex;
     align-items: center;
     gap: 8px;
+}
+
+/* Ensure chart containers inside analytics sections have proper height */
+.analytics-section .chart-container {
+    min-height: 150px;
 }
 
 /* Date Range Selector */

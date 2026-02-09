@@ -118,30 +118,35 @@ const DashboardManager = (function() {
         const container = document.getElementById('enhancedStatsContainer');
         if (!container) return;
 
+        // Safely access nested analytics data with defaults
+        const containers = analytics?.containers || { total: 0, tissueCount: 0 };
+        const transfers = analytics?.transfers || { total: 0, avgSplitRatio: 0 };
+        const trends = analytics?.trends || {};
+
         const stats = [
             {
                 label: 'Total Containers',
-                value: analytics.containers.total,
-                trend: analytics.trends.containers,
+                value: containers.total || 0,
+                trend: trends.containers,
                 icon: '📦',
                 color: '#10b981'
             },
             {
                 label: 'Total Tissues',
-                value: analytics.containers.tissueCount,
+                value: containers.tissueCount || 0,
                 icon: '🌱',
                 color: '#3b82f6'
             },
             {
                 label: 'Transfers',
-                value: analytics.transfers.total,
-                trend: analytics.trends.transfers,
+                value: transfers.total || 0,
+                trend: trends.transfers,
                 icon: '🔄',
                 color: '#8b5cf6'
             },
             {
                 label: 'Avg Split Ratio',
-                value: analytics.transfers.avgSplitRatio.toFixed(1),
+                value: (transfers.avgSplitRatio || 0).toFixed(1),
                 icon: '📊',
                 color: '#f59e0b'
             }
@@ -155,14 +160,14 @@ const DashboardManager = (function() {
         const container = document.getElementById('stageDistributionChart');
         if (!container) return;
 
-        const stages = analytics.containers.byStage;
+        const stages = analytics?.containers?.byStage || {};
         const labels = Object.keys(stages);
         const values = Object.values(stages);
 
         ChartRenderer.renderPieChart(container, { labels, values }, {
             title: 'Containers by Stage',
             donut: true,
-            centerText: analytics.containers.filtered,
+            centerText: analytics?.containers?.filtered || 0,
             centerLabel: 'Containers',
             onClick: (label) => filterInventoryByStage(label)
         });
@@ -173,7 +178,7 @@ const DashboardManager = (function() {
         const container = document.getElementById('transferTimelineChart');
         if (!container) return;
 
-        const daily = analytics.transfers.dailyTransfers;
+        const daily = analytics?.transfers?.dailyTransfers || {};
         const labels = Object.keys(daily).slice(-14); // Last 14 days
         const values = labels.map(d => daily[d] || 0);
 
@@ -190,7 +195,8 @@ const DashboardManager = (function() {
         const container = document.getElementById('activityHeatmapChart');
         if (!container) return;
 
-        ChartRenderer.renderHeatmap(container, analytics.activityHeatmap, {
+        const heatmapData = analytics?.activityHeatmap || { heatmap: [], dayLabels: [] };
+        ChartRenderer.renderHeatmap(container, heatmapData, {
             title: 'Activity by Day/Hour',
             showHourLabels: true
         });

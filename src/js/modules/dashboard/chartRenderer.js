@@ -40,6 +40,20 @@ window.ChartRenderer = (function() {
         if (!el) return;
 
         const { labels = [], values = [] } = data;
+        
+        // Handle empty data gracefully
+        const validValues = values.filter(v => typeof v === 'number' && !isNaN(v));
+        if (validValues.length === 0 || labels.length === 0) {
+            el.innerHTML = `<div class="chart-container bar-chart">
+                ${options.title ? `<div class="chart-title">${options.title}</div>` : ''}
+                <div class="chart-body" style="display: flex; align-items: center; justify-content: center; height: 150px; color: #94a3b8; flex-direction: column; gap: 12px;">
+                    <span style="font-size: 2.5rem;">📈</span>
+                    <span>No data available</span>
+                </div>
+            </div>`;
+            return;
+        }
+        
         const maxValue = Math.max(...values, 1);
         const maxBars = options.maxBars || 10;
         const horizontal = options.horizontal !== false;
@@ -100,6 +114,20 @@ window.ChartRenderer = (function() {
         if (!el) return;
 
         const { labels = [], values = [] } = data;
+        
+        // Handle empty data gracefully
+        const validValues = values.filter(v => typeof v === 'number' && !isNaN(v) && v > 0);
+        if (validValues.length === 0 || labels.length === 0) {
+            el.innerHTML = `<div class="chart-container pie-chart">
+                ${options.title ? `<div class="chart-title">${options.title}</div>` : ''}
+                <div class="chart-body" style="display: flex; align-items: center; justify-content: center; height: 200px; color: #94a3b8; flex-direction: column; gap: 12px;">
+                    <span style="font-size: 3rem;">📊</span>
+                    <span>No data available yet</span>
+                </div>
+            </div>`;
+            return;
+        }
+        
         const total = values.reduce((sum, v) => sum + v, 0);
         const colors = data.colors || COLORS.palette;
         const donut = options.donut !== false;
@@ -291,7 +319,21 @@ window.ChartRenderer = (function() {
         if (!el) return;
 
         const { heatmap = [], dayLabels = [] } = data;
-        const maxValue = Math.max(...heatmap.flat(), 1);
+        
+        // Handle empty or invalid data
+        if (!Array.isArray(heatmap) || heatmap.length === 0 || dayLabels.length === 0) {
+            el.innerHTML = `<div class="chart-container heatmap-chart">
+                ${options.title ? `<div class="chart-title">${options.title}</div>` : ''}
+                <div class="chart-body" style="display: flex; align-items: center; justify-content: center; height: 150px; color: #94a3b8; flex-direction: column; gap: 12px;">
+                    <span style="font-size: 2.5rem;">📅</span>
+                    <span>Activity data will appear here</span>
+                </div>
+            </div>`;
+            return;
+        }
+        
+        const flatValues = heatmap.flat().filter(v => typeof v === 'number' && !isNaN(v));
+        const maxValue = flatValues.length > 0 ? Math.max(...flatValues, 1) : 1;
 
         // Get intensity color
         function getColor(value) {

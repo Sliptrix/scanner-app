@@ -9,10 +9,15 @@
 
 /* Typography and Base Styles */
 body {
-    font-family: -apple-system, BlinkMacSystemFont, 'Segura UI', Roboto, sans-serif;
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
     min-height: 100vh;
-    padding: 20px;
+    /* Background and padding now handled by dashboard.css for sidebar layout */
+    /* Legacy gradient background only for non-sidebar views */
+}
+
+/* Login page gets the original gradient background */
+#loginPage {
+    background: linear-gradient(180deg, #1e293b 0%, #0f172a 100%);
 }
 
 /* Animation Keyframes */
