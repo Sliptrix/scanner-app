@@ -89,7 +89,7 @@ window.DataUtils = {
     validateInput: function(step, value) {
         const validationRules = {
             container: /^\d+$/,
-            owner: /^[A-Z]+$/i,
+            owner: /^[A-Za-z0-9]{1,10}$/,
             strain: /^\d{1,5}$/,
             media: /^[A-Z]+$/i,
             stage: /^[1-9]$/,
@@ -374,7 +374,7 @@ window.DataUtils = {
 
             data.forEach(row => {
                 // Try different column name variations (including HQ workbook format)
-                const ownerCode = row['Owner ID'] || row['Owner_ID'] || row['OwnerID'] || row['Owner Code'] || row['Owner_Code'] || row['owner_code'];
+                const ownerCode = row['Owner_Code'] || row['Owner Code'] || row['owner_code'] || row['Owner ID'] || row['Owner_ID'] || row['OwnerID'];
                 // FIX: Added 'Alternate_name' (singular) to match HQ workbook format
                 const alt1 = row['Alternate_names'] || row['Alternate_name'] || row['Alt1'] || row['Alternate1'] || row['alternate_name'];
                 const alt2 = row['Alt2'] || row['Alternate2'];
@@ -415,8 +415,12 @@ window.DataUtils = {
         if (!sheet) return;
         const data = this._sheetToJsonSmart(sheet, ['Owner ID', 'Owner_Code', 'Owner', 'Owner_Name']);
         data.forEach(row => {
-            const id = row['Owner ID'] || row['Owner_Code'] || row['OwnerID'];
-            const name = row['Owner'] || row['Owner_Name'] || row['OwnerName'];
+            // Prefer Owner_Code (alphabetic, e.g. "AP") over numeric Owner ID
+            // Barcode generator requires 1-3 letter codes
+            const code = row['Owner_Code'] || row['Owner Code'];
+            const numId = row['Owner ID'] || row['OwnerID'];
+            const id = code || numId;
+            const name = row['Owner'] || row['Owner_Name'] || row['OwnerName'] || row['Name'];
             if (id && name) {
                 window.appState.ownersTable[id] = name;
             }
@@ -579,7 +583,7 @@ window.DataUtils = {
         data.forEach(row => {
             // Try different possible column names
             const strainId = row['Strain ID'] || row['StrainID'] || row['Strain_ID'] || row['strain_id'];
-            const ownerId = row['Owner ID'] || row['OwnerID'] || row['Owner_ID'] || row['owner_id'] || row['Owner'];
+            const ownerId = row['Owner_Code'] || row['Owner Code'] || row['owner_code'] || row['Owner ID'] || row['OwnerID'] || row['Owner_ID'] || row['owner_id'] || row['Owner'];
             
             if (strainId && ownerId) {
                 const normalizedStrainId = parseInt(strainId).toString();
@@ -625,17 +629,17 @@ window.DataUtils = {
         // If still no data, use minimal demo data
         if (!window.appState.strainOwnerMapping || Object.keys(window.appState.strainOwnerMapping).length === 0) {
             window.appState.strainOwnerMapping = {
-                "1": "vibe",
-                "2": "vibe",
-                "3": "vibe",
-                "4": "vibe",
-                "5": "vibe",
-                "10": "vibe",
-                "13": "vibe",
+                "1": "VIBE",
+                "2": "VIBE",
+                "3": "VIBE",
+                "4": "VIBE",
+                "5": "VIBE",
+                "10": "VIBE",
+                "13": "VIBE",
                 "22": "LWB",
                 "23": "LWB",
-                "68": "beau",
-                "71": "jay"
+                "68": "BEAU",
+                "71": "JAY"
             };
         }
         
@@ -724,9 +728,9 @@ window.DataUtils = {
         window.appState.ownersTable = {
             "LW": "Luke Wilson",
             "JR": "John Doe",
-            "vibe": "Vibe Owner",
-            "beau": "Beau Owner",
-            "jay": "Jay Owner"
+            "VIBE": "Vibe Owner",
+            "BEAU": "Beau Owner",
+            "JAY": "Jay Owner"
         };
         
         // Set basic media types
@@ -738,9 +742,9 @@ window.DataUtils = {
         
         // Set strain-owner mapping
         window.appState.strainOwnerMapping = {
-            "1": "vibe",
-            "2": "vibe",
-            "13": "vibe",
+            "1": "VIBE",
+            "2": "VIBE",
+            "13": "VIBE",
             "22": "LW",
             "23": "LW"
         };
